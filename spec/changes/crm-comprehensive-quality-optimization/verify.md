@@ -95,3 +95,10 @@ conclusion: fail
 - `python scripts\manage.py stop --profile stable`：退出码 0；通过进程树中的项目路径识别后停止整棵服务进程树。
 - 停止后的 `python scripts\manage.py status --profile stable`：退出码 0，PID 不存在、端口未监听、锁文件已清理。
 - 单实例进程树校验第一次实现曾出现父 PID 自循环，已修复并通过 `python scripts\manage.py runtime-test --profile stable`；当前 `scripts/runtime/process_identity.py` 为 64 行。
+
+## Apply working evidence - 2026-08-23 19:40
+
+- `python scripts\manage.py dbstatus --profile stable`：退出码 0，MySQL 服务端口 `localhost:3306` 可达。
+- `python scripts\manage.py data-reachability --profile stable`：现在已执行真实 Prisma `SELECT 1`，退出码 1；错误为数据库服务器拒绝 `root` 凭据。
+- 连接结构检查显示 `.env.local` 的 `DATABASE_URL` 中 `@` 数量为 2。当前连接串存在未编码的额外 `@`，密码中的特殊字符应使用 URL 编码，例如 `@` 写成 `%40`；密码本身仍需使用 MySQL 实际密码，不能凭猜测替换。
+- 这次检查排除了“端口未开”和“脚本未连接 Prisma”两个误判，当前阻塞明确为 `DATABASE_URL` 凭据或格式错误。

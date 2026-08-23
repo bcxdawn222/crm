@@ -194,6 +194,8 @@ def main() -> int:
     except ValueError as error:
         print(f"profile 配置错误: {error}", file=sys.stderr)
         return 2
+    os.environ["CRM_PROFILE"] = profile.name
+    os.environ["DATABASE_URL"] = profile.database_url
     logger = configure_logger(args.action, profile)
     logger.info(
         "当前 profile=%s，数据库=%s:%s，应用端口=%s",

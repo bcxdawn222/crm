@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import socket
+import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -25,6 +26,27 @@ def _database_target() -> tuple[str, int]:
     return parsed.hostname, parsed.port or 3306
 
 
+def _run_prisma_probe() -> int:
+    executable = "npx.cmd" if os.name == "nt" else "npx"
+    result = subprocess.run(
+        [executable, "prisma", "db", "execute", "--stdin", "--schema", str(ROOT / "prisma" / "schema.prisma")],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        input="SELECT 1;\n",
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode == 0:
+        print("Prisma 数据库探针通过: SELECT 1")
+        return 0
+    details = (result.stderr or result.stdout).strip().splitlines()
+    safe_details = " | ".join(details[-4:]) if details else "未返回错误详情"
+    print(f"Prisma 数据库探针失败，退出码={result.returncode}: {safe_details}")
+    return 1
+
+
 def main() -> int:
     host, port = _database_target()
     try:
@@ -33,8 +55,7 @@ def main() -> int:
     except OSError as error:
         print(f"数据库不可达: {host}:{port}，{error}")
         return 1
-    print("数据可达性深度检查尚未连接 Prisma；当前仅完成数据库网络层检查")
-    return 2
+    return _run_prisma_probe()
 
 
 if __name__ == "__main__":
