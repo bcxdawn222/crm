@@ -68,3 +68,12 @@ conclusion: fail
 - `scripts/runtime/manager.py` 当前 278 行，进程识别逻辑位于 `scripts/runtime/process_identity.py`，57 行。
 - `python scripts\manage.py typecheck --profile stable`：退出码 0。
 - 11.2、11.3、11.4、11.5、11.6 尚未完全完成；当前没有启动真实服务做双启动、端口归属和 PM2/systemd 演练。
+
+## Apply working evidence - 2026-08-23 18:56
+
+- `/api/health` 现在支持浅检查和 `?deep=1` 深检查：返回 `status`、`profile`、`version`、`commit`、`uptimeSeconds`、数据库、存储和 `requestId`；深检查要求登录，健康检查不写入业务数据。
+- `/api/health` 已加入公开路由，避免监控探针被登录页重定向；数据库不可达时仍返回 HTTP `503` 和明确的 `degraded` 状态。
+- `python scripts\manage.py routes --profile stable`：退出码 0。
+- `python scripts\manage.py build --profile stable`：退出码 0。
+- `python scripts\manage.py typecheck --profile stable`：串行执行退出码 0。此前与 build 并发执行时因共享 `.next/types` 出现 `TS6053`，该结果归因于验证命令并发冲突，不是代码错误。
+- 迁移状态和真实 HTTP 健康探针尚未在数据库/服务进程可用环境下执行。

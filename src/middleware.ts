@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
 // 公开路由(不需要认证)
-const publicRoutes = ['/login', '/api/auth']
+const publicRoutes = ['/login', '/api/auth', '/api/health']
 
 // 路由权限映射
 const routePermissions: Record<string, string[]> = {
