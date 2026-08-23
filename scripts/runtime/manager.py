@@ -8,6 +8,7 @@ import subprocess
 import time
 from pathlib import Path
 
+from .process_identity import is_process_running, process_belongs_to_crm
 from .profile_config import ProfileConfig, validate_profile_isolated
 
 
@@ -19,23 +20,6 @@ DATABASE_PORT = 3306
 MYSQL_SERVICE_NAME = os.environ.get("CRM_MYSQL_SERVICE", "MySQL")
 MYSQL_BINARY = os.environ.get("CRM_MYSQL_BIN", "")
 MYSQL_CONFIG = os.environ.get("CRM_MYSQL_CONFIG", "")
-
-
-def is_process_running(pid: int) -> bool:
-    if os.name == "nt":
-        result = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        return result.returncode == 0 and f'"{pid}"' in result.stdout
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    return True
 
 
 def is_port_open(host: str, port: int) -> bool:
@@ -179,29 +163,51 @@ def _release_lock(config: ProfileConfig) -> None:
     config.lock_file.unlink(missing_ok=True)
 
 
+def _lock_pid(lock_file: Path) -> int | None:
+    if not lock_file.exists():
+        return None
+    for line in lock_file.read_text(encoding="utf-8", errors="replace").splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key == "pid" and value.isdigit():
+            return int(value)
+    return None
+
+
 def _acquire_lock(config: ProfileConfig, pid: int) -> None:
     try:
         handle = config.lock_file.open("x", encoding="utf-8")
     except FileExistsError as error:
-        raise RuntimeError(f"{config.name} profile 已有实例锁: {config.lock_file}") from error
+        existing_pid = _lock_pid(config.lock_file)
+        if existing_pid is not None and is_process_running(existing_pid):
+            raise RuntimeError(f"{config.name} profile 已有实例锁，PID={existing_pid}") from error
+        config.lock_file.unlink(missing_ok=True)
+        handle = config.lock_file.open("x", encoding="utf-8")
     with handle:
         handle.write(f"pid={pid}\nprofile={config.name}\nport={config.app_port}\nroot={ROOT}\n")
 
 
 def start_server(logger: logging.Logger, config: ProfileConfig) -> int:
     validate_profile_isolated(config)
+    try:
+        _acquire_lock(config, os.getpid())
+    except RuntimeError as error:
+        logger.error("%s", error)
+        return 1
+
     database_result = start_database(logger, config)
     if database_result != 0:
+        _release_lock(config)
         return database_result
     if config.pid_file.exists():
         pid_text = config.pid_file.read_text(encoding="ascii", errors="ignore").strip()
         if pid_text.isdigit() and is_process_running(int(pid_text)):
-            logger.error("%s profile 服务已在运行，PID=%s", config.name, pid_text)
+            logger.error("%s profile PID 文件指向正在运行的进程，拒绝启动，PID=%s", config.name, pid_text)
+            _release_lock(config)
             return 1
         config.pid_file.unlink(missing_ok=True)
-        _release_lock(config)
     if is_port_open(config.app_host, config.app_port):
         logger.error("端口 %s 已被占用，无法确认该进程属于当前项目", config.app_port)
+        _release_lock(config)
         return 1
 
     server_log_path = config.log_dir / "server.log"
@@ -210,22 +216,27 @@ def start_server(logger: logging.Logger, config: ProfileConfig) -> int:
     if os.name == "nt":
         creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
     npm_command = "npm.cmd" if os.name == "nt" else "npm"
-    process = subprocess.Popen(
-        [npm_command, "run", "dev", "--", "--hostname", config.app_host, "--port", str(config.app_port)],
-        cwd=ROOT,
-        env={
-            **os.environ,
-            "CRM_PROFILE": config.name,
-            "CRM_UPLOAD_DIR": str(config.upload_dir),
-            "DATABASE_URL": config.database_url,
-        },
-        stdout=server_log,
-        stderr=subprocess.STDOUT,
-        creationflags=creation_flags,
-        start_new_session=os.name != "nt",
-    )
+    try:
+        process = subprocess.Popen(
+            [npm_command, "run", "dev", "--", "--hostname", config.app_host, "--port", str(config.app_port)],
+            cwd=ROOT,
+            env={
+                **os.environ,
+                "CRM_PROFILE": config.name,
+                "CRM_UPLOAD_DIR": str(config.upload_dir),
+                "DATABASE_URL": config.database_url,
+            },
+            stdout=server_log,
+            stderr=subprocess.STDOUT,
+            creationflags=creation_flags,
+            start_new_session=os.name != "nt",
+        )
+    except OSError:
+        server_log.close()
+        _release_lock(config)
+        raise
     server_log.close()
-    _acquire_lock(config, process.pid)
+    config.lock_file.write_text(f"pid={process.pid}\nprofile={config.name}\nport={config.app_port}\nroot={ROOT}\n", encoding="utf-8")
     config.pid_file.write_text(str(process.pid), encoding="ascii")
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
@@ -257,6 +268,9 @@ def stop_server(logger: logging.Logger, config: ProfileConfig) -> int:
         return 1
     pid = int(pid_text)
     if is_process_running(pid):
+        if not process_belongs_to_crm(pid):
+            logger.error("PID=%s 不属于当前 CRM 项目，拒绝终止", pid)
+            return 1
         terminate_process_tree(pid)
         logger.info("%s profile 服务已停止，PID=%s", config.name, pid)
     config.pid_file.unlink(missing_ok=True)

@@ -59,3 +59,12 @@ conclusion: fail
 - `python scripts\manage.py build --profile stable`：退出码 0；构建输出仍为 Next.js `14.2.35`，首页 First Load JS 约 `623 kB`。
 - `python scripts\manage.py button-audit --profile stable`：退出码 0。
 - 9.5 仍未完全完成：其他页面尚未全部接入统一请求层，恢复网络后的只读数据重新拉取和长时间会话测试待后续实现。
+
+## Apply working evidence - 2026-08-23 18:53
+
+- 单实例锁已调整为服务启动前原子创建，锁内容包含 profile、PID、端口和项目根目录；陈旧锁可清理，活跃锁会拒绝第二次启动。
+- 停止服务前会读取进程命令行并确认其包含当前 CRM 项目根目录及 Node/Next/npm 标识；无法确认归属时拒绝终止，避免 PID 复用误杀其他进程。
+- `python scripts\manage.py runtime-test --profile stable`：退出码 0；临时目录中的同 profile 重复加锁测试通过。
+- `scripts/runtime/manager.py` 当前 278 行，进程识别逻辑位于 `scripts/runtime/process_identity.py`，57 行。
+- `python scripts\manage.py typecheck --profile stable`：退出码 0。
+- 11.2、11.3、11.4、11.5、11.6 尚未完全完成；当前没有启动真实服务做双启动、端口归属和 PM2/systemd 演练。
