@@ -41,7 +41,7 @@ const menuItems = [
     permission: 'report:view',
   },
   {
-    key: '/customers',
+    key: '/customer-management',
     icon: <TeamOutlined />,
     label: '客户管理',
     permission: 'customer:view',

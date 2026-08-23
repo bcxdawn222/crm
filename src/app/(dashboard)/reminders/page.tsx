@@ -13,6 +13,7 @@ import {
   CloseCircleOutlined
 } from '@ant-design/icons'
 import { apiRequest } from '@/lib/http/client'
+import { FollowUpModal } from '@/components/customers/follow-up-modal'
 
 interface ReminderItem {
   type: string
@@ -83,6 +84,7 @@ export default function RemindersPage() {
   const [disabledList, setDisabledList] = useState<DisabledCustomer[]>([])
   const [disableModalVisible, setDisableModalVisible] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<ReminderItem | null>(null)
+  const [followUpModalVisible, setFollowUpModalVisible] = useState(false)
   const [form] = Form.useForm()
 
   useEffect(() => {
@@ -120,8 +122,9 @@ export default function RemindersPage() {
     }
   }
 
-  const handleFollowUp = (customerId: string) => {
-    window.location.href = `/customers?id=${customerId}`
+  const handleFollowUp = (item: ReminderItem) => {
+    setSelectedCustomer(item)
+    setFollowUpModalVisible(true)
   }
 
   const handleDisableReminder = (item: ReminderItem) => {
@@ -185,7 +188,7 @@ export default function RemindersPage() {
             <Button 
               type="primary" 
               size="small"
-              onClick={() => handleFollowUp(item.customerId!)}
+              onClick={() => handleFollowUp(item)}
             >
               立即跟进
             </Button>
@@ -205,7 +208,7 @@ export default function RemindersPage() {
             <Button 
               type="primary" 
               size="small"
-              onClick={() => handleFollowUp(item.customerId!)}
+              onClick={() => handleFollowUp(item)}
             >
               联系续签
             </Button>
@@ -225,7 +228,7 @@ export default function RemindersPage() {
             <Button 
               type="primary" 
               size="small"
-              onClick={() => handleFollowUp(item.customerId!)}
+              onClick={() => handleFollowUp(item)}
             >
               查看计划
             </Button>
@@ -245,7 +248,7 @@ export default function RemindersPage() {
             <Button 
               type="primary" 
               size="small"
-              onClick={() => handleFollowUp(item.customerId!)}
+              onClick={() => handleFollowUp(item)}
             >
               开始跟进
             </Button>
@@ -540,6 +543,18 @@ export default function RemindersPage() {
         {/* Reminder List */}
         <Tabs items={tabs} activeKey={activeTab} onChange={setActiveTab} />
       </Card>
+
+      <FollowUpModal
+        open={followUpModalVisible}
+        customerId={selectedCustomer?.customerId}
+        customerName={selectedCustomer?.customerName}
+        plannedFollowUpId={selectedCustomer?.followUpId}
+        onClose={() => setFollowUpModalVisible(false)}
+        onSaved={() => {
+          setFollowUpModalVisible(false)
+          void fetchReminders()
+        }}
+      />
 
       {/* Disable Reminder Modal */}
       <Modal

@@ -5,6 +5,7 @@ import { Card, Table, Button, Space, Input, Select, Modal, Form, message, Tag, U
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ExportOutlined, UploadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { PermissionGuard } from '@/components/common/PermissionGuard'
+import { FollowUpModal } from '@/components/customers/follow-up-modal'
 import { apiRequest } from '@/lib/http/client'
 import { Resizable } from 'react-resizable'
 import 'react-resizable/css/styles.css'
@@ -75,6 +76,13 @@ interface Customer {
     orders: number
   }
   followUps?: Array<{
+    id?: string
+    type?: string
+    content?: string
+    result?: string | null
+    nextAction?: string | null
+    nextFollowUpAt?: string | null
+    status?: string
     createdAt: string
   }>
 }
@@ -92,6 +100,8 @@ export default function CustomersPage() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [importModalVisible, setImportModalVisible] = useState(false)
   const [focusedCustomerId, setFocusedCustomerId] = useState<string | null>(null)
+  const [followUpCustomer, setFollowUpCustomer] = useState<Customer | null>(null)
+  const [followUpModalVisible, setFollowUpModalVisible] = useState(false)
   const [form] = Form.useForm()
   const [uploading, setUploading] = useState(false)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
@@ -168,6 +178,18 @@ export default function CustomersPage() {
     }
     setModalVisible(true)
   }, [form])
+
+  const handleOpenFollowUp = (customer: Customer) => {
+    setModalVisible(false)
+    setFollowUpCustomer(customer)
+    setFollowUpModalVisible(true)
+  }
+
+  const handleFollowUpSaved = () => {
+    setFollowUpModalVisible(false)
+    setFollowUpCustomer(null)
+    void loadCustomers()
+  }
 
   useEffect(() => {
     if (!focusedCustomerId) return
@@ -679,7 +701,40 @@ export default function CustomersPage() {
             </Button>
           </Form.Item>
         </Form>
+        {editingCustomer && (
+          <div style={{ marginTop: 20, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <strong>跟进记录</strong>
+              <PermissionGuard action="create" subject="followUp">
+                <Button size="small" type="primary" onClick={() => handleOpenFollowUp(editingCustomer)}>
+                  新增跟进
+                </Button>
+              </PermissionGuard>
+            </div>
+            {editingCustomer.followUps && editingCustomer.followUps.length > 0 ? (
+              editingCustomer.followUps.map((followUp) => (
+                <div key={followUp.id || followUp.createdAt} style={{ padding: '8px 0', borderBottom: '1px solid #f5f5f5' }}>
+                  <div style={{ color: '#666', fontSize: 12 }}>
+                    {new Date(followUp.createdAt).toLocaleString('zh-CN')} · {followUp.type || '跟进'}
+                  </div>
+                  <div>{followUp.content || '已记录跟进'}</div>
+                  {followUp.nextAction && <div style={{ color: '#666', fontSize: 12 }}>下一步：{followUp.nextAction}</div>}
+                </div>
+              ))
+            ) : (
+              <div style={{ color: '#999' }}>暂无跟进记录</div>
+            )}
+          </div>
+        )}
       </Modal>
+
+      <FollowUpModal
+        open={followUpModalVisible}
+        customerId={followUpCustomer?.id}
+        customerName={followUpCustomer?.name}
+        onClose={() => setFollowUpModalVisible(false)}
+        onSaved={handleFollowUpSaved}
+      />
 
       {/* 客资录入弹窗 */}
       <Modal

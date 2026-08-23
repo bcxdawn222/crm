@@ -124,3 +124,13 @@ conclusion: fail
 - stable 回归：`data-reachability`、`typecheck`、`build`、`start`、`smoke`、`stop`、`status` 均退出码 0；构建输出仍为当前仓库已有的 Next.js 14.2.35，本轮没有执行框架升级。
 - 将回款列表的 Prisma 条件从 `any` 改为 `Prisma.PaymentWhereInput`，并将路由契约检查从 `scripts/manage.py` 拆出；Python 语法、路由检查、TypeScript 类型检查和生产构建均通过。
 - 当前未覆盖：跟进记录没有独立写入 Route Handler，文件、消息、导入、转移、公海、权限矩阵和 Playwright 按钮级全量验收仍不能宣称完成。
+
+## Apply working evidence - 2026-08-23 22:36
+
+- 新增 `POST /api/customers/:id/follow-ups`：校验跟进方式、内容、权限、客户数据范围和计划跟进状态；新增或完成跟进均与客户 `lastFollowUpAt`、`nextFollowUpAt` 更新放在同一事务，并写入 `AuditEvent`。
+- 客户页新增共享跟进弹窗和跟进记录展示；提醒中心的“立即跟进”“联系续签”“开始跟进”现在直接打开跟进表单，计划跟进会更新原记录为已完成并刷新提醒列表。
+- `python scripts\manage.py data-flow --profile test`：退出码 0；客户、跟进、订单、回款均写入并读回，数据库核对金额 `1000.00 / 250.00 / 750.00`，审计事件数量为 4，test 夹具已清理。
+- Playwright 真实浏览器验收：登录 test 服务后，从客户页新增客户、打开“新增跟进”、提交内容，页面列表立即显示跟进数为 1 和最近跟进时间；浏览器验收客户及跟进记录随后已清理。
+- `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build`：均退出码 0；构建产物包含 `/api/customers/[id]/follow-ups`。
+- 修复跟进弹窗的 Ant Design `destroyOnClose` 弃用警告，并修复侧边栏客户管理父菜单与子菜单重复 key。Playwright 环境在 Windows 上无法使用 Bash wrapper，因为系统未安装 WSL 发行版，改用同一 `@playwright/cli` 的 `npx` 入口完成验证。
+- 当前未覆盖：文件、消息、导入、转移、公海、权限矩阵和 Playwright 全量按钮验收仍不能宣称完成。

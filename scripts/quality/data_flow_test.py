@@ -119,6 +119,7 @@ def main() -> int:
     marker = uuid4().hex[:12]
     phone = f"139{marker[:8]}"
     customer_id: str | None = None
+    follow_up_id: str | None = None
     order_id: str | None = None
     payment_id: str | None = None
 
@@ -156,6 +157,28 @@ def main() -> int:
         customer_detail = json_body(request(opener, f"/api/customers/{customer_id}"))
         require(customer_detail.get("success") is True, "客户创建后无法读取详情")
         require(customer_detail["data"]["phone"] == phone, "客户详情未返回刚写入的电话")
+
+        follow_up_request_id = f"data-flow-follow-up-{marker}"
+        follow_up_result = request(
+            opener,
+            f"/api/customers/{customer_id}/follow-ups",
+            method="POST",
+            payload={
+                "type": "PHONE",
+                "content": "已电话沟通，客户确认继续推进",
+                "result": "客户有明确意向",
+                "nextAction": "发送方案并再次联系",
+                "nextFollowUpAt": (dt.date.today() + dt.timedelta(days=3)).isoformat(),
+            },
+            request_id=follow_up_request_id,
+        )
+        follow_up = json_body(follow_up_result)
+        require(follow_up.get("success") is True, f"跟进记录创建失败: {follow_up}")
+        follow_up_id = str(follow_up["data"]["id"])
+        require(
+            follow_up_result.headers.get("x-request-id") == follow_up_request_id,
+            "跟进响应缺少 x-request-id",
+        )
 
         order_request_id = f"data-flow-order-{marker}"
         order_result = request(
@@ -215,19 +238,32 @@ def main() -> int:
         audit_row = database_value(
             database_url,
             "SELECT COUNT(*) FROM AuditEvent WHERE entityId IN "
-            f"({sql_quote(customer_id)},{sql_quote(order_id)},{sql_quote(payment_id)})",
+            f"({sql_quote(customer_id)},{sql_quote(follow_up_id)},{sql_quote(order_id)},{sql_quote(payment_id)})",
         )
-        require(audit_row == "3", f"审计事件数量异常: {audit_row}")
-        print(f"业务数据核对通过，开始清理 test 夹具: customer={customer_id}, order={order_id}, payment={payment_id}")
+        require(audit_row == "4", f"审计事件数量异常: {audit_row}")
+        follow_up_row = database_value(
+            database_url,
+            f"SELECT COUNT(*) FROM FollowUp WHERE id={sql_quote(follow_up_id)} AND customerId={sql_quote(customer_id)}",
+        )
+        require(follow_up_row == "1", "数据库未找到刚创建的跟进记录")
+        print(
+            "业务数据核对通过，开始清理 test 夹具: "
+            f"customer={customer_id}, followUp={follow_up_id}, order={order_id}, payment={payment_id}"
+        )
         return 0
     finally:
-        entity_ids = [value for value in (customer_id, order_id, payment_id) if value]
+        entity_ids = [value for value in (customer_id, follow_up_id, order_id, payment_id) if value]
         cleanup = [
             f"DELETE FROM AuditEvent WHERE entityId IN ({','.join(sql_quote(value) for value in entity_ids)})"
         ] if entity_ids else []
         cleanup.extend(
             f"DELETE FROM {table} WHERE id={sql_quote(value)}"
-            for table, value in (("`Payment`", payment_id), ("`Order`", order_id), ("`Customer`", customer_id))
+            for table, value in (
+                ("`Payment`", payment_id),
+                ("`Order`", order_id),
+                ("`FollowUp`", follow_up_id),
+                ("`Customer`", customer_id),
+            )
             if value
         )
         for sql in cleanup:
