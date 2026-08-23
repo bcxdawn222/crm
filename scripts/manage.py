@@ -12,14 +12,14 @@ from typing import Sequence
 
 sys.dont_write_bytecode = True
 
-from runtime_manager import (
+from runtime.manager import (
     is_port_open,
     start_database,
     start_server,
     stop_server,
     stop_database_direct,
 )
-from profile_config import ProfileConfig, get_profile_config
+from runtime.profile_config import ProfileConfig, get_profile_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -174,6 +174,7 @@ def main() -> int:
             "instance-status",
             "button-audit",
             "data-reachability",
+            "runtime-test",
             "e2e",
             "perf",
             "release",
@@ -265,11 +266,14 @@ def main() -> int:
             (("audit-data", command),), logger
         )
     if args.action == "button-audit":
-        command = [sys.executable, str(ROOT / "scripts" / "button_audit.py")]
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "button_audit.py")]
         return run_sequence((("button-audit", command),), logger)
     if args.action == "data-reachability":
-        command = [sys.executable, str(ROOT / "scripts" / "data_reachability.py")]
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "data_reachability.py")]
         return run_sequence((("data-reachability", command),), logger)
+    if args.action == "runtime-test":
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "runtime_checks.py")]
+        return run_sequence((("runtime-test", command),), logger)
     if args.action in {"e2e", "perf", "release", "promote", "rollback"}:
         logger.error("动作已登记但尚未实现: %s", args.action)
         return 3

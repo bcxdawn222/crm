@@ -1,6 +1,8 @@
 import type { Prisma } from '@prisma/client'
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 import { auth } from '@/lib/auth'
 import { parsePagination } from '@/lib/http/pagination'
 import { prisma } from '@/lib/prisma'

@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _database_target() -> tuple[str, int]:

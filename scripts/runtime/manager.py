@@ -8,10 +8,10 @@ import subprocess
 import time
 from pathlib import Path
 
-from profile_config import ProfileConfig, validate_profile_isolated
+from .profile_config import ProfileConfig, validate_profile_isolated
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MYSQL_PID_FILE = ROOT / "logs" / "mysql.pid"
 MYSQL_SERVER_LOG = ROOT / "logs" / "mysql-server.log"
 DATABASE_HOST = "127.0.0.1"
