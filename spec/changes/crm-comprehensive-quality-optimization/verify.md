@@ -77,3 +77,11 @@ conclusion: fail
 - `python scripts\manage.py build --profile stable`：退出码 0。
 - `python scripts\manage.py typecheck --profile stable`：串行执行退出码 0。此前与 build 并发执行时因共享 `.next/types` 出现 `TS6053`，该结果归因于验证命令并发冲突，不是代码错误。
 - 迁移状态和真实 HTTP 健康探针尚未在数据库/服务进程可用环境下执行。
+
+## Apply working evidence - 2026-08-23 19:00
+
+- 提醒页跳转的 `/customers?id=<customerId>` 已接入客户页：客户页挂载后读取地址参数，调用真实 `GET /api/customers/:id`，加载成功后打开现有客户窗口；不存在或无权限时明确显示接口错误。
+- `python scripts\manage.py typecheck --profile stable`：退出码 0。
+- `python scripts\manage.py button-audit --profile stable`：退出码 0。
+- 首次构建因 Next.js 14 的 `useSearchParams()` 缺少 `Suspense` 边界退出码 1；改为客户端挂载后读取 URL 参数后，`python scripts\manage.py build --profile stable` 退出码 0。
+- 当前仍未新增跟进记录 Route Handler，因此“提交跟进并同步提醒状态/客户时间线”不宣称完成。

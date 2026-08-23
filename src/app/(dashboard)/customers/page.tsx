@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, Table, Button, Space, Input, Select, Modal, Form, message, Tag, Upload } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ExportOutlined, UploadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { PermissionGuard } from '@/components/common/PermissionGuard'
+import { apiRequest } from '@/lib/http/client'
 import { Resizable } from 'react-resizable'
 import 'react-resizable/css/styles.css'
 
@@ -90,6 +91,7 @@ export default function CustomersPage() {
   const [modalVisible, setModalVisible] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [importModalVisible, setImportModalVisible] = useState(false)
+  const [focusedCustomerId, setFocusedCustomerId] = useState<string | null>(null)
   const [form] = Form.useForm()
   const [uploading, setUploading] = useState(false)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
@@ -138,6 +140,10 @@ export default function CustomersPage() {
     loadCustomers()
   }, [page, pageSize])
 
+  useEffect(() => {
+    setFocusedCustomerId(new URLSearchParams(window.location.search).get('id'))
+  }, [])
+
   // 搜索
   const handleSearch = () => {
     setPage(1)
@@ -153,7 +159,7 @@ export default function CustomersPage() {
   }
 
   // 打开新增/编辑弹窗
-  const handleOpenModal = (customer?: Customer) => {
+  const handleOpenModal = useCallback((customer?: Customer) => {
     setEditingCustomer(customer || null)
     if (customer) {
       form.setFieldsValue(customer)
@@ -161,7 +167,24 @@ export default function CustomersPage() {
       form.resetFields()
     }
     setModalVisible(true)
-  }
+  }, [form])
+
+  useEffect(() => {
+    if (!focusedCustomerId) return
+    let active = true
+    const loadFocusedCustomer = async () => {
+      try {
+        const result = await apiRequest<{ success: boolean; data: Customer }>(`/api/customers/${encodeURIComponent(focusedCustomerId)}`)
+        if (active) handleOpenModal(result.data)
+      } catch (error) {
+        if (active) message.error(error instanceof Error ? error.message : '加载客户详情失败')
+      }
+    }
+    void loadFocusedCustomer()
+    return () => {
+      active = false
+    }
+  }, [focusedCustomerId, handleOpenModal])
 
   // 提交表单
   const handleSubmit = async (values: any) => {
