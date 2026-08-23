@@ -85,3 +85,13 @@ conclusion: fail
 - `python scripts\manage.py button-audit --profile stable`：退出码 0。
 - 首次构建因 Next.js 14 的 `useSearchParams()` 缺少 `Suspense` 边界退出码 1；改为客户端挂载后读取 URL 参数后，`python scripts\manage.py build --profile stable` 退出码 0。
 - 当前仍未新增跟进记录 Route Handler，因此“提交跟进并同步提醒状态/客户时间线”不宣称完成。
+
+## Apply working evidence - 2026-08-23 19:04
+
+- `python scripts\manage.py dbstatus --profile stable`：退出码 0，`localhost:3306` 网络端口可达；这不等于 Prisma 认证成功。
+- `python scripts\manage.py start --profile stable`：退出码 0，启动 stable PID `68360`，端口 `3000` 监听。
+- `python scripts\manage.py smoke --profile stable`：退出码 1，真实登录失败；服务日志显示 Prisma 连接使用 `root` 数据库账号时认证失败，未执行业务写入。
+- `GET http://127.0.0.1:3000/api/health`：返回 HTTP `503`，`status=degraded`、`database=unreachable`，没有泄露连接密码。
+- `python scripts\manage.py stop --profile stable`：退出码 0；通过进程树中的项目路径识别后停止整棵服务进程树。
+- 停止后的 `python scripts\manage.py status --profile stable`：退出码 0，PID 不存在、端口未监听、锁文件已清理。
+- 单实例进程树校验第一次实现曾出现父 PID 自循环，已修复并通过 `python scripts\manage.py runtime-test --profile stable`；当前 `scripts/runtime/process_identity.py` 为 64 行。

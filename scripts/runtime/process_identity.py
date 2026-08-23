@@ -25,13 +25,20 @@ def is_process_running(pid: int) -> bool:
     return True
 
 
-def process_command_line(pid: int) -> str:
+def process_command_lines(pid: int) -> list[str]:
     if not is_process_running(pid):
-        return ""
+        return []
     if os.name == "nt":
         command = (
-            "$p=Get-CimInstance Win32_Process -Filter "
-            f"'ProcessId = {pid}'; if ($p) {{ $p.CommandLine }}"
+            "$all=@(Get-CimInstance Win32_Process); "
+            "$queue=New-Object System.Collections.Generic.Queue[int]; "
+            "$seen=@{}; "
+            f"$queue.Enqueue({pid}); $seen[{pid}]=\$true; $lines=@(); "
+            "while($queue.Count -gt 0){$current=$queue.Dequeue(); "
+            "foreach($p in $all | Where-Object {$_.ParentProcessId -eq $current}){"
+            "if(-not $seen.ContainsKey([int]$p.ProcessId)){ $seen[[int]$p.ProcessId]=\$true; "
+            "$queue.Enqueue([int]$p.ProcessId); if($p.CommandLine){$lines += $p.CommandLine}}}}; "
+            "$lines"
         )
         result = subprocess.run(
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
@@ -40,15 +47,15 @@ def process_command_line(pid: int) -> str:
             encoding="utf-8",
             errors="replace",
         )
-        return result.stdout.strip()
+        return [line.strip() for line in result.stdout.splitlines() if line.strip()]
     command_path = Path(f"/proc/{pid}/cmdline")
     if not command_path.exists():
-        return ""
-    return command_path.read_bytes().replace(b"\x00", b" ").decode("utf-8", errors="replace").strip()
+        return []
+    return [command_path.read_bytes().replace(b"\x00", b" ").decode("utf-8", errors="replace").strip()]
 
 
 def process_belongs_to_crm(pid: int) -> bool:
-    command_line = process_command_line(pid).lower()
+    command_line = "\n".join(process_command_lines(pid)).lower()
     root_text = str(ROOT).lower()
     return bool(
         command_line
