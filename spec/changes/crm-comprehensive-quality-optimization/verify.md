@@ -102,3 +102,14 @@ conclusion: fail
 - `python scripts\manage.py data-reachability --profile stable`：现在已执行真实 Prisma `SELECT 1`，退出码 1；错误为数据库服务器拒绝 `root` 凭据。
 - 连接结构检查显示 `.env.local` 的 `DATABASE_URL` 中 `@` 数量为 2。当前连接串存在未编码的额外 `@`，密码中的特殊字符应使用 URL 编码，例如 `@` 写成 `%40`；密码本身仍需使用 MySQL 实际密码，不能凭猜测替换。
 - 这次检查排除了“端口未开”和“脚本未连接 Prisma”两个误判，当前阻塞明确为 `DATABASE_URL` 凭据或格式错误。
+
+## Apply working evidence - 2026-08-23 21:52
+
+- 已确认本地 MySQL 账号认证通过，连接目标为新建的 `crm_system` 数据库；没有修改现有 `crm_db`。
+- `python scripts\manage.py migrate --profile stable`：退出码 0，7 个 Prisma migration 全部成功应用，包含 `_prisma_migrations` 状态表和 `AuditEvent` 表。
+- `python scripts\manage.py data-reachability --profile stable`：退出码 0；数据库网络可达，Prisma `SELECT 1` 探针通过。
+- `python scripts\manage.py audit-data --profile stable`：退出码 0；迁移状态已应用 7 个，孤立客户销售为 0、孤立订单客户为 0、负回款为 0。当前数据库为空业务库，因此这些一致性检查的样本量为 0，不能替代业务写入后的验收。
+- 原阻塞处理方式：先修正本地 profile 使用的数据库连接目标并创建与 Prisma schema 对应的 `crm_system`，再通过项目脚本执行 `prisma migrate deploy`；不能把结构不兼容的旧 `crm_db` 直接当作当前 CRM 数据库。
+- 当前剩余范围：尚未在 test 数据库准备最小业务夹具，也尚未完成页面按钮到 API、数据库行、审计事件和文件对象的全链路写入验收，因此任务 8 仍保持未完成。
+- 新增 `python scripts\manage.py migrate --profile stable` 和 `python scripts\manage.py seed --profile stable` 入口；种子脚本不再把管理员密码写入日志。
+- 使用种子数据后，`python scripts\manage.py start --profile stable`、`python scripts\manage.py smoke --profile stable`、`python scripts\manage.py stop --profile stable` 和最终 `status` 均退出码 0；HTTP 冒烟已完成管理员登录验证，停止后端口未监听、PID 不存在、锁已清理。

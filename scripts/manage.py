@@ -157,6 +157,8 @@ def main() -> int:
         "action",
         choices=(
             "generate",
+            "migrate",
+            "seed",
             "build",
             "typecheck",
             "routes",
@@ -240,6 +242,16 @@ def main() -> int:
         )
     if args.action == "generate":
         return run_sequence((("prisma-generate", ("npx", "prisma", "generate")),), logger)
+    if args.action == "migrate":
+        return run_sequence(
+            (("prisma-migrate-deploy", ("npx", "prisma", "migrate", "deploy")),),
+            logger,
+        )
+    if args.action == "seed":
+        return run_sequence(
+            (("prisma-seed", ("npx", "ts-node", "prisma/seed.ts")),),
+            logger,
+        )
     if args.action == "build":
         return run_sequence(
             (

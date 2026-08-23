@@ -278,7 +278,7 @@ async function main() {
   })
 
   console.log('示例用户创建完成')
-  console.log('管理员账号: admin / 123456')
+  console.log('管理员账号已创建: admin')
   console.log('种子数据完成!')
 }
 
