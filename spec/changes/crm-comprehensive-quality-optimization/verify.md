@@ -113,3 +113,14 @@ conclusion: fail
 - 当前剩余范围：尚未在 test 数据库准备最小业务夹具，也尚未完成页面按钮到 API、数据库行、审计事件和文件对象的全链路写入验收，因此任务 8 仍保持未完成。
 - 新增 `python scripts\manage.py migrate --profile stable` 和 `python scripts\manage.py seed --profile stable` 入口；种子脚本不再把管理员密码写入日志。
 - 使用种子数据后，`python scripts\manage.py start --profile stable`、`python scripts\manage.py smoke --profile stable`、`python scripts\manage.py stop --profile stable` 和最终 `status` 均退出码 0；HTTP 冒烟已完成管理员登录验证，停止后端口未监听、PID 不存在、锁已清理。
+
+## Apply working evidence - 2026-08-23 22:10
+
+- 新增 test 数据库初始化入口 `python scripts\manage.py dbinit-test --profile test`；当 `DATABASE_URL` 被 manage 注入为 test 连接时，profile 隔离校验仍以文件中的 stable 连接为准，不会把 test 误判为 stable。
+- `crm_system_test` 已独立创建并通过 7 个 Prisma migration、种子初始化和 `python scripts\manage.py data-reachability --profile test`。
+- 修正 stable/test 的 `NEXTAUTH_URL` 隔离：stable 默认使用 3000，test 默认使用 3001，也支持 `CRM_STABLE_NEXTAUTH_URL` 和 `CRM_TEST_NEXTAUTH_URL` 覆盖。此前 test 登录回调误指向 3000，导致 HTTP 连接被拒绝。
+- 新增 `python scripts\manage.py data-flow --profile test`：真实登录后创建客户、读取客户详情、创建订单、登记回款，并直接核对数据库金额 `1000.00 / 250.00 / 750.00` 和 3 条 `AuditEvent`；唯一标记的 test 夹具已自动清理。
+- `python scripts\manage.py data-flow --profile test`：退出码 0；test 服务启动、停止和最终状态检查均退出码 0。stable/test 数据库中均未残留本轮测试标记数据。
+- stable 回归：`data-reachability`、`typecheck`、`build`、`start`、`smoke`、`stop`、`status` 均退出码 0；构建输出仍为当前仓库已有的 Next.js 14.2.35，本轮没有执行框架升级。
+- 将回款列表的 Prisma 条件从 `any` 改为 `Prisma.PaymentWhereInput`，并将路由契约检查从 `scripts/manage.py` 拆出；Python 语法、路由检查、TypeScript 类型检查和生产构建均通过。
+- 当前未覆盖：跟进记录没有独立写入 Route Handler，文件、消息、导入、转移、公海、权限矩阵和 Playwright 按钮级全量验收仍不能宣称完成。

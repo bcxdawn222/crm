@@ -29,6 +29,10 @@ def _read_env_value(name: str) -> str:
     if value:
         return value.strip('"').strip("'")
 
+    return _read_file_env_value(name)
+
+
+def _read_file_env_value(name: str) -> str:
     for env_path in (ROOT / ".env.local", ROOT / ".env"):
         if not env_path.is_file():
             continue
@@ -42,12 +46,20 @@ def _read_env_value(name: str) -> str:
     return ""
 
 
+def _stable_database_url() -> str:
+    return (
+        os.environ.get("CRM_STABLE_DATABASE_URL", "").strip()
+        or _read_file_env_value("CRM_STABLE_DATABASE_URL")
+        or _read_file_env_value("DATABASE_URL")
+    )
+
+
 def _required_database_url(profile_name: str) -> str:
     if profile_name == "stable":
-        value = _read_env_value("CRM_STABLE_DATABASE_URL") or _read_env_value("DATABASE_URL")
+        value = _stable_database_url()
     else:
         value = _read_env_value("CRM_TEST_DATABASE_URL")
-        stable_value = _read_env_value("CRM_STABLE_DATABASE_URL") or _read_env_value("DATABASE_URL")
+        stable_value = _stable_database_url()
         if not value:
             raise ValueError("test profile 必须配置 CRM_TEST_DATABASE_URL，不能复用稳定版数据库")
         if stable_value and value == stable_value:
@@ -97,6 +109,6 @@ def validate_profile_isolated(config: ProfileConfig) -> None:
     config.pid_file.parent.mkdir(parents=True, exist_ok=True)
     config.build_dir.mkdir(parents=True, exist_ok=True)
     if config.name == "test":
-        stable_url = _read_env_value("CRM_STABLE_DATABASE_URL") or _read_env_value("DATABASE_URL")
+        stable_url = _stable_database_url()
         if stable_url and stable_url == config.database_url:
             raise ValueError("test profile 与 stable profile 使用了相同数据库连接")

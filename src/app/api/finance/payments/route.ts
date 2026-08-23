@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
-import { InvoiceType, PaymentMethod } from '@prisma/client'
+import { InvoiceType, PaymentMethod, Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { createPayment, CreatePaymentError } from '@/lib/payments/create'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     const endDate = searchParams.get('endDate') || ''
 
     // Build query conditions
-    const where: any = {}
+    const where: Prisma.PaymentWhereInput = {}
     
     // Sales can only view their own payments
     if (session.user.roles.includes('sales')) {

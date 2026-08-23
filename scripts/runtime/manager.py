@@ -216,6 +216,10 @@ def start_server(logger: logging.Logger, config: ProfileConfig) -> int:
     if os.name == "nt":
         creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
     npm_command = "npm.cmd" if os.name == "nt" else "npm"
+    profile_nextauth_url = os.environ.get(f"CRM_{config.name.upper()}_NEXTAUTH_URL", "")
+    if not profile_nextauth_url and config.name == "stable":
+        profile_nextauth_url = os.environ.get("NEXTAUTH_URL", "")
+    profile_nextauth_url = profile_nextauth_url or f"http://{config.app_host}:{config.app_port}"
     try:
         process = subprocess.Popen(
             [npm_command, "run", "dev", "--", "--hostname", config.app_host, "--port", str(config.app_port)],
@@ -225,6 +229,7 @@ def start_server(logger: logging.Logger, config: ProfileConfig) -> int:
                 "CRM_PROFILE": config.name,
                 "CRM_UPLOAD_DIR": str(config.upload_dir),
                 "DATABASE_URL": config.database_url,
+                "NEXTAUTH_URL": profile_nextauth_url,
             },
             stdout=server_log,
             stderr=subprocess.STDOUT,

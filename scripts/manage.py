@@ -20,6 +20,7 @@ from runtime.manager import (
     stop_database_direct,
 )
 from runtime.profile_config import ProfileConfig, get_profile_config
+from quality.route_contracts import run_route_check
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -86,67 +87,6 @@ def run_sequence(commands: Sequence[tuple[str, Sequence[str]]], logger: logging.
     return 0
 
 
-def run_route_check(logger: logging.Logger) -> int:
-    checks = (
-        (ROOT / "src/app/api/customers/renewal-reminders/route.ts", True),
-        (ROOT / "src/app/api/public-pool/claim/route.ts", True),
-        (ROOT / "src/app/api/tasks/assignees/route.ts", True),
-    )
-    for path, should_exist in checks:
-        if path.exists() != should_exist:
-            logger.error("路由文件状态不符合预期: %s", path)
-            return 1
-
-    cooperating_route = (ROOT / "src/app/api/customers/cooperating/route.ts").read_text(
-        encoding="utf-8"
-    )
-    payments_page = (ROOT / "src/app/(dashboard)/finance/payments/page.tsx").read_text(
-        encoding="utf-8"
-    )
-    orders_page = (ROOT / "src/app/(dashboard)/finance/orders/page.tsx").read_text(
-        encoding="utf-8"
-    )
-    order_form = (ROOT / "src/app/(dashboard)/finance/orders/order-form-modal.tsx").read_text(
-        encoding="utf-8"
-    )
-    tasks_page = (ROOT / "src/app/(dashboard)/tasks/page.tsx").read_text(
-        encoding="utf-8"
-    )
-    task_form = (ROOT / "src/app/(dashboard)/tasks/task-form-modal.tsx").read_text(
-        encoding="utf-8"
-    )
-    order_api = (ROOT / "src/app/api/finance/orders/route.ts").read_text(encoding="utf-8")
-    task_api = (ROOT / "src/app/api/tasks/route.ts").read_text(encoding="utf-8")
-    assignee_api = (ROOT / "src/app/api/tasks/assignees/route.ts").read_text(encoding="utf-8")
-    forbidden_fragments = (
-        ("GET_REMINDERS", cooperating_route),
-        ("/api/finance/payments/${id}", payments_page),
-        ("PROCESSING", orders_page),
-        ("DONE", tasks_page),
-    )
-    for fragment, content in forbidden_fragments:
-        if fragment in content:
-            logger.error("仍存在失效契约: %s", fragment)
-            return 1
-
-    required_fragments = (
-        ("订单客户远程查询", "/api/customers?", order_form),
-        ("订单客户选项", "customerOptions", order_form),
-        ("任务负责人远程查询", "/api/tasks/assignees?", task_form),
-        ("任务负责人选项", "assigneeOptions", task_form),
-        ("订单客户范围校验", "buildDataFilter", order_api),
-        ("任务负责人范围校验", "findTaskAssigneeWithinScope", task_api),
-        ("任务负责人接口分页", "parsePagination", assignee_api),
-    )
-    for label, fragment, content in required_fragments:
-        if fragment not in content:
-            logger.error("缺少本轮流程契约: %s (%s)", label, fragment)
-            return 1
-
-    logger.info("路由契约静态检查通过")
-    return 0
-
-
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -166,6 +106,7 @@ def main() -> int:
             "test",
             "smoke",
             "dbstart",
+            "dbinit-test",
             "dbstatus",
             "dbstop",
             "audit",
@@ -176,6 +117,7 @@ def main() -> int:
             "instance-status",
             "button-audit",
             "data-reachability",
+            "data-flow",
             "runtime-test",
             "e2e",
             "perf",
@@ -226,6 +168,12 @@ def main() -> int:
         return 0
     if args.action == "dbstart":
         return start_database(logger, profile)
+    if args.action == "dbinit-test":
+        if profile.name != "test":
+            logger.error("dbinit-test 只允许 --profile test")
+            return 2
+        command = [sys.executable, str(ROOT / "scripts/quality/setup_test_database.py")]
+        return run_sequence((("dbinit-test", command),), logger)
     if args.action == "dbstatus":
         if is_port_open(profile.database_host, profile.database_port):
             logger.info("数据库端口已就绪: %s:%s", profile.database_host, profile.database_port)
@@ -285,6 +233,12 @@ def main() -> int:
     if args.action == "data-reachability":
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "data_reachability.py")]
         return run_sequence((("data-reachability", command),), logger)
+    if args.action == "data-flow":
+        if profile.name != "test":
+            logger.error("data-flow 只允许 --profile test")
+            return 2
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "data_flow_test.py")]
+        return run_sequence((("data-flow", command),), logger)
     if args.action == "runtime-test":
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "runtime_checks.py")]
         return run_sequence((("runtime-test", command),), logger)
