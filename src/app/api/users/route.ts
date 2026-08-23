@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
+
+export const dynamic = 'force-dynamic'
 
 // GET /api/users - 获取用户列表
 export async function GET(request: Request) {
@@ -23,7 +26,7 @@ export async function GET(request: Request) {
     const role = searchParams.get('role')
 
     // Build query
-    const where: any = {
+    const where: Prisma.UserWhereInput = {
       status: 'ACTIVE'
     }
 
@@ -68,11 +71,8 @@ export async function GET(request: Request) {
       success: true,
       data: users
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Failed to get users:', error)
-    return NextResponse.json({ 
-      error: 'Server error',
-      details: error.message 
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -4,28 +4,28 @@
 > 所有启动、停止、测试、构建、性能和发布动作必须通过 `scripts/*.py` 与 `scripts/*.sh`，日志统一写入 `logs/`。
 
 - [ ] 1. 实施前状态与数据安全门禁
-  - [ ] 1.1 盘点三个未归档 Spec，归档两个已完成变更，并对 `crm-sales-sop-completion` 的未完成 HTTP 冒烟作出补验、保留或关闭记录。
-  - [ ] 1.2 经 HARD GATE 同意后初始化本地 Git，排除密钥、日志、构建产物和上传文件，建立可复核的基线提交；若不同意则记录“无法满足一步一提交”。
-  - [ ] 1.3 读取但不输出稳定环境密钥，确认数据库类型、上传存储、部署方式和现有备份路径，生成不含敏感值的环境清单。
-  - [ ] 1.4 为 stable/test 定义独立数据库、上传目录、端口、PID/锁、日志和构建目录，加入禁止 test 指向 stable 写库的硬校验。
+  - [x] 1.1 盘点三个未归档 Spec，归档两个已完成变更，并对 `crm-sales-sop-completion` 的未完成 HTTP 冒烟作出补验、保留或关闭记录。
+  - [x] 1.2 经 HARD GATE 同意后初始化本地 Git，排除密钥、日志、构建产物和上传文件，建立可复核的基线提交；若不同意则记录“无法满足一步一提交”。
+  - [x] 1.3 读取但不输出稳定环境密钥，确认数据库类型、上传存储、部署方式和现有备份路径，生成不含敏感值的环境清单。
+  - [x] 1.4 为 stable/test 定义独立数据库、上传目录、端口、PID/锁、日志和构建目录，加入禁止 test 指向 stable 写库的硬校验。
   - [ ] 1.5 通过脚本建立数据库和文件恢复点，执行只读连通性检查；无法连接时明确标记阻塞，不伪造通过结果。
-  - [ ] 1.6 记录当前页面、API、构建资源、启动耗时、关键查询和错误日志基线，所有数字注明日期、环境和命令。
-  - [ ] 1.7 清理本阶段临时文件，通过基线检查后提交 `chore: establish CRM quality baseline and safety gates`。
+  - [x] 1.6 记录当前页面、API、构建资源、启动耗时、关键查询和错误日志基线，所有数字注明日期、环境和命令。
+  - [x] 1.7 清理本阶段临时文件，通过基线检查后提交 `chore: establish CRM quality baseline and safety gates`。
 
-- [ ] 2. Run & Debug 统一入口
-  - [ ] 2.1 拆分 `scripts/manage.py` 和 `scripts/runtime_manager.py` 中超过职责边界的逻辑，保持脚本轻量且单文件尽量不超过 300 行。
-  - [ ] 2.2 为 `scripts/manage.py` 增加 `--profile stable|test`、配置加载、环境摘要和敏感值遮盖，并同步 `scripts/manage.sh`。
-  - [ ] 2.3 增加 `status`、`instance-status`、`button-audit`、`data-reachability`、`e2e`、`perf`、`release`、`promote` 和 `rollback` 动作骨架。
-  - [ ] 2.4 将每个动作的终端摘要、退出码、命令阶段和异常写入 `logs/<profile>/`，保留现有 Windows `python` 入口。
-  - [ ] 2.5 添加脚本级测试，覆盖缺失 profile、配置串用、日志目录不可写、子命令失败和敏感信息遮盖。
-  - [ ] 2.6 清理本阶段临时文件，通过脚本测试后提交 `refactor: unify CRM runtime and verification commands`。
+- [x] 2. Run & Debug 统一入口
+  - [x] 2.1 拆分 `scripts/manage.py` 和 `scripts/runtime_manager.py` 中超过职责边界的逻辑，保持脚本轻量且单文件尽量不超过 300 行。
+  - [x] 2.2 为 `scripts/manage.py` 增加 `--profile stable|test`、配置加载、环境摘要和敏感值遮盖，并同步 `scripts/manage.sh`。
+  - [x] 2.3 增加 `status`、`instance-status`、`button-audit`、`data-reachability`、`e2e`、`perf`、`release`、`promote` 和 `rollback` 动作骨架。
+  - [x] 2.4 将每个动作的终端摘要、退出码、命令阶段和异常写入 `logs/<profile>/`，保留现有 Windows `python` 入口。
+  - [x] 2.5 添加脚本级测试，覆盖缺失 profile、配置串用、日志目录不可写、子命令失败和敏感信息遮盖。
+  - [x] 2.6 清理本阶段临时文件，通过脚本测试后提交 `refactor: unify CRM runtime and verification commands`。
 
 - [ ] 3. 测试版技术栈迁移通道
   - [ ] 3.1 在可回退提交上将 test 通道升级到 Next.js 15.4、React 19、匹配的类型与 ESLint 依赖，保留 package lock 的可追溯差异。
   - [ ] 3.2 将 `next.config.js` 迁移为 ESM/TypeScript 配置，消除 CommonJS，不改变现有远程图片和 Ant Design 必要配置。
   - [ ] 3.3 核对 Ant Design React 19 兼容方式，修复 SSR、样式注入、表单、弹窗、表格和图表渲染问题。
   - [ ] 3.4 验证 NextAuth 认证、中间件回跳、Prisma、CASL 和所有 Route Handler 在升级后的类型、构建与运行行为。
-  - [ ] 3.5 消除或明确分类构建期间的 `Dynamic server usage` 等噪声，使真正失败不会被大量可忽略日志掩盖。
+  - [x] 3.5 消除或明确分类构建期间的 `Dynamic server usage` 等噪声，使真正失败不会被大量可忽略日志掩盖。
   - [ ] 3.6 test profile 完成类型检查、生产构建和登录冒烟；任何失败均回到升级提交修复，不影响 stable。
   - [ ] 3.7 清理本阶段临时文件，通过技术栈门禁后提交 `build: prepare Next 15.4 and React 19 test channel`。
 
@@ -50,9 +50,9 @@
 - [ ] 6. 按钮契约与静态审计
   - [ ] 6.1 枚举所有页面、菜单、链接、按钮、下拉项、表格操作和表单提交，分配稳定的按钮契约 ID。
   - [ ] 6.2 为每个动作记录页面、文字、权限、handler、HTTP 方法、接口、成功证据、数据库证据、审计证据和失败证据。
-  - [ ] 6.3 静态检查无 `onClick`、空 handler、仅 `message.success/info`、mock 数据源、无对应 Route Handler 和永远不可达分支。
+  - [x] 6.3 静态检查无 `onClick`、空 handler、仅 `message.success/info`、mock 数据源、无对应 Route Handler 和永远不可达分支。
   - [ ] 6.4 将菜单权限、页面权限、按钮权限、API 权限和数据范围映射到同一清单，列出不一致项。
-  - [ ] 6.5 `button-audit` 在发现 active 死按钮、mock 功能或缺失证据时返回非零退出码，并输出可定位文件与契约 ID。
+  - [x] 6.5 `button-audit` 在发现 active 死按钮、mock 功能或缺失证据时返回非零退出码，并输出可定位文件与契约 ID。
   - [ ] 6.6 清理本阶段临时文件，通过按钮清单检查后提交 `test: add button contract and static action audit`。
 
 - [ ] 7. Mock 页面与死按钮修复

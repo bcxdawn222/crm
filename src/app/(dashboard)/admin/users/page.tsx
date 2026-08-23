@@ -1,114 +1,78 @@
 'use client'
 
-import { Card, Table, Button, Space, Tag } from 'antd'
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { useCallback, useEffect, useState } from 'react'
+import { Card, message, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 
-interface User {
+
+interface UserRole {
+  role: { name: string; displayName: string }
+}
+
+interface UserItem {
   id: string
   username: string
   realName: string
-  email?: string
-  phone?: string
-  roles: string[]
-  status: string
-  createdAt: string
+  email: string | null
+  phone: string | null
+  department: string | null
+  position: string | null
+  roles: UserRole[]
 }
 
-const mockUsers: User[] = [
+interface UserResponse {
+  success: boolean
+  data: UserItem[]
+  error?: string
+}
+
+const columns: ColumnsType<UserItem> = [
+  { title: '用户名', dataIndex: 'username', width: 130 },
+  { title: '姓名', dataIndex: 'realName', width: 130 },
+  { title: '邮箱', dataIndex: 'email' },
+  { title: '电话', dataIndex: 'phone', width: 140 },
+  { title: '部门', dataIndex: 'department', width: 130 },
+  { title: '职位', dataIndex: 'position', width: 130 },
   {
-    id: '1',
-    username: 'admin',
-    realName: '系统管理员',
-    email: 'admin@example.com',
-    phone: '13800138000',
-    roles: ['admin'],
-    status: 'ACTIVE',
-    createdAt: new Date().toISOString(),
+    title: '角色',
+    dataIndex: 'roles',
+    width: 180,
+    render: (roles: UserRole[]) => roles.map(({ role }) => <Tag key={role.name}>{role.displayName || role.name}</Tag>),
   },
 ]
 
 export default function UsersPage() {
-  const columns: ColumnsType<User> = [
-    {
-      title: '用户名',
-      dataIndex: 'username',
-      key: 'username',
-      width: 120,
-    },
-    {
-      title: '姓名',
-      dataIndex: 'realName',
-      key: 'realName',
-      width: 120,
-    },
-    {
-      title: '邮箱',
-      dataIndex: 'email',
-      key: 'email',
-    },
-    {
-      title: '电话',
-      dataIndex: 'phone',
-      key: 'phone',
-      width: 130,
-    },
-    {
-      title: '角色',
-      dataIndex: 'roles',
-      key: 'roles',
-      width: 150,
-      render: (roles: string[]) => roles.map((role) => <Tag key={role}>{role}</Tag>),
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (text) => (
-        <Tag color={text === 'ACTIVE' ? 'green' : 'red'}>
-          {text === 'ACTIVE' ? '启用' : '禁用'}
-        </Tag>
-      ),
-    },
-    {
-      title: '注册时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (date) => new Date(date).toLocaleString(),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 150,
-      fixed: 'right',
-      render: () => (
-        <Space size="small">
-          <Button type="link" size="small" icon={<EditOutlined />}>
-            编辑
-          </Button>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-            删除
-          </Button>
-        </Space>
-      ),
-    },
-  ]
+  const [users, setUsers] = useState<UserItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadUsers = useCallback(async () => {
+    setLoading(true)
+    try {
+      const response = await fetch('/api/users')
+      const result = (await response.json()) as UserResponse
+      if (!response.ok) throw new Error(result.error || '加载用户失败')
+      setUsers(result.data)
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '加载用户失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadUsers()
+  }, [loadUsers])
 
   return (
-    <div>
-      <Card title="用户管理">
-        <Table
-          columns={columns}
-          dataSource={mockUsers}
-          rowKey="id"
-          pagination={{
-            pageSize: 10,
-            showTotal: (total) => `共 ${total} 条`,
-          }}
-        />
-      </Card>
-    </div>
+    <Card title="用户管理">
+      <Table
+        columns={columns}
+        dataSource={users}
+        loading={loading}
+        rowKey="id"
+        scroll={{ x: 920 }}
+        pagination={{ pageSize: 20, showTotal: (total) => `共 ${total} 条` }}
+      />
+    </Card>
   )
 }
