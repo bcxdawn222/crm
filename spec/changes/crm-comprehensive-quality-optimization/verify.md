@@ -42,3 +42,12 @@ conclusion: fail
 - 消息中心已改为读取真实 `/api/messages`，单条已读、全部已读和删除均调用对应 Route Handler；用户管理页已移除当前没有真实保存契约的编辑/删除控件。
 - 提醒页的跟进类按钮现在只跳转到客户入口，不再显示“正在跟进”的假成功提示；真正创建跟进记录及时间线同步仍未完成。
 - `python scripts\manage.py data-reachability --profile stable`：退出码 1；`localhost:3306` 当前不可达，因此上述文件、消息和权限行为尚未完成数据库级验证。
+
+## Apply working evidence - 2026-08-23 18:47
+
+- 新增 `src/lib/http/client.ts`：统一处理 `x-request-id`、超时、取消、离线状态、401 跳转、结构化 `ApiError`、GET 一次有限重试，以及带 `requestKey` 的重复请求保护。
+- 文件、消息、提醒三个页面已接入统一请求层；写操作未启用自动重试，并为上传、删除、已读和提醒开关设置了请求键。
+- `python scripts\manage.py typecheck --profile stable`：退出码 0。
+- `python scripts\manage.py build --profile stable`：退出码 0；构建输出显示 Next.js `14.2.35`，本轮未执行 Next.js 15.4/React 19 升级。
+- `python scripts\manage.py button-audit --profile stable`：退出码 0。
+- `python scripts\manage.py runtime-test --profile stable`：退出码 0。

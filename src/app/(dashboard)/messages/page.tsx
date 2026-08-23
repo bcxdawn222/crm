@@ -5,6 +5,7 @@ import { Avatar, Button, Card, List, message, Space, Tag } from 'antd'
 import { BellOutlined, DeleteOutlined, MailOutlined } from '@ant-design/icons'
 
 import { usePermission } from '@/hooks/usePermission'
+import { apiRequest } from '@/lib/http/client'
 
 
 interface MessageItem {
@@ -32,9 +33,7 @@ export default function MessagesPage() {
   const loadMessages = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/messages?page=1&pageSize=50')
-      const result = (await response.json()) as MessageResponse
-      if (!response.ok) throw new Error(result.error || '加载消息失败')
+      const result = await apiRequest<MessageResponse>('/api/messages?page=1&pageSize=50')
       setItems(result.data.list)
       setUnread(result.data.unread)
     } catch (error) {
@@ -50,32 +49,20 @@ export default function MessagesPage() {
 
   const markRead = async (item: MessageItem) => {
     if (item.isRead) return
-    const response = await fetch(`/api/messages/${item.id}`, { method: 'PATCH' })
-    if (!response.ok) {
-      message.error('标记已读失败')
-      return
-    }
+    await apiRequest<{ success: boolean }>(`/api/messages/${item.id}`, { method: 'PATCH' }, { requestKey: `message-read:${item.id}` })
     setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, isRead: true } : entry))
     setUnread((current) => Math.max(0, current - 1))
   }
 
   const markAllRead = async () => {
-    const response = await fetch('/api/messages/read-all', { method: 'POST' })
-    if (!response.ok) {
-      message.error('全部标记已读失败')
-      return
-    }
+    await apiRequest<{ success: boolean }>('/api/messages/read-all', { method: 'POST' }, { requestKey: 'message-read-all' })
     setItems((current) => current.map((entry) => ({ ...entry, isRead: true })))
     setUnread(0)
     message.success('已全部标记为已读')
   }
 
   const deleteMessage = async (id: string) => {
-    const response = await fetch(`/api/messages/${id}`, { method: 'DELETE' })
-    if (!response.ok) {
-      message.error('删除消息失败')
-      return
-    }
+    await apiRequest<{ success: boolean }>(`/api/messages/${id}`, { method: 'DELETE' }, { requestKey: `message-delete:${id}` })
     setItems((current) => current.filter((entry) => entry.id !== id))
     message.success('消息已删除')
   }

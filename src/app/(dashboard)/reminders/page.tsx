@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { Card, Tabs, Tag, Badge, Button, Empty, Spin, message, Modal, Form, Radio, Input } from 'antd'
-import { 
-  BellOutlined, 
-  PhoneOutlined, 
-  CalendarOutlined, 
+import {
+  BellOutlined,
+  PhoneOutlined,
+  CalendarOutlined,
   FileTextOutlined,
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined
 } from '@ant-design/icons'
+import { apiRequest } from '@/lib/http/client'
 
 interface ReminderItem {
   type: string
@@ -53,6 +54,22 @@ interface Summary {
   totalReminders: number
 }
 
+interface ReminderResponse {
+  success: boolean
+  data: {
+    overdueFollowUp: ReminderItem[]
+    expiringContracts: ReminderItem[]
+    upcomingVisits: ReminderItem[]
+    plannedFollowUps: ReminderItem[]
+    summary: Summary
+  }
+}
+
+interface DisabledResponse {
+  success: boolean
+  data: DisabledCustomer[]
+}
+
 export default function RemindersPage() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('all')
@@ -76,16 +93,9 @@ export default function RemindersPage() {
   const fetchReminders = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/reminders')
-      if (!res.ok) throw new Error('Failed to fetch reminders')
-      const data = await res.json()
-      if (data.success) {
-        setReminders(data.data)
-      } else {
-        message.error(data.error || '获取提醒失败')
-      }
+      const data = await apiRequest<ReminderResponse>('/api/reminders')
+      setReminders(data.data)
     } catch (error) {
-      console.error(error)
       message.error('获取提醒失败')
     } finally {
       setLoading(false)
@@ -94,14 +104,10 @@ export default function RemindersPage() {
 
   const fetchDisabledList = async () => {
     try {
-      const res = await fetch('/api/reminders/disabled')
-      if (!res.ok) throw new Error('Failed to fetch disabled list')
-      const data = await res.json()
-      if (data.success) {
-        setDisabledList(data.data)
-      }
+      const data = await apiRequest<DisabledResponse>('/api/reminders/disabled')
+      setDisabledList(data.data)
     } catch (error) {
-      console.error(error)
+      message.error(error instanceof Error ? error.message : '获取已禁用提醒失败')
     }
   }
 
@@ -127,53 +133,37 @@ export default function RemindersPage() {
   const confirmDisableReminder = async () => {
     try {
       const values = await form.validateFields()
-      const res = await fetch('/api/reminders/disable', {
+      const data = await apiRequest<{ success: boolean }>('/api/reminders/disable', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerId: selectedCustomer?.customerId,
           reason: values.reason === 'OTHER' ? values.otherReason : values.reason,
         }),
-      })
-      
-      if (!res.ok) throw new Error('Failed to disable reminder')
-      const data = await res.json()
-      
-      if (data.success) {
-        message.success('已设置为不再提醒')
-        setDisableModalVisible(false)
-        fetchReminders()
-        fetchDisabledList()
-      } else {
-        message.error(data.error || '操作失败')
-      }
+      }, { requestKey: `reminder-disable:${selectedCustomer?.customerId || 'unknown'}` })
+      if (!data.success) throw new Error('操作未完成')
+      message.success('已设置为不再提醒')
+      setDisableModalVisible(false)
+      void fetchReminders()
+      void fetchDisabledList()
     } catch (error) {
-      console.error(error)
-      message.error('操作失败')
+      message.error(error instanceof Error ? error.message : '操作失败')
     }
   }
 
   const handleEnableReminder = async (customerId: string) => {
     try {
-      const res = await fetch('/api/reminders/enable', {
+      const data = await apiRequest<{ success: boolean }>('/api/reminders/enable', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customerId }),
-      })
-      
-      if (!res.ok) throw new Error('Failed to enable reminder')
-      const data = await res.json()
-      
-      if (data.success) {
-        message.success('已恢复提醒')
-        fetchReminders()
-        fetchDisabledList()
-      } else {
-        message.error(data.error || '操作失败')
-      }
+      }, { requestKey: `reminder-enable:${customerId}` })
+      if (!data.success) throw new Error('操作未完成')
+      message.success('已恢复提醒')
+      void fetchReminders()
+      void fetchDisabledList()
     } catch (error) {
-      console.error(error)
-      message.error('操作失败')
+      message.error(error instanceof Error ? error.message : '操作失败')
     }
   }
 

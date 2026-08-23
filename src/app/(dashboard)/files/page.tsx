@@ -7,6 +7,7 @@ import type { ColumnsType } from 'antd/es/table'
 import type { UploadRequestOption } from 'rc-upload/lib/interface'
 
 import { usePermission } from '@/hooks/usePermission'
+import { apiRequest } from '@/lib/http/client'
 
 
 interface FileItem {
@@ -34,9 +35,7 @@ export default function FilesPage() {
   const loadFiles = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/files?page=1&pageSize=50')
-      const result = (await response.json()) as FileResponse
-      if (!response.ok) throw new Error(result.error || '加载文件失败')
+      const result = await apiRequest<FileResponse>('/api/files?page=1&pageSize=50')
       setFiles(result.data.list)
     } catch (error) {
       message.error(error instanceof Error ? error.message : '加载文件失败')
@@ -50,12 +49,14 @@ export default function FilesPage() {
   }, [loadFiles])
 
   const uploadFile = async ({ file, onError, onSuccess }: UploadRequestOption) => {
+    if (!(file instanceof File)) {
+      onError?.(new Error('请选择有效文件'))
+      return
+    }
     const formData = new FormData()
-    formData.append('file', file as Blob)
+    formData.append('file', file)
     try {
-      const response = await fetch('/api/files', { method: 'POST', body: formData })
-      const result = await response.json() as { error?: string }
-      if (!response.ok) throw new Error(result.error || '上传失败')
+      const result = await apiRequest<{ success: boolean; data: FileItem }>('/api/files', { method: 'POST', body: formData }, { requestKey: `file-upload:${file.name}:${file.size}` })
       onSuccess?.(result)
       message.success('文件上传成功')
       await loadFiles()
@@ -67,12 +68,7 @@ export default function FilesPage() {
   }
 
   const deleteFile = async (id: string) => {
-    const response = await fetch(`/api/files/${id}`, { method: 'DELETE' })
-    const result = await response.json() as { error?: string }
-    if (!response.ok) {
-      message.error(result.error || '删除失败')
-      return
-    }
+    await apiRequest<{ success: boolean }>(`/api/files/${id}`, { method: 'DELETE' }, { requestKey: `file-delete:${id}` })
     message.success('文件已删除')
     await loadFiles()
   }
