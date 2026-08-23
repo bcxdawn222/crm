@@ -114,9 +114,8 @@ export default function RemindersPage() {
     }
   }
 
-  const handleFollowUp = (customerId: string, customerName: string) => {
+  const handleFollowUp = (customerId: string) => {
     window.location.href = `/customers?id=${customerId}`
-    message.info(`正在跟进客户: ${customerName}`)
   }
 
   const handleDisableReminder = (item: ReminderItem) => {
@@ -196,7 +195,7 @@ export default function RemindersPage() {
             <Button 
               type="primary" 
               size="small"
-              onClick={() => handleFollowUp(item.customerId!, item.customerName)}
+              onClick={() => handleFollowUp(item.customerId!)}
             >
               立即跟进
             </Button>
@@ -216,7 +215,7 @@ export default function RemindersPage() {
             <Button 
               type="primary" 
               size="small"
-              onClick={() => handleFollowUp(item.customerId!, item.customerName)}
+              onClick={() => handleFollowUp(item.customerId!)}
             >
               联系续签
             </Button>
@@ -236,7 +235,7 @@ export default function RemindersPage() {
             <Button 
               type="primary" 
               size="small"
-              onClick={() => handleFollowUp(item.customerId!, item.customerName)}
+              onClick={() => handleFollowUp(item.customerId!)}
             >
               查看计划
             </Button>
@@ -256,7 +255,7 @@ export default function RemindersPage() {
             <Button 
               type="primary" 
               size="small"
-              onClick={() => handleFollowUp(item.customerId!, item.customerName)}
+              onClick={() => handleFollowUp(item.customerId!)}
             >
               开始跟进
             </Button>

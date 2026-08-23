@@ -213,7 +213,12 @@ def start_server(logger: logging.Logger, config: ProfileConfig) -> int:
     process = subprocess.Popen(
         [npm_command, "run", "dev", "--", "--hostname", config.app_host, "--port", str(config.app_port)],
         cwd=ROOT,
-        env={**os.environ, "CRM_PROFILE": config.name, "DATABASE_URL": config.database_url},
+        env={
+            **os.environ,
+            "CRM_PROFILE": config.name,
+            "CRM_UPLOAD_DIR": str(config.upload_dir),
+            "DATABASE_URL": config.database_url,
+        },
         stdout=server_log,
         stderr=subprocess.STDOUT,
         creationflags=creation_flags,
