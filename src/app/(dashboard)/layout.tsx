@@ -3,6 +3,7 @@
 import { Layout } from 'antd'
 import Sidebar from '@/components/common/Sidebar'
 import AppHeader from '@/components/common/Header'
+import NetworkStatusBanner from '@/components/common/NetworkStatusBanner'
 import { useUIStore } from '@/stores/uiStore'
 
 const { Content } = Layout
@@ -27,6 +28,7 @@ export default function DashboardLayout({
             minHeight: 280,
           }}
         >
+          <NetworkStatusBanner />
           {children}
         </Content>
       </Layout>

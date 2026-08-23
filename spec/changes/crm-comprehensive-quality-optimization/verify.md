@@ -51,3 +51,11 @@ conclusion: fail
 - `python scripts\manage.py build --profile stable`：退出码 0；构建输出显示 Next.js `14.2.35`，本轮未执行 Next.js 15.4/React 19 升级。
 - `python scripts\manage.py button-audit --profile stable`：退出码 0。
 - `python scripts\manage.py runtime-test --profile stable`：退出码 0。
+
+## Apply working evidence - 2026-08-23 18:50
+
+- 新增全局 `NetworkStatusBanner` 和 `useNetworkStatus`：离线时提示只读数据暂时不可更新，恢复时提示手动核对数据；未确认写操作不会由该层自动重放。
+- `python scripts\manage.py typecheck --profile stable`：退出码 0。
+- `python scripts\manage.py build --profile stable`：退出码 0；构建输出仍为 Next.js `14.2.35`，首页 First Load JS 约 `623 kB`。
+- `python scripts\manage.py button-audit --profile stable`：退出码 0。
+- 9.5 仍未完全完成：其他页面尚未全部接入统一请求层，恢复网络后的只读数据重新拉取和长时间会话测试待后续实现。
