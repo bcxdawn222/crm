@@ -1,0 +1,13 @@
+[Unit]
+Description=CRM MariaDB backup
+After=mariadb.service
+Requires=mariadb.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/www/wwwroot/crm-system
+Environment=PYTHONIOENCODING=utf-8
+Environment=CRM_ENV_PATH=/root/.config/crm-system/migrate.env
+ExecStart=/usr/bin/python3 /www/wwwroot/crm-system/scripts/deploy/backup_database.py

@@ -1,0 +1,227 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 15, 23, 42;
+  --background-start-rgb: 241, 245, 249;
+  --background-end-rgb: 248, 250, 252;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-start-rgb));
+  font-family: Arial, 'Microsoft YaHei', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.crm-app-shell {
+  background: #f1f5f9;
+}
+
+.crm-main-layout {
+  min-width: 0;
+  background: #f1f5f9;
+  transition: margin-left 0.2s ease;
+}
+
+.crm-page-content {
+  background: #f8fafc;
+}
+
+.ant-layout-sider {
+  background: #0f172a !important;
+}
+
+.ant-menu-dark,
+.ant-menu-dark .ant-menu-sub {
+  background: #0f172a !important;
+}
+
+.ant-menu-dark .ant-menu-item-selected,
+.ant-menu-dark > .ant-menu .ant-menu-item-selected {
+  background: #164e63 !important;
+}
+
+@media (max-width: 820px) {
+  .crm-main-layout {
+    margin-left: 0 !important;
+  }
+
+  .crm-page-content {
+    margin: 72px 8px 8px !important;
+    padding: 16px !important;
+  }
+}
+
+.crm-login-shell {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #0d1b2a;
+}
+
+.crm-login-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: url('/login-crm-background.png') center / cover no-repeat;
+}
+
+.crm-login-shell::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, rgb(7 18 30 / 0.24), rgb(7 18 30 / 0.05) 52%, rgb(7 18 30 / 0.28));
+  content: '';
+  pointer-events: none;
+}
+
+.crm-login-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  align-items: center;
+  gap: clamp(48px, 8vw, 156px);
+  width: min(1160px, calc(100% - 64px));
+  margin: 0 auto;
+  padding: 64px 0;
+}
+
+.crm-login-intro {
+  max-width: 560px;
+  color: #f4f8fb;
+}
+
+.crm-login-mark {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 28px;
+  border: 1px solid rgb(138 218 220 / 0.65);
+  border-radius: 14px;
+  background: rgb(14 35 53 / 0.78);
+  color: #8adadc;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.crm-login-kicker {
+  margin: 0 0 14px;
+  color: #8adadc;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.crm-login-intro h1 {
+  max-width: 520px;
+  margin: 0;
+  color: #f4f8fb;
+  font-size: clamp(34px, 4vw, 56px);
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.12;
+}
+
+.crm-login-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+.crm-login-meta span {
+  padding: 8px 12px;
+  border: 1px solid rgb(175 216 235 / 0.22);
+  border-radius: 999px;
+  background: rgb(12 33 51 / 0.66);
+  color: rgb(237 247 252 / 0.78);
+  font-size: 13px;
+}
+
+.crm-login-card {
+  width: 400px;
+  border: 1px solid rgb(255 255 255 / 0.72);
+  border-radius: 12px;
+  box-shadow: 0 24px 70px rgb(2 12 22 / 0.34);
+}
+
+.crm-login-card .ant-card-head {
+  min-height: 68px;
+  border-bottom-color: #e5ebef;
+}
+
+.crm-login-card .ant-card-body {
+  padding: 28px 32px 22px;
+}
+
+.crm-login-card .ant-form-item:last-child {
+  margin-bottom: 0;
+}
+
+.crm-login-card .ant-btn-primary {
+  background: #197b9c;
+  box-shadow: none;
+}
+
+.crm-login-card .ant-btn-primary:hover {
+  background: #12677f;
+}
+
+.crm-login-footer {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  width: calc(100% - 32px);
+  margin: 0;
+  transform: translateX(-50%);
+  color: rgb(225 240 247 / 0.58);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+@media (max-width: 820px) {
+  .crm-login-content {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    width: min(440px, calc(100% - 32px));
+    padding: 36px 0 64px;
+  }
+
+  .crm-login-intro {
+    display: none;
+  }
+
+  .crm-login-card {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crm-login-shell::after {
+    background: rgb(7 18 30 / 0.22);
+  }
+}

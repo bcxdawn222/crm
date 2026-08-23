@@ -1,0 +1,11 @@
+[Unit]
+Description=Run CRM MariaDB backup every day
+
+[Timer]
+OnCalendar=*-*-* 03:20:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=300
+Unit=crm-db-backup.service
+
+[Install]
+WantedBy=timers.target

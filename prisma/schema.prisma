@@ -1,0 +1,629 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 用户与权限 ====================
+
+model User {
+  id            String    @id @default(uuid())
+  username      String    @unique @db.VarChar(50)
+  email         String    @unique @db.VarChar(100)
+  password      String    @db.VarChar(255)
+  realName      String    @db.VarChar(50)
+  phone         String?   @db.VarChar(20)
+  avatar        String?   @db.VarChar(255)
+  department    String?   @db.VarChar(50)
+  position      String?   @db.VarChar(50)
+  status        UserStatus @default(ACTIVE)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // 层级关系 - 上级主管
+  managerId     String?   // 上级ID
+  manager       User?     @relation("UserManager", fields: [managerId], references: [id])
+  subordinates  User[]    @relation("UserManager")
+  
+  roles         UserRole[]
+  dailyReports  DailyReport[]
+  reviewedReports DailyReport[] @relation("ReportReviewer")
+  customers     Customer[] @relation("SalesCustomer")
+  operationManagedCustomers Customer[] @relation("OperationManagerCustomer")
+  followUps     FollowUp[]
+  leads         Lead[]
+  orders        Order[]
+  payments      Payment[]
+  sentMessages  Message[] @relation("SentMessage")
+  receivedMessages Message[] @relation("ReceivedMessage")
+  tasks         Task[] @relation("TaskAssignee")
+  createdTasks  Task[] @relation("TaskCreator")
+  uploadedFiles File[]
+  contractArchives ContractArchive[] @relation("ContractArchiver")  // 备案的合同
+  telemarketingLists TelemarketingList[] @relation("SalesTelemarketing")
+  auditEvents   AuditEvent[] @relation("AuditActor")
+  
+  // ========== 公海池认领配额 ==========
+  maxActiveCustomers Int      @default(50)    // 最大活跃客户数
+  maxDailyClaims     Int      @default(5)     // 每日最大认领数
+  claimHoldDays      Int      @default(30)    // 认领后最长持有时间(天)
+  
+  @@index([username])
+  @@index([email])
+  @@index([department])
+  @@index([managerId])
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(50)
+  displayName String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  users       UserRole[]
+  permissions RolePermission[]
+  
+  @@index([name])
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique @db.VarChar(100)
+  name        String   @db.VarChar(100)
+  module      String   @db.VarChar(50)
+  description String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+  
+  roles       RolePermission[]
+  
+  @@index([code])
+  @@index([module])
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+  
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String   @db.VarChar(100)
+  entityType String   @db.VarChar(100)
+  entityId   String?  @db.VarChar(191)
+  beforeData Json?
+  afterData  Json?
+  reason     String?  @db.VarChar(500)
+  requestId  String?  @db.VarChar(100)
+  createdAt  DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+}
+
+// ==================== 客户管理 ====================
+
+model Customer {
+  id              String        @id @default(uuid())
+  name            String        @db.VarChar(100)
+  company         String?       @db.VarChar(200)
+  contactPerson   String?       @db.VarChar(50)
+  phone           String?       @db.VarChar(20)
+  email           String?       @db.VarChar(100)
+  wechat          String?       @db.VarChar(50)
+  address         String?       @db.VarChar(500)
+  province        String?       @db.VarChar(50)
+  city            String?       @db.VarChar(50)
+  district        String?       @db.VarChar(50)
+  source          CustomerSource?
+  industry        String?       @db.VarChar(50)
+  level           CustomerLevel? @default(POTENTIAL)
+  status          CustomerStatus @default(ACTIVE)
+  tags            String?       @db.VarChar(500)
+  notes           String?       @db.Text
+  salesId         String
+  isPublic        Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  lastFollowUpAt  DateTime?
+  nextFollowUpAt  DateTime?
+  
+  // 跟进提醒相关字段
+  reminderDisabled Boolean      @default(false)  // 是否禁用提醒
+  reminderDisabledReason String? @db.VarChar(500) // 禁用提醒原因
+  reminderDisabledAt DateTime?   // 禁用提醒时间
+  
+  // 已合作客户相关字段
+  contractStartDate DateTime?   // 合同开始日期
+  contractEndDate   DateTime?   // 合同到期日期
+  contractAmount    Decimal?    @db.Decimal(12, 2)  // 合同金额
+  renewalReminderDays Int?      @default(30)  // 续签提前提醒天数
+  lastVisitAt       DateTime?   // 最后回访时间
+  nextVisitAt       DateTime?   // 下次回访时间
+  visitFrequency    String?     @db.VarChar(50)   // 回访频率 (WEEKLY/MONTHLY/QUARTERLY/YEARLY)
+  cooperationNotes  String?     @db.Text          // 合作备注
+  operationManagerId String?    // 运营负责人ID
+  
+  // ========== 公海池相关字段 ==========
+  publicPoolEnteredAt DateTime?     // 进入公海池时间
+  publicPoolReason    String?       @db.VarChar(200)  // 进入原因(RULE_1/RULE_2/AUTO_RECYCLE等)
+  originalSalesId     String?       // 原销售ID(用于追溯)
+  publicPoolHistory   Json?         // 流转历史记录(JSON数组)
+  
+  sales           User          @relation("SalesCustomer", fields: [salesId], references: [id])
+  operationManager User?        @relation("OperationManagerCustomer", fields: [operationManagerId], references: [id])
+  followUps       FollowUp[]
+  leads           Lead[]
+  orders          Order[]
+  contractArchives ContractArchive[]  // 合同备案列表
+  telemarketingList TelemarketingList? @relation("TelemarketingToCustomer")
+  
+  @@index([salesId])
+  @@index([status])
+  @@index([level])
+  @@index([createdAt])
+  @@index([name])
+  @@index([contractEndDate])
+  @@index([nextVisitAt])
+  @@index([publicPoolEnteredAt])
+}
+
+enum CustomerSource {
+  WEBSITE
+  REFERRAL
+  ADVERTISEMENT
+  EXHIBITION
+  COLD_CALL
+  SOCIAL_MEDIA
+  OTHER
+}
+
+enum CustomerLevel {
+  VIP
+  IMPORTANT
+  NORMAL
+  POTENTIAL
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  FOLLOWING
+  CONVERTED
+  LOST
+  COOPERATING  // 已合作
+}
+
+// 电销名单状态
+enum TelemarketingStatus {
+  PENDING      // 待拨打
+  CONNECTED    // 已接通
+  NOT_ANSWERED // 未接听
+  BUSY         // 忙线
+  INVALID      // 无效号码
+  CALLBACK     // 需回拨
+  FOLLOW_UP    // 需跟进
+  CONVERTED    // 已转化
+}
+
+// 电销结果
+enum TelemarketingResult {
+  INTERESTED   // 有意向
+  NOT_INTERESTED // 无意向
+  NEED_FOLLOWUP  // 需要跟进
+  WRONG_NUMBER   // 错号
+  EMPTY_NUMBER   // 空号
+  OTHER          // 其他
+}
+
+model TelemarketingList {
+  id              String              @id @default(uuid())
+  name            String              @db.VarChar(100)  // 客户姓名
+  company         String?             @db.VarChar(200)  // 公司名称
+  phone           String              @db.VarChar(20)   // 电话号码
+  position        String?             @db.VarChar(50)   // 职位
+  industry        String?             @db.VarChar(50)   // 行业
+  source          String?             @db.VarChar(100)  // 数据来源
+  callTimes       Int                 @default(0)       // 拨打次数
+  lastCallAt      DateTime?           // 最后拨打时间
+  callDuration    Int?                // 通话时长(秒)
+  status          TelemarketingStatus @default(PENDING) // 拨打状态
+  result          TelemarketingResult? // 拨打结果
+  notes           String?             @db.Text          // 沟通备注
+  isEffective     Boolean             @default(false)   // 是否有效客户
+  customerId      String?             @unique           // 关联的客户ID(转入后)
+  salesId         String              // 销售人员ID
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  sales           User                @relation("SalesTelemarketing", fields: [salesId], references: [id])
+  customer        Customer?           @relation("TelemarketingToCustomer", fields: [customerId], references: [id])
+  
+  @@index([salesId])
+  @@index([status])
+  @@index([isEffective])
+  @@index([createdAt])
+  @@index([phone])
+}
+
+model FollowUp {
+  id            String        @id @default(uuid())
+  customerId    String
+  salesId       String
+  type          FollowUpType
+  content       String        @db.Text
+  result        String?       @db.VarChar(500)
+  nextAction    String?       @db.VarChar(500)
+  nextFollowUpAt DateTime?
+  status        FollowUpStatus @default(COMPLETED)
+  attachments   String?       @db.VarChar(1000)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sales         User          @relation(fields: [salesId], references: [id])
+  
+  @@index([customerId])
+  @@index([salesId])
+  @@index([createdAt])
+}
+
+enum FollowUpType {
+  PHONE
+  VISIT
+  EMAIL
+  WECHAT
+  MEETING
+  OTHER
+}
+
+enum FollowUpStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+}
+
+model Lead {
+  id            String      @id @default(uuid())
+  customerId    String
+  name          String      @db.VarChar(100)
+  company       String?     @db.VarChar(200)
+  contactInfo   String?     @db.VarChar(200)
+  source        LeadSource
+  level         LeadLevel   @default(COLD)
+  status        LeadStatus  @default(NEW)
+  estimatedValue Decimal?   @db.Decimal(10, 2)
+  notes         String?     @db.Text
+  salesId       String
+  convertedAt   DateTime?
+  convertedCustomerId String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  customer      Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sales         User        @relation(fields: [salesId], references: [id])
+  
+  @@index([salesId])
+  @@index([status])
+  @@index([level])
+}
+
+enum LeadSource {
+  WEBSITE
+  REFERRAL
+  ADVERTISEMENT
+  EXHIBITION
+  COLD_CALL
+  SOCIAL_MEDIA
+  OTHER
+}
+
+enum LeadLevel {
+  HOT
+  WARM
+  COLD
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED
+  REJECTED
+}
+
+// ==================== 财务管理 ====================
+
+model Order {
+  id            String        @id @default(uuid())
+  orderNo       String        @unique @db.VarChar(50)
+  customerId    String
+  salesId       String
+  contractNo    String?       @db.VarChar(50)
+  contractAmount Decimal      @db.Decimal(10, 2)
+  paidAmount    Decimal      @default(0) @db.Decimal(10, 2)
+  unpaidAmount  Decimal      @db.Decimal(10, 2)
+  currency      String       @default("CNY") @db.VarChar(10)
+  status        OrderStatus  @default(PENDING)
+  signDate      DateTime?
+  deliveryDate  DateTime?
+  remarks       String?      @db.Text
+  attachments   String?      @db.VarChar(1000)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  customer      Customer     @relation(fields: [customerId], references: [id])
+  sales         User         @relation(fields: [salesId], references: [id])
+  payments      Payment[]
+  
+  @@index([orderNo])
+  @@index([customerId])
+  @@index([salesId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  DELIVERING
+  COMPLETED
+  CANCELLED
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  paymentNo     String        @unique @db.VarChar(50)
+  orderId       String
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod
+  paymentDate   DateTime
+  invoiceNo     String?       @db.VarChar(50)
+  invoiceType   InvoiceType?
+  remarks       String?       @db.VarChar(500)
+  attachments   String?       @db.VarChar(1000)
+  operatorId    String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  operator      User          @relation(fields: [operatorId], references: [id])
+  
+  @@index([orderId])
+  @@index([paymentDate])
+  @@index([operatorId])
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  ALIPAY
+  WECHAT_PAY
+  CASH
+  CHECK
+  OTHER
+}
+
+enum InvoiceType {
+  VAT_SPECIAL
+  VAT_NORMAL
+  RECEIPT
+}
+
+// ==================== 协同办公 ====================
+
+model DailyReport {
+  id            String        @id @default(uuid())
+  userId        String
+  title         String        @db.VarChar(200)
+  content       String        @db.Text
+  workSummary   String?       @db.Text
+  tomorrowPlan  String?       @db.Text
+  issues        String?       @db.Text
+  attachments   String?       @db.VarChar(1000)
+  reportDate    DateTime      @db.Date
+  status        ReportStatus  @default(DRAFT)
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  reviewComment String?       @db.Text
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer      User?         @relation("ReportReviewer", fields: [reviewedBy], references: [id])
+  
+  @@unique([userId, reportDate])
+  @@index([userId])
+  @@index([reportDate])
+  @@index([status])
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+  REJECTED
+}
+
+model Message {
+  id            String        @id @default(uuid())
+  senderId      String
+  receiverId    String
+  type          MessageType   @default(TEXT)
+  title         String?       @db.VarChar(200)
+  content       String        @db.Text
+  attachments   String?       @db.VarChar(1000)
+  isRead        Boolean       @default(false)
+  readAt        DateTime?
+  createdAt     DateTime      @default(now())
+  
+  sender        User          @relation("SentMessage", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver      User          @relation("ReceivedMessage", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM
+  NOTIFICATION
+}
+
+model Task {
+  id            String        @id @default(uuid())
+  title         String        @db.VarChar(200)
+  description   String?       @db.Text
+  priority      TaskPriority  @default(MEDIUM)
+  status        TaskStatus    @default(TODO)
+  assigneeId    String
+  creatorId     String
+  startDate     DateTime?
+  endDate       DateTime?
+  completedAt   DateTime?
+  projectId     String?       @db.VarChar(50)
+  tags          String?       @db.VarChar(500)
+  attachments   String?       @db.VarChar(1000)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  assignee      User          @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creator       User          @relation("TaskCreator", fields: [creatorId], references: [id])
+  
+  @@index([assigneeId])
+  @@index([creatorId])
+  @@index([status])
+  @@index([endDate])
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model File {
+  id            String        @id @default(uuid())
+  name          String        @db.VarChar(255)
+  originalName  String        @db.VarChar(255)
+  url           String        @db.VarChar(500)
+  path          String        @db.VarChar(500)
+  size          Int
+  mimeType      String        @db.VarChar(100)
+  category      FileCategory  @default(OTHER)
+  uploadedBy    String
+  description   String?       @db.VarChar(500)
+  tags          String?       @db.VarChar(500)
+  isPublic      Boolean       @default(false)
+  downloadCount Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  uploader      User          @relation(fields: [uploadedBy], references: [id])
+  
+  @@index([uploadedBy])
+  @@index([category])
+  @@index([createdAt])
+}
+
+enum FileCategory {
+  DOCUMENT
+  CONTRACT
+  TEMPLATE
+  IMAGE
+  VIDEO
+  OTHER
+}
+
+// ==================== 合同备案 ====================
+
+model ContractArchive {
+  id              String        @id @default(uuid())
+  archiveNo       String        @unique @db.VarChar(50)  // 备案号
+  
+  customerId      String        // 关联客户ID
+  version         Int           @default(1)              // 版本号
+  isLatest        Boolean       @default(true)           // 是否最新版本
+  parentArchiveId String?       // 父版本ID(用于版本链)
+  
+  // 合同基本信息
+  contractName    String        @db.VarChar(200)  // 合同名称
+  contractType    String?       @db.VarChar(50)   // 合同类型(SALES/SERVICE/COOPERATION/OTHER)
+  signDate        DateTime?     // 签订日期
+  effectiveDate   DateTime?     // 生效日期
+  expiryDate      DateTime?     // 到期日期
+  contractAmount  Decimal?      @db.Decimal(12, 2)  // 合同金额
+  
+  // 文件信息(OSS存储)
+  fileName        String        @db.VarChar(200)  // 原始文件名
+  ossUrl          String        @db.VarChar(500)  // OSS存储URL
+  ossKey          String        @db.VarChar(300)  // OSS对象键
+  fileSize        Int           // 文件大小(字节)
+  fileType        String        @db.VarChar(20)   // 文件类型(pdf/doc/docx/jpg/png)
+  
+  // 备案信息
+  archivedBy      String        // 备案人ID
+  archivedAt      DateTime      @default(now())   // 备案时间
+  remarks         String?       @db.Text          // 备注说明
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // 关系
+  customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  archivedUser    User          @relation("ContractArchiver", fields: [archivedBy], references: [id])
+  parentArchive   ContractArchive? @relation("VersionChain", fields: [parentArchiveId], references: [id])
+  childArchives   ContractArchive[] @relation("VersionChain")
+  
+  @@index([customerId])
+  @@index([archivedBy])
+  @@index([isLatest])
+  @@index([createdAt])
+}

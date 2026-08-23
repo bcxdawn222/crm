@@ -1,0 +1,65 @@
+import bcrypt from 'bcryptjs'
+
+import { prisma } from '@/lib/prisma'
+
+
+export interface AuthenticatedDatabaseUser {
+  id: string
+  username: string
+  email: string
+  realName: string
+  roles: string[]
+  permissions: string[]
+}
+
+
+export async function authenticateDatabaseUser(
+  username: string,
+  password: string
+): Promise<AuthenticatedDatabaseUser | null> {
+  const user = await prisma.user.findUnique({
+    where: { username },
+    include: {
+      roles: {
+        include: {
+          role: {
+            include: {
+              permissions: {
+                include: {
+                  permission: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!user || user.status !== 'ACTIVE') {
+    return null
+  }
+
+  const isPasswordValid = await bcrypt.compare(password, user.password)
+  if (!isPasswordValid) {
+    return null
+  }
+
+  const roles = user.roles.map(({ role }) => role.name)
+  const permissions = Array.from(
+    new Set(
+      user.roles.flatMap(({ role }) =>
+        role.permissions.map(({ permission }) => permission.code)
+      )
+    )
+  )
+
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    realName: user.realName,
+    roles,
+    permissions,
+  }
+}

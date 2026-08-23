@@ -1,0 +1,706 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { Card, Table, Button, Space, Input, Select, Modal, Form, message, Tag, Upload } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ExportOutlined, UploadOutlined } from '@ant-design/icons'
+import type { ColumnsType } from 'antd/es/table'
+import { PermissionGuard } from '@/components/common/PermissionGuard'
+import { Resizable } from 'react-resizable'
+import 'react-resizable/css/styles.css'
+
+// 可拖动的表头组件
+const ResizableTitle = (props: any) => {
+  const { onResize, width, ...restProps } = props
+
+  if (!width) {
+    return <th {...restProps} />
+  }
+
+  return (
+    <Resizable
+      width={width}
+      height={0}
+      handle={
+        <span
+          className="react-resizable-handle"
+          style={{
+            position: 'absolute',
+            right: -5,
+            top: 0,
+            bottom: 0,
+            width: 10,
+            cursor: 'col-resize',
+            zIndex: 100,
+            padding: 0,
+            margin: 0,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      }
+      onResize={onResize}
+      draggableOpts={{ enableUserSelectHack: false }}
+    >
+      <th 
+        {...restProps} 
+        style={{ 
+          position: 'relative', 
+          overflow: 'visible',
+          paddingRight: 8,
+        }} 
+      />
+    </Resizable>
+  )
+}
+
+interface Customer {
+  id: string
+  name: string
+  company?: string
+  phone: string
+  email?: string
+  address?: string
+  category: string
+  source: string
+  status: string
+  salesId: string
+  createdAt: string
+  updatedAt: string
+  isPublic: boolean
+  sales?: {
+    realName: string
+  }
+  _count?: {
+    followUps: number
+    orders: number
+  }
+  followUps?: Array<{
+    createdAt: string
+  }>
+}
+
+export default function CustomersPage() {
+  const [loading, setLoading] = useState(false)
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [keyword, setKeyword] = useState('')
+  const [category, setCategory] = useState<string>()
+  const [status, setStatus] = useState<string>()
+  const [modalVisible, setModalVisible] = useState(false)
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
+  const [importModalVisible, setImportModalVisible] = useState(false)
+  const [form] = Form.useForm()
+  const [uploading, setUploading] = useState(false)
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    name: 120,
+    company: 200,
+    phone: 130,
+    email: 200,
+    category: 100,
+    status: 80,
+    followUps: 80,
+    lastFollowUp: 160,
+    sales: 100,
+    createdAt: 160,
+    action: 200,
+  })
+
+  // 加载客户列表
+  const loadCustomers = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        pageSize: pageSize.toString(),
+      })
+      if (keyword) params.append('keyword', keyword)
+      if (category) params.append('category', category)
+      if (status) params.append('status', status)
+
+      const res = await fetch(`/api/customers?${params}`)
+      const data = await res.json()
+
+      if (data.success) {
+        setCustomers(data.data.list)
+        setTotal(data.data.total)
+      } else {
+        message.error(data.error || '加载失败')
+      }
+    } catch (error) {
+      message.error('网络错误')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadCustomers()
+  }, [page, pageSize])
+
+  // 搜索
+  const handleSearch = () => {
+    setPage(1)
+    loadCustomers()
+  }
+
+  // 重置搜索
+  const handleReset = () => {
+    setKeyword('')
+    setCategory(undefined)
+    setStatus(undefined)
+    setPage(1)
+  }
+
+  // 打开新增/编辑弹窗
+  const handleOpenModal = (customer?: Customer) => {
+    setEditingCustomer(customer || null)
+    if (customer) {
+      form.setFieldsValue(customer)
+    } else {
+      form.resetFields()
+    }
+    setModalVisible(true)
+  }
+
+  // 提交表单
+  const handleSubmit = async (values: any) => {
+    try {
+      let url = '/api/customers'
+      let method = 'POST'
+
+      if (editingCustomer) {
+        url = `/api/customers/${editingCustomer.id}`
+        method = 'PUT'
+      }
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        message.success(editingCustomer ? '更新成功' : '创建成功')
+        setModalVisible(false)
+        loadCustomers()
+      } else {
+        message.error(data.error || '操作失败')
+      }
+    } catch (error) {
+      message.error('网络错误')
+    }
+  }
+
+  // 归档客户到公海池
+  const handleArchive = (id: string, name: string) => {
+    Modal.confirm({
+      title: '确认归档',
+      content: `确定要将客户"${name}"归档到公海池吗?归档后其他销售可以认领。`,
+      okText: '确认归档',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const res = await fetch(`/api/customers/${id}/archive`, {
+            method: 'POST',
+          })
+
+          const data = await res.json()
+
+          if (data.success) {
+            message.success('归档成功')
+            loadCustomers()
+          } else {
+            message.error(data.error || '归档失败')
+          }
+        } catch (error) {
+          message.error('网络错误')
+        }
+      },
+    })
+  }
+
+  // 删除客户
+  const handleDelete = (id: string) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除该客户吗?',
+      onOk: async () => {
+        try {
+          const res = await fetch(`/api/customers/${id}`, {
+            method: 'DELETE',
+          })
+
+          const data = await res.json()
+
+          if (data.success) {
+            message.success('删除成功')
+            loadCustomers()
+          } else {
+            message.error(data.error || '删除失败')
+          }
+        } catch (error) {
+          message.error('网络错误')
+        }
+      },
+    })
+  }
+
+  // 处理文件上传
+  const handleFileUpload = async (file: File) => {
+    setUploading(true)
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const res = await fetch('/api/customers/import', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        message.success(`导入成功！共导入 ${data.data.count} 条记录`)
+        setImportModalVisible(false)
+        loadCustomers()
+      } else {
+        message.error(data.error || '导入失败')
+      }
+    } catch (error) {
+      message.error('网络错误')
+    } finally {
+      setUploading(false)
+    }
+
+    return false // 阻止默认上传行为
+  }
+
+  // 处理列宽度调整
+  const handleResize = (key: string) => (_: any, { size }: { size: { width: number } }) => {
+    setColumnWidths((prev) => ({
+      ...prev,
+      [key]: size.width,
+    }))
+  }
+
+  // 表格列定义
+  const columns: ColumnsType<Customer> = [
+    {
+      title: '姓名',
+      dataIndex: 'name',
+      key: 'name',
+      width: columnWidths.name,
+      onHeaderCell: (column) => ({
+        width: 'width' in column ? column.width : undefined,
+        onResize: handleResize(column.key as string),
+      }),
+    },
+    {
+      title: '公司',
+      dataIndex: 'company',
+      key: 'company',
+      width: columnWidths.company,
+      ellipsis: true,
+      onHeaderCell: (column) => ({
+        width: 'width' in column ? column.width : undefined,
+        onResize: handleResize(column.key as string),
+      }),
+    },
+    {
+      title: '电话',
+      dataIndex: 'phone',
+      key: 'phone',
+      width: columnWidths.phone,
+      onHeaderCell: (column) => ({
+        width: 'width' in column ? column.width : undefined,
+        onResize: handleResize(column.key as string),
+      }),
+    },
+    {
+      title: '邮箱',
+      dataIndex: 'email',
+      key: 'email',
+      width: columnWidths.email,
+      ellipsis: true,
+      onHeaderCell: (column) => ({
+        width: 'width' in column ? column.width : undefined,
+        onResize: handleResize(column.key as string),
+      }),
+    },
+    {
+      title: '分类',
+      dataIndex: 'category',
+      key: 'category',
+      width: columnWidths.category,
+      render: (text) => <Tag color="blue">{text}</Tag>,
+      onHeaderCell: (column) => ({
+        width: 'width' in column ? column.width : undefined,
+        onResize: handleResize(column.key as string),
+      }),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: columnWidths.status,
+      render: (text) => (
+        <Tag color={text === 'ACTIVE' ? 'green' : 'red'}>
+          {text === 'ACTIVE' ? '活跃' : ' inactive'}
+        </Tag>
+      ),
+      onHeaderCell: (column) => ({
+        width: 'width' in column ? column.width : undefined,
+        onResize: handleResize(column.key as string),
+      }),
+    },
+    {
+      title: '跟进数',
+      dataIndex: '_count',
+      key: 'followUps',
+      width: columnWidths.followUps,
+      render: (_, record) => record._count?.followUps || 0,
+      onHeaderCell: (column) => ({
+        width: 'width' in column ? column.width : undefined,
+        onResize: handleResize(column.key as string),
+      }),
+    },
+    {
+      title: '最近一次跟进时间',
+      dataIndex: 'followUps',
+      key: 'lastFollowUp',
+      width: columnWidths.lastFollowUp,
+      render: (followUps) => {
+        if (!followUps || followUps.length === 0) return '-'
+        return new Date(followUps[0].createdAt).toLocaleString('zh-CN')
+      },
+      onHeaderCell: (column) => ({
+        width: 'width' in column ? column.width : undefined,
+        onResize: handleResize(column.key as string),
+      }),
+    },
+    {
+      title: '销售',
+      dataIndex: 'sales',
+      key: 'sales',
+      width: columnWidths.sales,
+      render: (_, record) => record.sales?.realName || '-',
+      onHeaderCell: (column) => ({
+        width: 'width' in column ? column.width : undefined,
+        onResize: handleResize(column.key as string),
+      }),
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: columnWidths.createdAt,
+      render: (text) => new Date(text).toLocaleString('zh-CN'),
+      onHeaderCell: (column) => ({
+        width: 'width' in column ? column.width : undefined,
+        onResize: handleResize(column.key as string),
+      }),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: columnWidths.action,
+      fixed: 'right',
+      onHeaderCell: (column) => ({
+        width: 'width' in column ? column.width : undefined,
+        onResize: handleResize(column.key as string),
+      }),
+      render: (_, record) => (
+        <Space size="small">
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleOpenModal(record)}
+          >
+            查看
+          </Button>
+          <PermissionGuard action="update" subject="customer">
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenModal(record)}
+            >
+              编辑
+            </Button>
+          </PermissionGuard>
+          <PermissionGuard action="delete" subject="customer">
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record.id)}
+            >
+              删除
+            </Button>
+          </PermissionGuard>
+          {!record.isPublic && (
+            <PermissionGuard action="update" subject="customer">
+              <Button
+                type="link"
+                size="small"
+                icon={<ExportOutlined />}
+                onClick={() => handleArchive(record.id, record.name)}
+              >
+                归档
+              </Button>
+            </PermissionGuard>
+          )}
+        </Space>
+      ),
+    },
+  ]
+
+  return (
+    <div>
+      {/* 自定义样式 */}
+      <style jsx global>{`
+        .react-resizable-handle {
+          position: absolute !important;
+          right: -5px !important;
+          top: 0 !important;
+          bottom: 0 !important;
+          width: 10px !important;
+          cursor: col-resize !important;
+          z-index: 100 !important;
+          background-color: transparent !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        .react-resizable-handle:hover {
+          background-color: rgba(24, 144, 255, 0.5) !important;
+          border-left: 2px solid #1890ff !important;
+        }
+        .react-resizable-handle::before {
+          content: '' !important;
+          position: absolute !important;
+          left: 50% !important;
+          top: 0 !important;
+          bottom: 0 !important;
+          width: 1px !important;
+          background-color: #e8e8e8 !important;
+        }
+        th.ant-table-cell {
+          position: relative !important;
+          overflow: visible !important;
+        }
+      `}</style>
+      
+      <Card
+        title="客户管理"
+        extra={
+          <Space>
+            <PermissionGuard action="create" subject="customer">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => handleOpenModal()}
+              >
+                新增客户
+              </Button>
+            </PermissionGuard>
+            <PermissionGuard action="create" subject="customer">
+              <Button
+                icon={<UploadOutlined />}
+                onClick={() => setImportModalVisible(true)}
+              >
+                客资录入
+              </Button>
+            </PermissionGuard>
+          </Space>
+        }
+      >
+        {/* 搜索栏 */}
+        <Space style={{ marginBottom: 16 }} wrap>
+          <Input
+            placeholder="搜索姓名、公司、电话"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            style={{ width: 200 }}
+            onPressEnter={handleSearch}
+          />
+          <Select
+            placeholder="选择分类"
+            value={category}
+            onChange={setCategory}
+            style={{ width: 120 }}
+            allowClear
+            options={[
+              { label: '潜在客户', value: '潜在客户' },
+              { label: '普通客户', value: '普通客户' },
+              { label: '重要客户', value: '重要客户' },
+              { label: 'VIP客户', value: 'VIP客户' },
+            ]}
+          />
+          <Select
+            placeholder="选择状态"
+            value={status}
+            onChange={setStatus}
+            style={{ width: 120 }}
+            allowClear
+            options={[
+              { label: '活跃', value: 'ACTIVE' },
+              { label: ' inactive', value: 'INACTIVE' },
+            ]}
+          />
+          <Button type="primary" onClick={handleSearch}>
+            搜索
+          </Button>
+          <Button onClick={handleReset}>重置</Button>
+        </Space>
+
+        {/* 表格 */}
+        <Table
+          columns={columns}
+          dataSource={customers}
+          rowKey="id"
+          loading={loading}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          pagination={{
+            current: page,
+            pageSize,
+            total,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: (p, ps) => {
+              setPage(p)
+              setPageSize(ps)
+            },
+          }}
+          scroll={{ x: 1200 }}
+        />
+      </Card>
+
+      {/* 新增/编辑弹窗 */}
+      <Modal
+        title={editingCustomer ? '编辑客户' : '新增客户'}
+        open={modalVisible}
+        onCancel={() => setModalVisible(false)}
+        footer={null}
+        width={600}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          initialValues={{
+            category: '潜在客户',
+            source: 'OTHER',
+            status: 'ACTIVE',
+          }}
+        >
+          <Form.Item
+            name="name"
+            label="客户姓名"
+            rules={[{ required: true, message: '请输入客户姓名' }]}
+          >
+            <Input placeholder="请输入客户姓名" />
+          </Form.Item>
+
+          <Form.Item name="company" label="公司名称">
+            <Input placeholder="请输入公司名称" />
+          </Form.Item>
+
+          <Form.Item
+            name="phone"
+            label="联系电话"
+            rules={[{ required: true, message: '请输入联系电话' }]}
+          >
+            <Input placeholder="请输入联系电话" />
+          </Form.Item>
+
+          <Form.Item name="email" label="邮箱地址">
+            <Input placeholder="请输入邮箱地址" />
+          </Form.Item>
+
+          <Form.Item name="address" label="联系地址">
+            <Input.TextArea rows={3} placeholder="请输入联系地址" />
+          </Form.Item>
+
+          <Form.Item name="category" label="客户分类">
+            <Select
+              options={[
+                { label: '潜在客户', value: '潜在客户' },
+                { label: '普通客户', value: '普通客户' },
+                { label: '重要客户', value: '重要客户' },
+                { label: 'VIP客户', value: 'VIP客户' },
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item name="source" label="客户来源">
+            <Input placeholder="请输入客户来源，如：网站咨询、推荐介绍等" />
+          </Form.Item>
+
+          <Form.Item name="notes" label="备注信息">
+            <Input.TextArea rows={4} placeholder="请输入备注信息" />
+          </Form.Item>
+
+          <Form.Item>
+            <Button type="primary" htmlType="submit" block>
+              {editingCustomer ? '更新' : '创建'}
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 客资录入弹窗 */}
+      <Modal
+        title="客资录入"
+        open={importModalVisible}
+        onCancel={() => setImportModalVisible(false)}
+        footer={null}
+        width={600}
+      >
+        <div style={{ padding: '20px 0' }}>
+          <p style={{ marginBottom: 16, color: '#666' }}>
+            请上传Excel或CSV文件进行批量导入。文件格式要求：
+          </p>
+          <ul style={{ marginBottom: 24, paddingLeft: 20, color: '#999', lineHeight: 1.8 }}>
+            <li>支持 .xlsx, .xls, .csv 格式</li>
+            <li>第一行为表头，包含：姓名、公司、电话、邮箱等字段</li>
+            <li>姓名为必填项</li>
+            <li>单次最多导入1000条记录</li>
+          </ul>
+          
+          <Upload.Dragger
+            name="file"
+            accept=".xlsx,.xls,.csv"
+            beforeUpload={handleFileUpload}
+            showUploadList={false}
+            maxCount={1}
+          >
+            <p className="ant-upload-drag-icon">
+              <UploadOutlined style={{ fontSize: 48, color: '#1890ff' }} />
+            </p>
+            <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+            <p className="ant-upload-hint">
+              支持单个文件上传，文件大小不超过10MB
+            </p>
+          </Upload.Dragger>
+
+          <div style={{ marginTop: 24, textAlign: 'center' }}>
+            <Button onClick={() => setImportModalVisible(false)}>
+              取消
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+
