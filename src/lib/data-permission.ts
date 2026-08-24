@@ -56,8 +56,8 @@ export async function buildDataFilter(
     return {}
   }
   
-  // 默认返回空过滤器(无权限)
-  return {}
+  // 无明确数据范围的角色只能看到空集合，不能把缺少范围解释为全局访问。
+  return { salesId: { in: [] } }
 }
 
 /**

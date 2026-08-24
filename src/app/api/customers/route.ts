@@ -45,16 +45,12 @@ export async function GET(request: Request) {
     if (publicPool) {
       where.isPublic = true
     } else {
-      // Apply hierarchical data filter based on user role
+      // Apply the data filter for every role. Admin/finance return an empty
+      // filter, while roles without a declared scope return an empty set.
       const roles = session.user.roles || []
       const dataFilter = await buildDataFilter(session.user.id, roles)
-      
-      // Sales Manager and Sales can only view their own and subordinates' customers
-      if (roles.includes('sales_manager') || roles.includes('sales')) {
-        Object.assign(where, dataFilter)
-        where.isPublic = false
-      }
-      // Admin and Finance can view all non-public customers (no filter applied)
+      Object.assign(where, dataFilter)
+      where.isPublic = false
     }
 
     // Keyword search

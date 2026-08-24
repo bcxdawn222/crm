@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
 import { CustomerLevel, CustomerSource, CustomerStatus } from '@prisma/client'
 import { recordAuditEvent } from '@/lib/audit/record'
+import { canAccessSalesData } from '@/lib/data-permission'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 
 // GET /api/customers/[id] - 获取客户详情
@@ -64,8 +65,7 @@ export async function GET(
       return NextResponse.json({ error: '客户不存在' }, { status: 404 })
     }
 
-    // 普通销售只能查看自己的客户
-    if (session.user.roles.includes('sales') && customer.salesId !== session.user.id) {
+    if (!await canAccessSalesData(session.user.id, session.user.roles, customer.salesId)) {
       return NextResponse.json({ error: '无权查看该客户' }, { status: 403 })
     }
 
@@ -115,8 +115,7 @@ export async function PUT(
       return NextResponse.json({ error: '客户不存在' }, { status: 404 })
     }
 
-    // 普通销售只能修改自己的客户
-    if (session.user.roles.includes('sales') && existingCustomer.salesId !== session.user.id) {
+    if (!await canAccessSalesData(session.user.id, session.user.roles, existingCustomer.salesId)) {
       return NextResponse.json({ error: '无权修改该客户' }, { status: 403 })
     }
 
@@ -211,8 +210,7 @@ export async function DELETE(
       return NextResponse.json({ error: '客户不存在' }, { status: 404 })
     }
 
-    // 普通销售只能删除自己的客户
-    if (session.user.roles.includes('sales') && customer.salesId !== session.user.id) {
+    if (!await canAccessSalesData(session.user.id, session.user.roles, customer.salesId)) {
       return NextResponse.json({ error: '无权删除该客户' }, { status: 403 })
     }
 

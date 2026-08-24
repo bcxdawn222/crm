@@ -186,3 +186,11 @@ conclusion: fail
 - 首次执行因 Windows MySQL 的 `lower_case_table_names` 返回小写表名，脚本误报核心表缺失；修正为大小写无关比对后，发现 `Lead` 未转义导致 SQL 语法错误；修正为 `` `Lead` `` 后重新执行通过。这两次失败均为检查器问题，未修改业务数据。
 - `python scripts\manage.py data-reachability --profile test`：退出码 0。测试库网络和 Prisma 探针通过；核心表 15 张；孤立用户角色、角色权限、客户销售、跟进、线索、订单、回款、文件、消息、合同均为 0；异常订单金额和负回款均为 0。
 - 当前报告是数据库结构与数据质量门禁，不等同于全部页面按钮链路已完成；8.1 的多角色最小夹具、导入、合作客户、合同版本和批量重复写入仍待后续链路验收。
+
+## Apply working evidence - 2026-08-24 13:49
+
+- 数据范围审查发现：`buildDataFilter` 对没有 admin、finance、sales_manager、sales 角色的账号返回 `{}`，客户列表会把“没有声明范围”解释为全局访问；客户详情、更新和删除也只限制 `sales` 角色，其他自定义角色可绕过范围。
+- 默认数据范围已改为空集合 `{ salesId: { in: [] } }`；客户列表对所有角色统一应用 `buildDataFilter`；客户详情、更新和删除统一调用 `canAccessSalesData`，不再只判断角色名是否为 `sales`。
+- 新增 `python scripts\manage.py scope-flow --profile test`，退出码 0：临时创建只拥有 `customer:view` 的受限角色和用户，再创建管理员客户；受限用户列表中看不到该客户，直接详情 API 返回 403。临时角色、权限关系、用户、客户和审计记录均已清理。
+- `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build` 均退出码 0。
+- 本轮验证了受限自定义角色的客户列表与详情范围；经理下属层级、订单、回款、提醒、文件等模块的统一范围矩阵仍待任务 10 后续完成。
