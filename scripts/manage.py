@@ -122,6 +122,7 @@ def main() -> int:
             "user-flow",
             "role-flow",
             "settings-flow",
+            "public-pool-flow",
             "runtime-test",
             "e2e",
             "perf",
@@ -267,6 +268,12 @@ def main() -> int:
             return 2
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "settings_flow_test.py")]
         return run_sequence((("settings-flow", command),), logger)
+    if args.action == "public-pool-flow":
+        if profile.name != "test":
+            logger.error("public-pool-flow 只允许 --profile test")
+            return 2
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "public_pool_flow_test.py")]
+        return run_sequence((("public-pool-flow", command),), logger)
     if args.action == "runtime-test":
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "runtime_checks.py")]
         return run_sequence((("runtime-test", command),), logger)

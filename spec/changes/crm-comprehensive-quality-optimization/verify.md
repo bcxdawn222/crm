@@ -172,3 +172,10 @@ conclusion: fail
 - Playwright 真实浏览器验收通过：登录后打开 `/admin/settings`，修改系统名称和公司名称，页面显示“设置保存成功”；刷新页面后两个字段仍回显修改值。随后已删除页面验收产生的设置记录和审计记录，测试库恢复为 `SystemSetting=0`、设置审计=0。
 - `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build` 均退出码 0；生产构建包含 `/api/settings`，`/admin/settings` First Load JS 约 231 kB。
 - 稳定库尚未执行 `prisma migrate deploy`，避免在未进入发布门禁前改变稳定数据库结构；迁移和回滚文件已提交，发布阶段需先备份再执行。
+
+## Apply working evidence - 2026-08-24 13:40
+
+- 审查发现 `src/app/(dashboard)/daily-leads/page.tsx` 的“转入我的客户”调用旧 `/api/customers/transfer`，旧接口没有复用公海认领配额、流转历史和串行化冲突保护。
+- `/api/customers/transfer` 已改为复用 `handlePublicPoolClaim`，因此每日客资入口与公海页面入口使用同一客户认领规则、事务和审计动作。
+- 新增 `python scripts\manage.py public-pool-flow --profile test`，退出码 0：创建客户、进入公海、重复归档 409、通过每日客资入口认领、重复认领 409、数据库状态、`ARCHIVED`/`CLAIMED` 流转历史和 `ARCHIVE_TO_PUBLIC_POOL`/`CLAIM` 审计均通过；测试客户和审计记录已清理。
+- 本轮只完成公海进入/认领链路；客户转移其他场景、导入、合作客户更新、合同版本和批量重复写入仍未宣称完成。
