@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Form, Input, message, Modal, Select, Space } from 'antd'
 
+import { useFormDraft } from '@/hooks/useFormDraft'
 import { apiRequest } from '@/lib/http/client'
 
 interface TransferCustomer {
@@ -22,6 +23,15 @@ interface TransferTarget {
 interface TransferFormValues {
   targetSalesId: string
   reason?: string
+}
+
+type TransferDraft = Partial<TransferFormValues>
+
+function isTransferDraft(value: unknown): value is TransferDraft {
+  if (typeof value !== 'object' || value === null) return false
+  const draft = value as TransferDraft
+  return (draft.targetSalesId === undefined || typeof draft.targetSalesId === 'string')
+    && (draft.reason === undefined || typeof draft.reason === 'string')
 }
 
 interface TransferOptionsResponse {
@@ -52,11 +62,20 @@ export function CustomerTransferModal({
   const [loadingTargets, setLoadingTargets] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const requestIdRef = useRef('')
+  const draft = useFormDraft<TransferFormValues, TransferDraft>({
+    key: `customer-transfer:${customer?.id || 'unknown'}`,
+    enabled: Boolean(customer),
+    form,
+    serialize: (values) => ({ targetSalesId: values.targetSalesId, reason: values.reason }),
+    deserialize: (values) => values,
+    validate: isTransferDraft,
+  })
 
   useEffect(() => {
     if (!customer) return
     requestIdRef.current = crypto.randomUUID()
     form.resetFields()
+    if (draft.restore()) message.info('已恢复未提交的客户转移草稿')
     setLoadingTargets(true)
     void apiRequest<TransferOptionsResponse>('/api/customers/transfer-options')
       .then((data) => {
@@ -85,6 +104,7 @@ export function CustomerTransferModal({
       })
 
       message.success(data.replayed ? '该转移请求已完成' : '客户转移成功')
+      draft.clear()
       onClose()
       await onSaved()
     } catch (error) {
@@ -98,13 +118,17 @@ export function CustomerTransferModal({
     <Modal
       title={customer ? `转移客户：${customer.name}` : '转移客户'}
       open={Boolean(customer)}
-      onCancel={onClose}
+      onCancel={() => {
+        if (submitting) return
+        draft.clear()
+        onClose()
+      }}
       footer={null}
       width={520}
       closable={!submitting}
       maskClosable={!submitting}
     >
-      <Form form={form} layout="vertical" onFinish={handleSubmit}>
+      <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={draft.save}>
         <Form.Item
           name="targetSalesId"
           label="目标销售"
@@ -135,7 +159,7 @@ export function CustomerTransferModal({
             <Button type="primary" htmlType="submit" loading={submitting}>
               确认转移
             </Button>
-            <Button onClick={onClose} disabled={submitting}>
+            <Button onClick={() => { draft.clear(); onClose() }} disabled={submitting}>
               取消
             </Button>
           </Space>

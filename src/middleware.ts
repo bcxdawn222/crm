@@ -35,11 +35,20 @@ export async function middleware(request: NextRequest) {
   
   // 未登录用户重定向到登录页
   if (!token) {
+    if (pathname.startsWith('/api/')) {
+      const requestId = request.headers.get('x-request-id') || crypto.randomUUID()
+      const response = NextResponse.json(
+        { error: '登录状态已过期', requestId },
+        { status: 401 },
+      )
+      response.headers.set('x-request-id', requestId)
+      return response
+    }
     const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0].trim()
       || request.headers.get('host')
       || request.nextUrl.host
     const externalOrigin = `${forwardedProtocol}://${forwardedHost}`
-    const callbackUrl = `${externalOrigin}${request.nextUrl.pathname}${request.nextUrl.search}`
+    const callbackUrl = `${request.nextUrl.pathname}${request.nextUrl.search}`
     const loginUrl = new URL('/login', externalOrigin)
     loginUrl.searchParams.set('callbackUrl', callbackUrl)
     return NextResponse.redirect(loginUrl)

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Form, Input, message, Modal, Select, Space } from 'antd'
 
+import { useFormDraft } from '@/hooks/useFormDraft'
 import { apiRequest } from '@/lib/http/client'
 
 interface ConvertRecord {
@@ -14,6 +15,16 @@ interface ConvertFormValues {
   level: string
   source: string
   notes?: string
+}
+
+type ConvertDraft = Partial<ConvertFormValues>
+
+function isConvertDraft(value: unknown): value is ConvertDraft {
+  if (typeof value !== 'object' || value === null) return false
+  const draft = value as ConvertDraft
+  return (draft.level === undefined || typeof draft.level === 'string')
+    && (draft.source === undefined || typeof draft.source === 'string')
+    && (draft.notes === undefined || typeof draft.notes === 'string')
 }
 
 interface ConvertResponse {
@@ -36,6 +47,14 @@ export function TelemarketingConvertModal({
   const [form] = Form.useForm<ConvertFormValues>()
   const [submitting, setSubmitting] = useState(false)
   const requestIdRef = useRef('')
+  const draft = useFormDraft<ConvertFormValues, ConvertDraft>({
+    key: `telemarketing-convert:${record?.id || 'unknown'}`,
+    enabled: Boolean(record),
+    form,
+    serialize: (values) => ({ level: values.level, source: values.source, notes: values.notes }),
+    deserialize: (values) => values,
+    validate: isConvertDraft,
+  })
 
   useEffect(() => {
     if (!record) return
@@ -45,6 +64,7 @@ export function TelemarketingConvertModal({
       source: 'COLD_CALL',
       notes: record.notes,
     })
+    if (draft.restore()) message.info('已恢复未提交的转客户草稿')
   }, [form, record])
 
   async function handleSubmit(values: ConvertFormValues) {
@@ -63,6 +83,7 @@ export function TelemarketingConvertModal({
       })
 
       message.success(data.replayed ? '该记录已转入客户' : '已成功转入我的客户')
+      draft.clear()
       form.resetFields()
       onClose()
       await onSaved()
@@ -77,13 +98,17 @@ export function TelemarketingConvertModal({
     <Modal
       title="转入我的客户"
       open={Boolean(record)}
-      onCancel={onClose}
+      onCancel={() => {
+        if (submitting) return
+        draft.clear()
+        onClose()
+      }}
       footer={null}
       width={500}
       closable={!submitting}
       maskClosable={!submitting}
     >
-      <Form form={form} layout="vertical" onFinish={handleSubmit}>
+      <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={draft.save}>
         <Form.Item name="level" label="客户等级" rules={[{ required: true }]}>
           <Select
             options={[
@@ -118,7 +143,7 @@ export function TelemarketingConvertModal({
             <Button type="primary" htmlType="submit" loading={submitting}>
               确认转入
             </Button>
-            <Button onClick={onClose} disabled={submitting}>
+            <Button onClick={() => { draft.clear(); onClose() }} disabled={submitting}>
               取消
             </Button>
           </Space>

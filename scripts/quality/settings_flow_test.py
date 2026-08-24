@@ -90,10 +90,11 @@ def main() -> int:
 
     try:
         unauthenticated = request(build_opener(), BASE_URL, "/api/settings")
-        login_location = unauthenticated.headers.get("location", "")
+        unauthenticated_payload = json_body(unauthenticated)
         require(
-            unauthenticated.status == 307 and "/login?callbackUrl=" in login_location,
-            "未登录用户没有被系统认证中间件拦截",
+            unauthenticated.status == 401
+            and isinstance(unauthenticated_payload.get("requestId"), str),
+            "未登录 API 没有返回带 requestId 的 401",
         )
         login(opener, BASE_URL, USERNAME, PASSWORD)
         initial_result = request(opener, BASE_URL, "/api/settings")

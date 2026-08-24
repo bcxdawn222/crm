@@ -8,6 +8,11 @@ import dayjs, { Dayjs } from 'dayjs'
 import { Resizable } from 'react-resizable'
 import 'react-resizable/css/styles.css'
 import { ContractArchiveModal } from '@/components/contract'
+import { useFormDraft } from '@/hooks/useFormDraft'
+import {
+  isCooperatingCustomerDraft,
+  type CooperatingCustomerDraft,
+} from '@/lib/forms/crm-drafts'
 import { apiRequest } from '@/lib/http/client'
 
 const { TextArea } = Input
@@ -120,6 +125,30 @@ export default function CooperatingCustomersPage() {
   const [managerLoading, setManagerLoading] = useState(false)
   const [managerOptions, setManagerOptions] = useState<OperationManagerOption[]>([])
   const requestIdRef = useRef('')
+  const cooperatingDraft = useFormDraft<CooperatingFormValues, CooperatingCustomerDraft>({
+    key: `cooperating:${editingCustomer?.id || 'unknown'}`,
+    enabled: editModalVisible && Boolean(editingCustomer),
+    form,
+    serialize: (values) => ({
+      contractStartDate: values.contractStartDate?.toISOString(),
+      contractEndDate: values.contractEndDate?.toISOString(),
+      contractAmount: values.contractAmount,
+      renewalReminderDays: values.renewalReminderDays,
+      operationManagerId: values.operationManagerId,
+      lastVisitAt: values.lastVisitAt?.toISOString(),
+      nextVisitAt: values.nextVisitAt?.toISOString(),
+      visitFrequency: values.visitFrequency,
+      cooperationNotes: values.cooperationNotes,
+    }),
+    deserialize: (values) => ({
+      ...values,
+      contractStartDate: values.contractStartDate ? dayjs(values.contractStartDate) : undefined,
+      contractEndDate: values.contractEndDate ? dayjs(values.contractEndDate) : null,
+      lastVisitAt: values.lastVisitAt ? dayjs(values.lastVisitAt) : undefined,
+      nextVisitAt: values.nextVisitAt ? dayjs(values.nextVisitAt) : undefined,
+    }),
+    validate: isCooperatingCustomerDraft,
+  })
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     name: 100,
     company: 150,
@@ -191,6 +220,12 @@ export default function CooperatingCustomersPage() {
     loadReminders()
   }, [page, pageSize, expiringSoon])
 
+  useEffect(() => {
+    if (editModalVisible && cooperatingDraft.restore()) {
+      message.info('已恢复未提交的合作客户草稿')
+    }
+  }, [editModalVisible, editingCustomer?.id])
+
   // Handle edit
   const handleEdit = async (values: CooperatingFormValues) => {
     if (!editingCustomer || submitting) return
@@ -218,6 +253,7 @@ export default function CooperatingCustomersPage() {
         requestKey: `cooperating-update-${editingCustomer.id}-${requestIdRef.current}`,
       })
       message.success('更新成功')
+      cooperatingDraft.clear()
       setEditModalVisible(false)
       form.resetFields()
       setEditingCustomer(null)
@@ -577,6 +613,7 @@ export default function CooperatingCustomersPage() {
         open={editModalVisible}
         onCancel={() => {
           if (submitting) return
+          cooperatingDraft.clear()
           setEditModalVisible(false)
           form.resetFields()
           setEditingCustomer(null)
@@ -590,6 +627,7 @@ export default function CooperatingCustomersPage() {
           form={form}
           layout="vertical"
           onFinish={handleEdit}
+          onValuesChange={cooperatingDraft.save}
         >
           <Row gutter={16}>
             <Col span={12}>
@@ -701,7 +739,7 @@ export default function CooperatingCustomersPage() {
               <Button type="primary" htmlType="submit" loading={submitting}>
                 保存
               </Button>
-              <Button onClick={() => setEditModalVisible(false)} disabled={submitting}>
+              <Button onClick={() => { cooperatingDraft.clear(); setEditModalVisible(false) }} disabled={submitting}>
                 取消
               </Button>
             </Space>

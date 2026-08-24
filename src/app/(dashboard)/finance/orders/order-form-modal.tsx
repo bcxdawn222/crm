@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Form, Input, message, Modal, Select, Spin } from 'antd'
 
+import { useFormDraft } from '@/hooks/useFormDraft'
 import { apiRequest } from '@/lib/http/client'
 import type { OrderRecord } from './order-types'
 
@@ -23,6 +24,20 @@ interface OrderFormValues {
   signDate: string
   deliveryDate?: string
   remarks?: string
+}
+
+type OrderDraft = Partial<OrderFormValues>
+
+function isOrderDraft(value: unknown): value is OrderDraft {
+  if (typeof value !== 'object' || value === null) return false
+  const draft = value as OrderDraft
+  return (draft.customerId === undefined || typeof draft.customerId === 'string')
+    && (draft.contractNo === undefined || typeof draft.contractNo === 'string')
+    && (draft.contractAmount === undefined || ['string', 'number'].includes(typeof draft.contractAmount))
+    && (draft.currency === undefined || typeof draft.currency === 'string')
+    && (draft.signDate === undefined || typeof draft.signDate === 'string')
+    && (draft.deliveryDate === undefined || typeof draft.deliveryDate === 'string')
+    && (draft.remarks === undefined || typeof draft.remarks === 'string')
 }
 
 interface OrderFormModalProps {
@@ -49,6 +64,22 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const requestSequenceRef = useRef(0)
   const submissionIdRef = useRef('')
+  const draft = useFormDraft<OrderFormValues, OrderDraft>({
+    key: `orders:${order?.id || 'create'}`,
+    enabled: open,
+    form,
+    serialize: (values) => ({
+      customerId: values.customerId,
+      contractNo: values.contractNo,
+      contractAmount: values.contractAmount,
+      currency: values.currency,
+      signDate: values.signDate,
+      deliveryDate: values.deliveryDate,
+      remarks: values.remarks,
+    }),
+    deserialize: (values) => values,
+    validate: isOrderDraft,
+  })
 
   const preservedCustomer = order?.customer
     ? {
@@ -100,6 +131,7 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
         }
       : { currency: 'CNY' })
     setCustomers(preservedCustomer ? [preservedCustomer] : [])
+    if (draft.restore()) message.info('已恢复未提交的订单草稿')
     void loadCustomers()
 
     return () => {
@@ -131,6 +163,7 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
         }
       )
       message.success(order ? '更新成功' : '创建成功')
+      draft.clear()
       onClose()
       onSaved()
     } catch (error) {
@@ -150,7 +183,10 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
       title={order ? '编辑订单' : '新增订单'}
       open={open}
       onCancel={() => {
-        if (!isSubmitting) onClose()
+        if (!isSubmitting) {
+          draft.clear()
+          onClose()
+        }
       }}
       footer={null}
       width={700}
@@ -158,7 +194,7 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
       closable={!isSubmitting}
       maskClosable={!isSubmitting}
     >
-      <Form form={form} layout="vertical" onFinish={handleSubmit}>
+      <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={draft.save}>
         <Form.Item name="customerId" label="客户" rules={[{ required: true, message: '请选择客户' }]}>
           <Select
             showSearch

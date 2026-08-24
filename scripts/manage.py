@@ -25,6 +25,16 @@ from quality.route_contracts import run_route_check
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_DIR = ROOT / "logs"
+TEST_FLOW_SCRIPTS = {
+    "data-flow": "data_flow_test.py",
+    "content-flow": "content_flow_test.py",
+    "user-flow": "user_flow_test.py",
+    "role-flow": "role_flow_test.py",
+    "settings-flow": "settings_flow_test.py",
+    "public-pool-flow": "public_pool_flow_test.py",
+    "scope-flow": "scope_flow_test.py",
+    "network-session-flow": "network_session_flow_test.py",
+}
 
 
 @dataclass(frozen=True)
@@ -117,13 +127,7 @@ def main() -> int:
             "instance-status",
             "button-audit",
             "data-reachability",
-            "data-flow",
-            "content-flow",
-            "user-flow",
-            "role-flow",
-            "settings-flow",
-            "public-pool-flow",
-            "scope-flow",
+            *TEST_FLOW_SCRIPTS,
             "runtime-test",
             "e2e",
             "perf",
@@ -239,48 +243,15 @@ def main() -> int:
     if args.action == "data-reachability":
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "data_reachability.py")]
         return run_sequence((("data-reachability", command),), logger)
-    if args.action == "data-flow":
+    if args.action in TEST_FLOW_SCRIPTS:
         if profile.name != "test":
-            logger.error("data-flow 只允许 --profile test")
+            logger.error("%s 只允许 --profile test", args.action)
             return 2
-        command = [sys.executable, str(ROOT / "scripts" / "quality" / "data_flow_test.py")]
-        return run_sequence((("data-flow", command),), logger)
-    if args.action == "content-flow":
-        if profile.name != "test":
-            logger.error("content-flow 只允许 --profile test")
-            return 2
-        command = [sys.executable, str(ROOT / "scripts" / "quality" / "content_flow_test.py")]
-        return run_sequence((("content-flow", command),), logger)
-    if args.action == "user-flow":
-        if profile.name != "test":
-            logger.error("user-flow 只允许 --profile test")
-            return 2
-        command = [sys.executable, str(ROOT / "scripts" / "quality" / "user_flow_test.py")]
-        return run_sequence((("user-flow", command),), logger)
-    if args.action == "role-flow":
-        if profile.name != "test":
-            logger.error("role-flow 只允许 --profile test")
-            return 2
-        command = [sys.executable, str(ROOT / "scripts" / "quality" / "role_flow_test.py")]
-        return run_sequence((("role-flow", command),), logger)
-    if args.action == "settings-flow":
-        if profile.name != "test":
-            logger.error("settings-flow 只允许 --profile test")
-            return 2
-        command = [sys.executable, str(ROOT / "scripts" / "quality" / "settings_flow_test.py")]
-        return run_sequence((("settings-flow", command),), logger)
-    if args.action == "public-pool-flow":
-        if profile.name != "test":
-            logger.error("public-pool-flow 只允许 --profile test")
-            return 2
-        command = [sys.executable, str(ROOT / "scripts" / "quality" / "public_pool_flow_test.py")]
-        return run_sequence((("public-pool-flow", command),), logger)
-    if args.action == "scope-flow":
-        if profile.name != "test":
-            logger.error("scope-flow 只允许 --profile test")
-            return 2
-        command = [sys.executable, str(ROOT / "scripts" / "quality" / "scope_flow_test.py")]
-        return run_sequence((("scope-flow", command),), logger)
+        command = [
+            sys.executable,
+            str(ROOT / "scripts" / "quality" / TEST_FLOW_SCRIPTS[args.action]),
+        ]
+        return run_sequence(((args.action, command),), logger)
     if args.action == "runtime-test":
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "runtime_checks.py")]
         return run_sequence((("runtime-test", command),), logger)

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, DatePicker, Form, Input, InputNumber, message, Modal, Select } from 'antd'
 import dayjs from 'dayjs'
 
+import { useFormDraft } from '@/hooks/useFormDraft'
 import { apiRequest } from '@/lib/http/client'
 import type { PaymentFormValues, PaymentOrderOption } from './payment-types'
 
@@ -16,18 +17,60 @@ interface PaymentFormModalProps {
   onSaved: () => void | Promise<void>
 }
 
+interface PaymentDraft {
+  orderId?: string
+  amount?: number
+  paymentMethod?: PaymentFormValues['paymentMethod']
+  paymentDate?: string
+  invoiceNo?: string
+  invoiceType?: PaymentFormValues['invoiceType']
+  remarks?: string
+}
+
+function isPaymentDraft(value: unknown): value is PaymentDraft {
+  if (typeof value !== 'object' || value === null) return false
+  const draft = value as PaymentDraft
+  return (draft.orderId === undefined || typeof draft.orderId === 'string')
+    && (draft.amount === undefined || typeof draft.amount === 'number')
+    && (draft.paymentMethod === undefined || typeof draft.paymentMethod === 'string')
+    && (draft.paymentDate === undefined || typeof draft.paymentDate === 'string')
+    && (draft.invoiceNo === undefined || typeof draft.invoiceNo === 'string')
+    && (draft.invoiceType === undefined || typeof draft.invoiceType === 'string')
+    && (draft.remarks === undefined || typeof draft.remarks === 'string')
+}
+
 export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalProps) {
   const [form] = Form.useForm<PaymentFormValues>()
   const [orderOptions, setOrderOptions] = useState<PaymentOrderOption[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const submissionIdRef = useRef('')
+  const draft = useFormDraft<PaymentFormValues, PaymentDraft>({
+    key: 'payments:create',
+    enabled: open,
+    form,
+    serialize: (values) => ({
+      orderId: values.orderId,
+      amount: values.amount,
+      paymentMethod: values.paymentMethod,
+      paymentDate: values.paymentDate?.toISOString(),
+      invoiceNo: values.invoiceNo,
+      invoiceType: values.invoiceType,
+      remarks: values.remarks,
+    }),
+    deserialize: (values) => ({
+      ...values,
+      paymentDate: values.paymentDate ? dayjs(values.paymentDate) : undefined,
+    }),
+    validate: isPaymentDraft,
+  })
 
   useEffect(() => {
     if (!open) return
 
     form.resetFields()
     submissionIdRef.current = crypto.randomUUID()
+    if (draft.restore()) message.info('已恢复未提交的回款草稿')
     setOrdersLoading(true)
 
     void apiRequest<OrdersResponse>('/api/finance/orders?page=1&pageSize=100')
@@ -65,6 +108,7 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
       })
 
       message.success('创建成功')
+      draft.clear()
       onClose()
       await onSaved()
     } catch (error) {
@@ -80,7 +124,10 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
       title="新增收款记录"
       open={open}
       onCancel={() => {
-        if (!submitting) onClose()
+        if (!submitting) {
+          draft.clear()
+          onClose()
+        }
       }}
       footer={null}
       width={600}
@@ -91,6 +138,7 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
         form={form}
         layout="vertical"
         onFinish={handleSubmit}
+        onValuesChange={draft.save}
         initialValues={{ paymentMethod: 'BANK_TRANSFER', paymentDate: dayjs() }}
       >
         <Form.Item name="orderId" label="订单" rules={[{ required: true, message: '请选择订单' }]}>

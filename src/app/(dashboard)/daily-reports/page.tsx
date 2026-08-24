@@ -6,6 +6,7 @@ import { PlusOutlined, EyeOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
+import { useFormDraft } from '@/hooks/useFormDraft'
 import { apiRequest } from '@/lib/http/client'
 
 const { RangePicker } = DatePicker
@@ -42,6 +43,22 @@ interface DailyReportFormValues {
   issues?: string
 }
 
+interface DailyReportDraft {
+  reportDate?: string
+  content?: string
+  tomorrowPlan?: string
+  issues?: string
+}
+
+function isDailyReportDraft(value: unknown): value is DailyReportDraft {
+  if (typeof value !== 'object' || value === null) return false
+  const draft = value as DailyReportDraft
+  return (draft.reportDate === undefined || typeof draft.reportDate === 'string')
+    && (draft.content === undefined || typeof draft.content === 'string')
+    && (draft.tomorrowPlan === undefined || typeof draft.tomorrowPlan === 'string')
+    && (draft.issues === undefined || typeof draft.issues === 'string')
+}
+
 export default function DailyReportsPage() {
   const [loading, setLoading] = useState(false)
   const [reports, setReports] = useState<DailyReport[]>([])
@@ -55,6 +72,22 @@ export default function DailyReportsPage() {
   const [form] = Form.useForm<DailyReportFormValues>()
   const [submitting, setSubmitting] = useState(false)
   const requestIdRef = useRef('')
+  const draft = useFormDraft<DailyReportFormValues, DailyReportDraft>({
+    key: 'daily-reports:create',
+    enabled: modalVisible,
+    form,
+    serialize: (values) => ({
+      reportDate: values.reportDate?.toISOString(),
+      content: values.content,
+      tomorrowPlan: values.tomorrowPlan,
+      issues: values.issues,
+    }),
+    deserialize: (values) => ({
+      ...values,
+      reportDate: values.reportDate ? dayjs(values.reportDate) : undefined,
+    }),
+    validate: isDailyReportDraft,
+  })
 
   // 加载日报列表
   const loadReports = async () => {
@@ -108,6 +141,10 @@ export default function DailyReportsPage() {
     setModalVisible(true)
   }
 
+  useEffect(() => {
+    if (modalVisible && draft.restore()) message.info('已恢复未提交的日报草稿')
+  }, [modalVisible])
+
   // 提交表单
   const handleSubmit = async (values: DailyReportFormValues) => {
     if (submitting) return
@@ -127,6 +164,7 @@ export default function DailyReportsPage() {
         requestKey: `daily-report-create-${requestIdRef.current}`,
       })
       message.success('提交成功')
+      draft.clear()
       setModalVisible(false)
       await loadReports()
     } catch (error) {
@@ -276,7 +314,10 @@ export default function DailyReportsPage() {
         title="提交日报"
         open={modalVisible}
         onCancel={() => {
-          if (!submitting) setModalVisible(false)
+          if (!submitting) {
+            draft.clear()
+            setModalVisible(false)
+          }
         }}
         footer={null}
         width={700}
@@ -287,6 +328,7 @@ export default function DailyReportsPage() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          onValuesChange={draft.save}
         >
           <Form.Item
             name="reportDate"

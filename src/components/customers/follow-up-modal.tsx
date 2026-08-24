@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, DatePicker, Form, Input, Modal, Select, message } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 
+import { useFormDraft } from '@/hooks/useFormDraft'
 import { apiRequest } from '@/lib/http/client'
 
 
@@ -13,6 +14,24 @@ interface FollowUpFormValues {
   result?: string
   nextAction?: string
   nextFollowUpAt?: Dayjs
+}
+
+interface FollowUpDraft {
+  type?: string
+  content?: string
+  result?: string
+  nextAction?: string
+  nextFollowUpAt?: string
+}
+
+function isFollowUpDraft(value: unknown): value is FollowUpDraft {
+  if (typeof value !== 'object' || value === null) return false
+  const draft = value as FollowUpDraft
+  return (draft.type === undefined || typeof draft.type === 'string')
+    && (draft.content === undefined || typeof draft.content === 'string')
+    && (draft.result === undefined || typeof draft.result === 'string')
+    && (draft.nextAction === undefined || typeof draft.nextAction === 'string')
+    && (draft.nextFollowUpAt === undefined || typeof draft.nextFollowUpAt === 'string')
 }
 
 
@@ -46,6 +65,32 @@ export function FollowUpModal({
 }: FollowUpModalProps) {
   const [form] = Form.useForm<FollowUpFormValues>()
   const [saving, setSaving] = useState(false)
+  const requestIdRef = useRef('')
+  const draft = useFormDraft<FollowUpFormValues, FollowUpDraft>({
+    key: `follow-up:${customerId || 'unknown'}:${plannedFollowUpId || 'new'}`,
+    enabled: open && Boolean(customerId),
+    form,
+    serialize: (values) => ({
+      type: values.type,
+      content: values.content,
+      result: values.result,
+      nextAction: values.nextAction,
+      nextFollowUpAt: values.nextFollowUpAt?.toISOString(),
+    }),
+    deserialize: (values) => ({
+      ...values,
+      nextFollowUpAt: values.nextFollowUpAt ? dayjs(values.nextFollowUpAt) : undefined,
+    }),
+    validate: isFollowUpDraft,
+  })
+
+  useEffect(() => {
+    if (!open || !customerId) return
+    form.resetFields()
+    form.setFieldValue('type', 'PHONE')
+    requestIdRef.current = crypto.randomUUID()
+    if (draft.restore()) message.info('已恢复未提交的跟进草稿')
+  }, [customerId, open, plannedFollowUpId])
 
   const handleSubmit = async (values: FollowUpFormValues) => {
     if (!customerId) return
@@ -53,7 +98,7 @@ export function FollowUpModal({
       setSaving(true)
       await apiRequest(`/api/customers/${encodeURIComponent(customerId)}/follow-ups`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-request-id': requestIdRef.current },
         body: JSON.stringify({
           ...values,
           nextFollowUpAt: values.nextFollowUpAt?.toISOString(),
@@ -61,6 +106,7 @@ export function FollowUpModal({
         }),
       }, { requestKey: `follow-up:${customerId}:${plannedFollowUpId || 'new'}` })
       message.success(plannedFollowUpId ? '计划跟进已完成' : '跟进记录已保存')
+      draft.clear()
       form.resetFields()
       onSaved()
     } catch (error) {
@@ -74,9 +120,15 @@ export function FollowUpModal({
     <Modal
       title={plannedFollowUpId ? '完成计划跟进' : '新增跟进记录'}
       open={open}
-      onCancel={onClose}
+      onCancel={() => {
+        if (saving) return
+        draft.clear()
+        onClose()
+      }}
       footer={null}
       destroyOnHidden
+      closable={!saving}
+      maskClosable={!saving}
     >
       <div style={{ marginBottom: 16, color: '#666' }}>客户：{customerName || '-'}</div>
       <Form
@@ -84,6 +136,7 @@ export function FollowUpModal({
         layout="vertical"
         initialValues={{ type: 'PHONE' }}
         onFinish={handleSubmit}
+        onValuesChange={draft.save}
       >
         <Form.Item name="type" label="跟进方式" rules={[{ required: true, message: '请选择跟进方式' }]}>
           <Select options={typeOptions} />
@@ -105,7 +158,7 @@ export function FollowUpModal({
           />
         </Form.Item>
         <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-          <Button onClick={onClose} style={{ marginRight: 8 }}>取消</Button>
+          <Button onClick={() => { draft.clear(); onClose() }} disabled={saving} style={{ marginRight: 8 }}>取消</Button>
           <Button type="primary" htmlType="submit" loading={saving} disabled={!customerId}>
             保存跟进
           </Button>

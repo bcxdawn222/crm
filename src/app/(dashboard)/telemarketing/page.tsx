@@ -5,6 +5,8 @@ import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Popconfir
 import { PlusOutlined, PhoneOutlined, CheckCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
+import { useFormDraft } from '@/hooks/useFormDraft'
+import { isTelemarketingDraft, type TelemarketingDraft } from '@/lib/forms/crm-drafts'
 import { apiRequest } from '@/lib/http/client'
 import { TelemarketingConvertModal } from './telemarketing-convert-modal'
 
@@ -69,6 +71,22 @@ export default function TelemarketingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const formRequestIdRef = useRef('')
+  const telemarketingDraft = useFormDraft<TelemarketingFormValues, TelemarketingDraft>({
+    key: `telemarketing:${editingRecord?.id || 'create'}`,
+    enabled: modalVisible,
+    form,
+    serialize: (values) => ({
+      name: values.name,
+      company: values.company,
+      phone: values.phone,
+      position: values.position,
+      industry: values.industry,
+      source: values.source,
+      notes: values.notes,
+    }),
+    deserialize: (values) => values,
+    validate: isTelemarketingDraft,
+  })
 
   // Load data
   const loadData = async () => {
@@ -90,6 +108,10 @@ export default function TelemarketingPage() {
     loadData()
   }, [page, pageSize])
 
+  useEffect(() => {
+    if (modalVisible && telemarketingDraft.restore()) message.info('已恢复未提交的电销草稿')
+  }, [editingRecord?.id, modalVisible])
+
   // Handle create/edit
   const handleSubmit = async (values: TelemarketingFormValues) => {
     if (submitting) return
@@ -109,6 +131,7 @@ export default function TelemarketingPage() {
         requestKey: `telemarketing-form-${editingRecord?.id || 'new'}-${formRequestIdRef.current}`,
       })
       message.success(editingRecord ? '更新成功' : '创建成功')
+      telemarketingDraft.clear()
       setModalVisible(false)
       form.resetFields()
       setEditingRecord(null)
@@ -385,6 +408,7 @@ export default function TelemarketingPage() {
         open={modalVisible}
         onCancel={() => {
           if (submitting) return
+          telemarketingDraft.clear()
           setModalVisible(false)
           form.resetFields()
           setEditingRecord(null)
@@ -398,6 +422,7 @@ export default function TelemarketingPage() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          onValuesChange={telemarketingDraft.save}
         >
           <Form.Item
             name="name"
@@ -458,7 +483,7 @@ export default function TelemarketingPage() {
               <Button type="primary" htmlType="submit" loading={submitting}>
                 {editingRecord ? '更新' : '创建'}
               </Button>
-              <Button onClick={() => setModalVisible(false)} disabled={submitting}>
+              <Button onClick={() => { telemarketingDraft.clear(); setModalVisible(false) }} disabled={submitting}>
                 取消
               </Button>
             </Space>

@@ -7,7 +7,9 @@ import type { ColumnsType } from 'antd/es/table'
 import { PermissionGuard } from '@/components/common/PermissionGuard'
 import { FollowUpModal } from '@/components/customers/follow-up-modal'
 import { CustomerTransferModal } from '@/components/customers/customer-transfer-modal'
+import { useFormDraft } from '@/hooks/useFormDraft'
 import { usePermission } from '@/hooks/usePermission'
+import { isCustomerDraft, type CustomerDraft } from '@/lib/forms/crm-drafts'
 import { apiRequest } from '@/lib/http/client'
 import { Resizable } from 'react-resizable'
 import 'react-resizable/css/styles.css'
@@ -136,10 +138,28 @@ export default function CustomersPage() {
   const [followUpCustomer, setFollowUpCustomer] = useState<Customer | null>(null)
   const [followUpModalVisible, setFollowUpModalVisible] = useState(false)
   const [transferCustomer, setTransferCustomer] = useState<Customer | null>(null)
-  const [form] = Form.useForm()
+  const [form] = Form.useForm<CustomerFormValues>()
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const formRequestIdRef = useRef('')
+  const customerDraft = useFormDraft<CustomerFormValues, CustomerDraft>({
+    key: `customers:${editingCustomer?.id || 'create'}`,
+    enabled: modalVisible,
+    form,
+    serialize: (values) => ({
+      name: values.name,
+      company: values.company,
+      phone: values.phone,
+      email: values.email,
+      address: values.address,
+      category: values.category,
+      source: values.source,
+      notes: values.notes,
+      status: values.status,
+    }),
+    deserialize: (values) => values,
+    validate: isCustomerDraft,
+  })
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     name: 120,
     company: 200,
@@ -211,6 +231,10 @@ export default function CustomersPage() {
     setModalVisible(true)
   }, [form])
 
+  useEffect(() => {
+    if (modalVisible && customerDraft.restore()) message.info('已恢复未提交的客户草稿')
+  }, [editingCustomer?.id, modalVisible])
+
   const handleOpenFollowUp = (customer: Customer) => {
     setModalVisible(false)
     setFollowUpCustomer(customer)
@@ -264,6 +288,7 @@ export default function CustomersPage() {
         requestKey: `customer-form-${editingCustomer?.id || 'new'}-${formRequestIdRef.current}`,
       })
       message.success(editingCustomer ? '更新成功' : '创建成功')
+      customerDraft.clear()
       setModalVisible(false)
       await loadCustomers()
     } catch (error) {
@@ -664,7 +689,10 @@ export default function CustomersPage() {
         title={editingCustomer ? '编辑客户' : '新增客户'}
         open={modalVisible}
         onCancel={() => {
-          if (!submitting) setModalVisible(false)
+          if (!submitting) {
+            customerDraft.clear()
+            setModalVisible(false)
+          }
         }}
         footer={null}
         width={600}
@@ -675,6 +703,7 @@ export default function CustomersPage() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          onValuesChange={customerDraft.save}
           initialValues={{
             category: '潜在客户',
             source: 'OTHER',

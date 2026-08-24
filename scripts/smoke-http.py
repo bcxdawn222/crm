@@ -140,8 +140,9 @@ def main() -> int:
     require(login_page.status == 200, f"登录页返回 {login_page.status}")
 
     protected = request(anonymous, "/api/customers")
-    require(protected.status in {302, 307, 308}, "未登录访问客户接口没有被重定向")
-    require("/login" in protected.headers.get("location", ""), "未登录重定向目标不是登录页")
+    protected_payload = json_body(protected)
+    require(protected.status == 401, "未登录访问客户接口没有返回 401")
+    require(isinstance(protected_payload.get("requestId"), str), "未登录 API 响应缺少 requestId")
 
     invalid = build_opener(http.cookiejar.CookieJar())
     login(invalid, USERNAME, f"{PASSWORD}-invalid")

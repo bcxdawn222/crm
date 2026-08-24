@@ -1,5 +1,7 @@
 'use client'
 
+import { notifySessionExpired } from './events'
+
 export type ApiErrorCode =
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
@@ -35,6 +37,7 @@ export class ApiError extends Error {
 }
 
 const inFlightRequests = new Map<string, Promise<unknown>>()
+let redirectingToLogin = false
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -72,9 +75,11 @@ function requestIdFrom(response: Response, payload: unknown): string {
 }
 
 function redirectToLogin(): void {
-  if (typeof window === 'undefined') return
-  const callbackUrl = `${window.location.pathname}${window.location.search}`
-  window.location.assign(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`)
+  if (typeof window === 'undefined' || redirectingToLogin) return
+  redirectingToLogin = true
+  notifySessionExpired()
+  const callbackUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  window.location.assign(`/login?reason=session-expired&callbackUrl=${encodeURIComponent(callbackUrl)}`)
 }
 
 async function executeRequest<T>(

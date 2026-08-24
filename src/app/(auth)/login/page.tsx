@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { Form, Input, Button, Card, message } from 'antd'
@@ -9,6 +9,27 @@ import { UserOutlined, LockOutlined } from '@ant-design/icons'
 export default function LoginPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('reason') === 'session-expired') {
+      message.warning('登录状态已过期，请重新登录。未提交的表单草稿已保留。')
+    }
+  }, [])
+
+  const getSafeCallbackPath = (): string => {
+    const params = new URLSearchParams(window.location.search)
+    const callbackUrl = params.get('callbackUrl')
+    if (!callbackUrl) return '/'
+
+    try {
+      const target = new URL(callbackUrl, window.location.origin)
+      if (target.origin !== window.location.origin || target.pathname.startsWith('/login')) return '/'
+      return `${target.pathname}${target.search}${target.hash}`
+    } catch {
+      return '/'
+    }
+  }
 
   const handleSubmit = async (values: { username: string; password: string }) => {
     setLoading(true)
@@ -23,7 +44,7 @@ export default function LoginPage() {
         message.error('用户名或密码错误')
       } else {
         message.success('登录成功')
-        router.push('/')
+        router.replace(getSafeCallbackPath())
         router.refresh()
       }
     } catch (error) {

@@ -5,6 +5,7 @@ import { Layout, Button, Avatar, Dropdown } from 'antd'
 import { MenuFoldOutlined, MenuUnfoldOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons'
 import { signOut } from 'next-auth/react'
 import { useUIStore } from '@/stores/uiStore'
+import { clearAllDrafts } from '@/lib/forms/draft-storage'
 
 const { Header } = Layout
 
@@ -25,7 +26,10 @@ export default function AppHeader({ userName }: HeaderProps) {
       key: 'logout',
       icon: <LogoutOutlined />,
       label: '退出登录',
-      onClick: () => signOut({ callbackUrl: '/login' }),
+      onClick: () => {
+        clearAllDrafts()
+        void signOut({ callbackUrl: '/login' })
+      },
     },
   ]
 

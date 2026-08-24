@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, DatePicker, Form, Input, message, Modal, Select, Spin } from 'antd'
 import type { Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 import { useSession } from 'next-auth/react'
+import { useFormDraft } from '@/hooks/useFormDraft'
 import { apiRequest } from '@/lib/http/client'
 
 interface AssigneeOption {
@@ -26,6 +28,24 @@ interface TaskFormValues {
   assigneeId: string
 }
 
+interface TaskDraft {
+  title?: string
+  description?: string
+  priority?: TaskFormValues['priority']
+  dueDate?: string
+  assigneeId?: string
+}
+
+function isTaskDraft(value: unknown): value is TaskDraft {
+  if (typeof value !== 'object' || value === null) return false
+  const draft = value as TaskDraft
+  return (draft.title === undefined || typeof draft.title === 'string')
+    && (draft.description === undefined || typeof draft.description === 'string')
+    && (draft.priority === undefined || ['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(draft.priority))
+    && (draft.dueDate === undefined || typeof draft.dueDate === 'string')
+    && (draft.assigneeId === undefined || typeof draft.assigneeId === 'string')
+}
+
 interface TaskFormModalProps {
   open: boolean
   onClose: () => void
@@ -43,6 +63,23 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
   const requestSequenceRef = useRef(0)
   const submissionIdRef = useRef('')
   const isSales = session?.user.roles.includes('sales') ?? false
+  const draft = useFormDraft<TaskFormValues, TaskDraft>({
+    key: 'tasks:create',
+    enabled: open,
+    form,
+    serialize: (values) => ({
+      title: values.title,
+      description: values.description,
+      priority: values.priority,
+      dueDate: values.dueDate?.toISOString(),
+      assigneeId: values.assigneeId,
+    }),
+    deserialize: (values) => ({
+      ...values,
+      dueDate: values.dueDate ? dayjs(values.dueDate) : undefined,
+    }),
+    validate: isTaskDraft,
+  })
 
   async function loadAssignees(keyword = '') {
     const requestSequence = ++requestSequenceRef.current
@@ -72,6 +109,7 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
     form.resetFields()
     submissionIdRef.current = crypto.randomUUID()
     form.setFieldsValue({ priority: 'MEDIUM' })
+    if (draft.restore()) message.info('已恢复未提交的任务草稿')
     void loadAssignees()
 
     return () => {
@@ -103,6 +141,7 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
       })
 
       message.success('创建成功')
+      draft.clear()
       onClose()
       onSaved()
     } catch (error) {
@@ -124,7 +163,10 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
       title="创建任务"
       open={open}
       onCancel={() => {
-        if (!isSubmitting) onClose()
+        if (!isSubmitting) {
+          draft.clear()
+          onClose()
+        }
       }}
       footer={null}
       width={600}
@@ -132,7 +174,7 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
       closable={!isSubmitting}
       maskClosable={!isSubmitting}
     >
-      <Form form={form} layout="vertical" onFinish={handleSubmit}>
+      <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={draft.save}>
         <Form.Item name="title" label="任务标题" rules={[{ required: true, message: '请输入任务标题' }]}>
           <Input placeholder="请输入任务标题" />
         </Form.Item>
