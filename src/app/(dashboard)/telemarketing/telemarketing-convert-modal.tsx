@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Form, Input, message, Modal, Select, Space } from 'antd'
 
+import { apiRequest } from '@/lib/http/client'
+
 interface ConvertRecord {
   id: string
   notes?: string
@@ -49,16 +51,16 @@ export function TelemarketingConvertModal({
     if (!record || submitting) return
     setSubmitting(true)
     try {
-      const response = await fetch('/api/telemarketing/convert', {
+      const data = await apiRequest<ConvertResponse>('/api/telemarketing/convert', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-request-id': requestIdRef.current,
         },
         body: JSON.stringify({ telemarketingId: record.id, ...values }),
+      }, {
+        requestKey: `telemarketing-convert-${record.id}-${requestIdRef.current}`,
       })
-      const data = (await response.json()) as ConvertResponse
-      if (!data.success) throw new Error(data.error || '转换失败')
 
       message.success(data.replayed ? '该记录已转入客户' : '已成功转入我的客户')
       form.resetFields()

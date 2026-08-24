@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Form, Input, message, Modal, Select, Space } from 'antd'
 
+import { apiRequest } from '@/lib/http/client'
+
 interface TransferCustomer {
   id: string
   name: string
@@ -56,12 +58,9 @@ export function CustomerTransferModal({
     requestIdRef.current = crypto.randomUUID()
     form.resetFields()
     setLoadingTargets(true)
-    void fetch('/api/customers/transfer-options')
-      .then(async (response) => {
-        const data = (await response.json()) as TransferOptionsResponse
-        if (!data.success || !data.data) {
-          throw new Error(data.error || '加载目标销售失败')
-        }
+    void apiRequest<TransferOptionsResponse>('/api/customers/transfer-options')
+      .then((data) => {
+        if (!data.data) throw new Error('加载目标销售失败')
         setTargets(data.data.filter((target) => target.id !== customer.salesId))
       })
       .catch((error: unknown) => {
@@ -74,16 +73,16 @@ export function CustomerTransferModal({
     if (!customer || submitting) return
     setSubmitting(true)
     try {
-      const response = await fetch(`/api/customers/${customer.id}/transfer`, {
+      const data = await apiRequest<TransferResponse>(`/api/customers/${customer.id}/transfer`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-request-id': requestIdRef.current,
         },
         body: JSON.stringify(values),
+      }, {
+        requestKey: `customer-transfer-${customer.id}-${requestIdRef.current}`,
       })
-      const data = (await response.json()) as TransferResponse
-      if (!data.success) throw new Error(data.error || '客户转移失败')
 
       message.success(data.replayed ? '该转移请求已完成' : '客户转移成功')
       onClose()

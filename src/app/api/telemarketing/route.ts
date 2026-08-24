@@ -1,47 +1,71 @@
-import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { defineAbility } from '@/lib/casl'
+import { Prisma, TelemarketingStatus } from '@prisma/client'
+import { z } from 'zod'
 
-// GET /api/telemarketing - 获取电销名单列表
+import { recordAuditEvent } from '@/lib/audit/record'
+import { auth } from '@/lib/auth'
+import { defineAbility } from '@/lib/casl'
+import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { parsePagination } from '@/lib/http/pagination'
+import { prisma } from '@/lib/prisma'
+
+const optionalText = (max: number) => z.preprocess(
+  (value) => value === '' || value === null ? undefined : value,
+  z.string().trim().max(max).optional()
+)
+
+const recordSchema = z.object({
+  name: z.string().trim().min(1, '客户姓名为必填项').max(100),
+  company: optionalText(200),
+  phone: z.string().trim().min(3, '电话号码格式不正确').max(20),
+  position: optionalText(50),
+  industry: optionalText(50),
+  source: optionalText(100),
+  notes: optionalText(10_000),
+})
+
+function recordId(request: Request): string | null {
+  return new URL(request.url).searchParams.get('id')
+}
+
+async function ownedRecord(id: string, actorId: string) {
+  const record = await prisma.telemarketingList.findUnique({ where: { id } })
+  if (!record) return { error: '电销记录不存在', status: 404 } as const
+  if (record.salesId !== actorId) return { error: '无权操作该电销记录', status: 403 } as const
+  return { record } as const
+}
+
+async function requestBody(request: Request): Promise<unknown | null> {
+  try {
+    return await request.json()
+  } catch {
+    return null
+  }
+}
+
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check permissions
-    const permissions = session.user?.permissions || []
-    const ability = defineAbility(permissions)
+    if (!session) return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
+    const ability = defineAbility(session.user.permissions || [])
     if (ability.cannot('read', 'customer')) {
-      return NextResponse.json({ error: 'No permission to access' }, { status: 403 })
+      return jsonWithRequestId({ error: '无权查看电销名单' }, requestId, { status: 403 })
     }
 
-    const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const pageSize = parseInt(searchParams.get('pageSize') || '10')
+    const searchParams = new URL(request.url).searchParams
+    const pagination = parsePagination(searchParams)
+    if (!pagination) return jsonWithRequestId({ error: '分页参数不正确' }, requestId, { status: 400 })
     const status = searchParams.get('status')
     const isEffective = searchParams.get('isEffective')
-    const keyword = searchParams.get('keyword')
-
-    // Build query conditions
-    const where: any = {
-      salesId: session.user.id
-    }
-
-    // Filter by status
+    const keyword = searchParams.get('keyword')?.trim()
+    const where: Prisma.TelemarketingListWhereInput = { salesId: session.user.id }
     if (status && status !== 'all') {
-      where.status = status
+      if (!Object.values(TelemarketingStatus).includes(status as TelemarketingStatus)) {
+        return jsonWithRequestId({ error: '电销状态不正确' }, requestId, { status: 400 })
+      }
+      where.status = status as TelemarketingStatus
     }
-
-    // Filter by effectiveness
-    if (isEffective !== null && isEffective !== undefined) {
-      where.isEffective = isEffective === 'true'
-    }
-
-    // Keyword search
+    if (isEffective === 'true' || isEffective === 'false') where.isEffective = isEffective === 'true'
     if (keyword) {
       where.OR = [
         { name: { contains: keyword } },
@@ -50,200 +74,128 @@ export async function GET(request: Request) {
       ]
     }
 
-    // Query total count
-    const total = await prisma.telemarketingList.count({ where })
-
-    // Query list
-    const list = await prisma.telemarketingList.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-          }
-        }
-      }
-    })
-
-    return NextResponse.json({
+    const [total, list] = await prisma.$transaction([
+      prisma.telemarketingList.count({ where }),
+      prisma.telemarketingList.findMany({
+        where,
+        skip: (pagination.page - 1) * pagination.pageSize,
+        take: pagination.pageSize,
+        orderBy: { createdAt: 'desc' },
+        include: { customer: { select: { id: true, name: true, phone: true } } },
+      }),
+    ])
+    return jsonWithRequestId({
       success: true,
-      data: {
-        list,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-      }
-    })
-  } catch (error: any) {
-    console.error('Failed to get telemarketing list:', error)
-    return NextResponse.json({ 
-      error: 'Server error',
-      details: error.message 
-    }, { status: 500 })
+      data: { list, total, ...pagination, totalPages: Math.ceil(total / pagination.pageSize) },
+    }, requestId)
+  } catch (error) {
+    return serverErrorResponse(error, 'GET /api/telemarketing', requestId)
   }
 }
 
-// POST /api/telemarketing - 创建电销记录
 export async function POST(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check permissions
-    const permissions = session.user?.permissions || []
-    const ability = defineAbility(permissions)
+    if (!session) return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
+    const ability = defineAbility(session.user.permissions || [])
     if (ability.cannot('create', 'customer')) {
-      return NextResponse.json({ error: 'No permission to create telemarketing record' }, { status: 403 })
+      return jsonWithRequestId({ error: '无权创建电销记录' }, requestId, { status: 403 })
     }
-
-    const body = await request.json()
-    const { name, company, phone, position, industry, source, notes } = body
-
-    // Validate required fields
-    if (!name || !phone) {
-      return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 })
+    const body = await requestBody(request)
+    if (body === null) return jsonWithRequestId({ error: '请求内容不是有效 JSON' }, requestId, { status: 400 })
+    const parsed = recordSchema.safeParse(body)
+    if (!parsed.success) {
+      return jsonWithRequestId({ error: parsed.error.issues[0]?.message || '电销信息不正确' }, requestId, { status: 400 })
     }
-
-    // Create telemarketing record
-    const record = await prisma.telemarketingList.create({
-      data: {
-        name,
-        company,
-        phone,
-        position,
-        industry,
-        source,
-        notes,
-        salesId: session.user.id,
-      }
+    const record = await prisma.$transaction(async (tx) => {
+      const created = await tx.telemarketingList.create({ data: { ...parsed.data, salesId: session.user.id } })
+      await recordAuditEvent(tx, {
+        actorId: session.user.id,
+        action: 'CREATE',
+        entityType: 'TelemarketingList',
+        entityId: created.id,
+        afterData: created,
+        reason: 'TELEMARKETING_CREATED',
+        requestId,
+      })
+      return created
     })
-
-    return NextResponse.json({
-      success: true,
-      data: record,
-      message: 'Telemarketing record created successfully'
-    })
-  } catch (error: any) {
-    console.error('Failed to create telemarketing record:', error)
-    return NextResponse.json({ 
-      error: 'Server error',
-      details: error.message 
-    }, { status: 500 })
+    return jsonWithRequestId({ success: true, data: record, message: '电销记录创建成功' }, requestId, { status: 201 })
+  } catch (error) {
+    return serverErrorResponse(error, 'POST /api/telemarketing', requestId)
   }
 }
 
-// PUT /api/telemarketing/[id] - 更新电销记录
 export async function PUT(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session) return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
+    const ability = defineAbility(session.user.permissions || [])
+    if (ability.cannot('update', 'lead')) {
+      return jsonWithRequestId({ error: '无权更新电销记录' }, requestId, { status: 403 })
     }
-
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-
-    if (!id) {
-      return NextResponse.json({ error: 'Record ID is required' }, { status: 400 })
+    const id = recordId(request)
+    if (!id) return jsonWithRequestId({ error: '缺少电销记录 ID' }, requestId, { status: 400 })
+    const owned = await ownedRecord(id, session.user.id)
+    if ('error' in owned) return jsonWithRequestId({ error: owned.error }, requestId, { status: owned.status })
+    const body = await requestBody(request)
+    if (body === null) return jsonWithRequestId({ error: '请求内容不是有效 JSON' }, requestId, { status: 400 })
+    const parsed = recordSchema.safeParse(body)
+    if (!parsed.success) {
+      return jsonWithRequestId({ error: parsed.error.issues[0]?.message || '电销信息不正确' }, requestId, { status: 400 })
     }
-
-    // Check ownership
-    const record = await prisma.telemarketingList.findUnique({
-      where: { id }
+    const updated = await prisma.$transaction(async (tx) => {
+      const record = await tx.telemarketingList.update({ where: { id }, data: parsed.data })
+      await recordAuditEvent(tx, {
+        actorId: session.user.id,
+        action: 'UPDATE',
+        entityType: 'TelemarketingList',
+        entityId: id,
+        beforeData: owned.record,
+        afterData: record,
+        reason: 'TELEMARKETING_UPDATED',
+        requestId,
+      })
+      return record
     })
-
-    if (!record) {
-      return NextResponse.json({ error: 'Record not found' }, { status: 404 })
-    }
-
-    if (record.salesId !== session.user.id) {
-      return NextResponse.json({ error: 'No permission to update this record' }, { status: 403 })
-    }
-
-    const body = await request.json()
-    const { callTimes, lastCallAt, callDuration, status, result, notes, isEffective } = body
-
-    // Update record
-    const updated = await prisma.telemarketingList.update({
-      where: { id },
-      data: {
-        callTimes,
-        lastCallAt: lastCallAt ? new Date(lastCallAt) : undefined,
-        callDuration,
-        status,
-        result,
-        notes,
-        isEffective,
-      }
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: updated,
-      message: 'Telemarketing record updated successfully'
-    })
-  } catch (error: any) {
-    console.error('Failed to update telemarketing record:', error)
-    return NextResponse.json({ 
-      error: 'Server error',
-      details: error.message 
-    }, { status: 500 })
+    return jsonWithRequestId({ success: true, data: updated, message: '电销记录更新成功' }, requestId)
+  } catch (error) {
+    return serverErrorResponse(error, 'PUT /api/telemarketing', requestId)
   }
 }
 
-// DELETE /api/telemarketing/[id] - 删除电销记录
 export async function DELETE(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session) return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
+    const ability = defineAbility(session.user.permissions || [])
+    if (ability.cannot('update', 'lead')) {
+      return jsonWithRequestId({ error: '无权删除电销记录' }, requestId, { status: 403 })
     }
-
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-
-    if (!id) {
-      return NextResponse.json({ error: 'Record ID is required' }, { status: 400 })
+    const id = recordId(request)
+    if (!id) return jsonWithRequestId({ error: '缺少电销记录 ID' }, requestId, { status: 400 })
+    const owned = await ownedRecord(id, session.user.id)
+    if ('error' in owned) return jsonWithRequestId({ error: owned.error }, requestId, { status: owned.status })
+    if (owned.record.customerId) {
+      return jsonWithRequestId({ error: '已转客户的电销记录不能删除', code: 'CONVERTED_RECORD' }, requestId, { status: 409 })
     }
-
-    // Check ownership
-    const record = await prisma.telemarketingList.findUnique({
-      where: { id }
+    await prisma.$transaction(async (tx) => {
+      await tx.telemarketingList.delete({ where: { id } })
+      await recordAuditEvent(tx, {
+        actorId: session.user.id,
+        action: 'DELETE',
+        entityType: 'TelemarketingList',
+        entityId: id,
+        beforeData: owned.record,
+        reason: 'TELEMARKETING_DELETED',
+        requestId,
+      })
     })
-
-    if (!record) {
-      return NextResponse.json({ error: 'Record not found' }, { status: 404 })
-    }
-
-    if (record.salesId !== session.user.id) {
-      return NextResponse.json({ error: 'No permission to delete this record' }, { status: 403 })
-    }
-
-    // Delete record
-    await prisma.telemarketingList.delete({
-      where: { id }
-    })
-
-    return NextResponse.json({
-      success: true,
-      message: 'Telemarketing record deleted successfully'
-    })
-  } catch (error: any) {
-    console.error('Failed to delete telemarketing record:', error)
-    return NextResponse.json({ 
-      error: 'Server error',
-      details: error.message 
-    }, { status: 500 })
+    return jsonWithRequestId({ success: true, message: '电销记录删除成功' }, requestId)
+  } catch (error) {
+    return serverErrorResponse(error, 'DELETE /api/telemarketing', requestId)
   }
 }

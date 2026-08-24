@@ -26,6 +26,7 @@ def run_history_consistency_flow(
 ) -> None:
     rejected_payment_id = f"data-flow-payment-rejected-{marker}"
     delete_customer_id = f"data-flow-customer-delete-{marker}"
+    repeat_delete_id = f"data-flow-customer-delete-repeat-{marker}"
 
     try:
         rejected = request(
@@ -108,9 +109,28 @@ def run_history_consistency_flow(
             ) == "1",
             "客户软删除后跟进无法追溯",
         )
+        repeated = request(
+            opener,
+            base_url,
+            f"/api/customers/{customer_id}",
+            method="DELETE",
+            request_id=repeat_delete_id,
+        )
+        repeated_body = json_body(repeated)
+        require(repeated.status == 409, "重复软删除客户没有被拒绝")
+        require(repeated_body.get("code") == "CUSTOMER_ALREADY_INACTIVE", "重复软删除错误码不正确")
+        require(repeated.headers.get("x-request-id") == repeat_delete_id, "重复软删除响应缺少请求号")
+        require(
+            database_value(
+                database_url,
+                f"SELECT COUNT(*) FROM AuditEvent WHERE requestId={sql_quote(repeat_delete_id)}",
+            ) == "0",
+            "重复软删除写入了成功审计",
+        )
         print("失败回款与客户软删除历史追溯验收通过")
     finally:
         database_value(
             database_url,
-            f"DELETE FROM AuditEvent WHERE requestId={sql_quote(rejected_payment_id)}",
+            "DELETE FROM AuditEvent WHERE requestId IN "
+            f"({sql_quote(rejected_payment_id)},{sql_quote(repeat_delete_id)})",
         )

@@ -66,7 +66,7 @@ def create_telemarketing(
         },
     )
     body = json_body(result)
-    require(result.status == 200 and body.get("success") is True, f"创建电销记录失败: {body}")
+    require(result.status in {200, 201} and body.get("success") is True, f"创建电销记录失败: {body}")
     return str(body["data"]["id"])
 
 

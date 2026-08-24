@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, Table, Button, Space, Input, Select, Modal, Form, message, Tag, Upload } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ExportOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -89,6 +89,36 @@ interface Customer {
   }>
 }
 
+interface CustomerFormValues {
+  name: string
+  company?: string
+  phone: string
+  email?: string
+  address?: string
+  category?: string
+  source?: string
+  notes?: string
+  status?: string
+}
+
+interface CustomerListResponse {
+  success: true
+  data: {
+    list: Customer[]
+    total: number
+  }
+}
+
+interface CustomerMutationResponse {
+  success: true
+  data?: Customer
+}
+
+interface CustomerImportResponse {
+  success: true
+  data: { count: number }
+}
+
 export default function CustomersPage() {
   const { roles } = usePermission()
   const [loading, setLoading] = useState(false)
@@ -108,6 +138,8 @@ export default function CustomersPage() {
   const [transferCustomer, setTransferCustomer] = useState<Customer | null>(null)
   const [form] = Form.useForm()
   const [uploading, setUploading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const formRequestIdRef = useRef('')
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     name: 120,
     company: 200,
@@ -135,17 +167,11 @@ export default function CustomersPage() {
       if (category) params.append('category', category)
       if (status) params.append('status', status)
 
-      const res = await fetch(`/api/customers?${params}`)
-      const data = await res.json()
-
-      if (data.success) {
-        setCustomers(data.data.list)
-        setTotal(data.data.total)
-      } else {
-        message.error(data.error || '加载失败')
-      }
+      const data = await apiRequest<CustomerListResponse>(`/api/customers?${params}`)
+      setCustomers(data.data.list)
+      setTotal(data.data.total)
     } catch (error) {
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '加载客户失败')
     } finally {
       setLoading(false)
     }
@@ -175,6 +201,7 @@ export default function CustomersPage() {
 
   // 打开新增/编辑弹窗
   const handleOpenModal = useCallback((customer?: Customer) => {
+    formRequestIdRef.current = crypto.randomUUID()
     setEditingCustomer(customer || null)
     if (customer) {
       form.setFieldsValue(customer)
@@ -214,7 +241,9 @@ export default function CustomersPage() {
   }, [focusedCustomerId, handleOpenModal])
 
   // 提交表单
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: CustomerFormValues) => {
+    if (submitting) return
+    setSubmitting(true)
     try {
       let url = '/api/customers'
       let method = 'POST'
@@ -224,23 +253,23 @@ export default function CustomersPage() {
         method = 'PUT'
       }
 
-      const res = await fetch(url, {
+      await apiRequest<CustomerMutationResponse>(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-request-id': formRequestIdRef.current,
+        },
         body: JSON.stringify(values),
+      }, {
+        requestKey: `customer-form-${editingCustomer?.id || 'new'}-${formRequestIdRef.current}`,
       })
-
-      const data = await res.json()
-
-      if (data.success) {
-        message.success(editingCustomer ? '更新成功' : '创建成功')
-        setModalVisible(false)
-        loadCustomers()
-      } else {
-        message.error(data.error || '操作失败')
-      }
+      message.success(editingCustomer ? '更新成功' : '创建成功')
+      setModalVisible(false)
+      await loadCustomers()
     } catch (error) {
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '客户保存失败')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -253,20 +282,15 @@ export default function CustomersPage() {
       cancelText: '取消',
       onOk: async () => {
         try {
-          const res = await fetch(`/api/customers/${id}/archive`, {
+          await apiRequest<CustomerMutationResponse>(`/api/customers/${id}/archive`, {
             method: 'POST',
+          }, {
+            requestKey: `customer-archive-${id}`,
           })
-
-          const data = await res.json()
-
-          if (data.success) {
-            message.success('归档成功')
-            loadCustomers()
-          } else {
-            message.error(data.error || '归档失败')
-          }
+          message.success('归档成功')
+          await loadCustomers()
         } catch (error) {
-          message.error('网络错误')
+          message.error(error instanceof Error ? error.message : '归档失败')
         }
       },
     })
@@ -279,20 +303,15 @@ export default function CustomersPage() {
       content: '确定要删除该客户吗?',
       onOk: async () => {
         try {
-          const res = await fetch(`/api/customers/${id}`, {
+          await apiRequest<CustomerMutationResponse>(`/api/customers/${id}`, {
             method: 'DELETE',
+          }, {
+            requestKey: `customer-delete-${id}`,
           })
-
-          const data = await res.json()
-
-          if (data.success) {
-            message.success('删除成功')
-            loadCustomers()
-          } else {
-            message.error(data.error || '删除失败')
-          }
+          message.success('删除成功')
+          await loadCustomers()
         } catch (error) {
-          message.error('网络错误')
+          message.error(error instanceof Error ? error.message : '删除失败')
         }
       },
     })
@@ -305,22 +324,17 @@ export default function CustomersPage() {
     formData.append('file', file)
 
     try {
-      const res = await fetch('/api/customers/import', {
+      const data = await apiRequest<CustomerImportResponse>('/api/customers/import', {
         method: 'POST',
         body: formData,
+      }, {
+        requestKey: `customer-import-${file.name}-${file.size}`,
       })
-
-      const data = await res.json()
-
-      if (data.success) {
-        message.success(`导入成功！共导入 ${data.data.count} 条记录`)
-        setImportModalVisible(false)
-        loadCustomers()
-      } else {
-        message.error(data.error || '导入失败')
-      }
+      message.success(`导入成功！共导入 ${data.data.count} 条记录`)
+      setImportModalVisible(false)
+      await loadCustomers()
     } catch (error) {
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '导入失败')
     } finally {
       setUploading(false)
     }
@@ -649,9 +663,13 @@ export default function CustomersPage() {
       <Modal
         title={editingCustomer ? '编辑客户' : '新增客户'}
         open={modalVisible}
-        onCancel={() => setModalVisible(false)}
+        onCancel={() => {
+          if (!submitting) setModalVisible(false)
+        }}
         footer={null}
         width={600}
+        closable={!submitting}
+        maskClosable={!submitting}
       >
         <Form
           form={form}
@@ -711,7 +729,7 @@ export default function CustomersPage() {
           </Form.Item>
 
           <Form.Item>
-            <Button type="primary" htmlType="submit" block>
+            <Button type="primary" htmlType="submit" block loading={submitting}>
               {editingCustomer ? '更新' : '创建'}
             </Button>
           </Form.Item>

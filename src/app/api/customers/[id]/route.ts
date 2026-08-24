@@ -7,6 +7,17 @@ import { recordAuditEvent } from '@/lib/audit/record'
 import { canAccessSalesData } from '@/lib/data-permission'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 
+class CustomerRouteError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string
+  ) {
+    super(message)
+    this.name = 'CustomerRouteError'
+  }
+}
+
 // GET /api/customers/[id] - 获取客户详情
 export async function GET(
   request: Request,
@@ -214,12 +225,31 @@ export async function DELETE(
       return NextResponse.json({ error: '无权删除该客户' }, { status: 403 })
     }
 
+    if (customer.status === 'INACTIVE') {
+      return jsonWithRequestId(
+        { error: '客户已删除', code: 'CUSTOMER_ALREADY_INACTIVE' },
+        requestId,
+        { status: 409 }
+      )
+    }
+
     // 软删除(设置状态为INACTIVE)
     const updatedCustomer = await prisma.$transaction(async (tx) => {
-      const updated = await tx.customer.update({
-        where: { id: params.id },
+      const result = await tx.customer.updateMany({
+        where: { id: params.id, status: { not: 'INACTIVE' } },
         data: { status: 'INACTIVE' }
       })
+      if (result.count !== 1) {
+        throw new CustomerRouteError(
+          '客户状态已变化，请刷新后重试',
+          409,
+          'CUSTOMER_DELETE_CONFLICT'
+        )
+      }
+      const updated = await tx.customer.findUnique({ where: { id: params.id } })
+      if (!updated) {
+        throw new CustomerRouteError('客户删除结果不存在', 500, 'CUSTOMER_DELETE_RESULT_MISSING')
+      }
       await recordAuditEvent(tx, {
         actorId: session.user.id,
         action: 'DELETE',
@@ -238,6 +268,13 @@ export async function DELETE(
       message: '客户删除成功'
     }, requestId)
   } catch (error) {
+    if (error instanceof CustomerRouteError) {
+      return jsonWithRequestId(
+        { error: error.message, code: error.code },
+        requestId,
+        { status: error.status }
+      )
+    }
     return serverErrorResponse(error, 'DELETE /api/customers/[id]', requestId)
   }
 }

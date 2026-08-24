@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from quality.crm_http import build_opener, json_body, login, request, require
 from quality.data_flows.customer_extension import run_customer_extension_flow
 from quality.data_flows.history_consistency import run_history_consistency_flow
+from quality.data_flows.telemarketing_crud import run_telemarketing_crud_flow
 from quality.data_flows.customer_transfer import run_customer_transfer_flow
 from quality.data_flows.finance_contract import run_finance_contract_flow
 from runtime.mysql_client import parse_database_url, run_mysql
@@ -208,6 +209,7 @@ def main() -> int:
             PASSWORD,
         )
         run_customer_extension_flow(database_url, BASE_URL, opener, marker, USERNAME, PASSWORD)
+        run_telemarketing_crud_flow(database_url, BASE_URL, opener, marker)
         run_customer_transfer_flow(database_url, BASE_URL, opener, marker)
         run_history_consistency_flow(
             database_url,

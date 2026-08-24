@@ -251,3 +251,14 @@ conclusion: fail
 - `python scripts\manage.py scope-flow --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-scope-flow-20260824-172026.log`；受限用户无法在列表或详情读取管理员客户，角色、用户、客户和审计夹具均已清理。
 - 现有 `File` 模型只通过 `uploadedBy` 关联用户，`Message` 模型只通过 `senderId`、`receiverId` 关联用户，均没有 `customerId`。本轮按原系统字段验证，没有为满足测试描述而新增客户关联字段。
 - 任务 8.1 至 8.7 已全部完成，一级任务“数据可达性与一致性”标记完成。该结论不代表任务 10 的完整权限矩阵或任务 15 的 Playwright 全量按钮验收已经完成。
+
+## Apply working evidence - 2026-08-24 17:35
+
+- 客户页的列表、创建、编辑、归档、软删除和导入入口已接入 `src/lib/http/client.ts`；写操作带固定 `x-request-id`、`requestKey` 和提交中禁用，GET 保留有限重试，写操作不自动重放。
+- 电销页和转化弹窗已接入统一请求层；新增、编辑、删除和转化提交期间按钮会进入 loading，重复点击不会并发创建或删除同一记录。
+- 重写 `src/app/api/telemarketing/route.ts`：编辑现在会持久化姓名、公司、电话、职位、行业、来源和备注；新增、编辑、删除均在事务内写审计并返回 `x-request-id`；已转客户的电销记录返回 `CONVERTED_RECORD`，禁止删除，保留来源追溯。
+- 客户软删除增加状态前置条件；已删除客户再次删除返回 `CUSTOMER_ALREADY_INACTIVE`，不会新增成功审计。
+- `python scripts\manage.py typecheck --profile stable`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260824-173043.log`。
+- `python scripts\manage.py data-flow --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-flow-20260824-173200.log`；新增电销 CRUD、编辑字段落库、转化后禁止删除和重复软删除验收均通过，夹具已清理。
+- `python scripts\manage.py data-reachability --profile test`、`python scripts\manage.py button-audit --profile test` 和 `python scripts\manage.py build --profile test` 均退出码 0；链路报告日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260824-173247.log`，按钮审计日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-button-audit-20260824-173258.log`，构建日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-173315.log`。
+- 任务 9 仍未整体完成：财务、公海、合作客户、合同等页面尚未全部切换到统一请求层，401 草稿恢复、断网恢复和长时间会话测试尚未覆盖。

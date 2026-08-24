@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Popconfirm, Statistic, Row, Col } from 'antd'
 import { PlusOutlined, PhoneOutlined, CheckCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
+import { apiRequest } from '@/lib/http/client'
 import { TelemarketingConvertModal } from './telemarketing-convert-modal'
 
 const { TextArea } = Input
@@ -33,6 +34,28 @@ interface TelemarketingRecord {
   }
 }
 
+interface TelemarketingFormValues {
+  name: string
+  company?: string
+  phone: string
+  position?: string
+  industry?: string
+  source?: string
+  notes?: string
+}
+
+interface TelemarketingListResponse {
+  success: true
+  data: {
+    list: TelemarketingRecord[]
+    total: number
+  }
+}
+
+interface TelemarketingMutationResponse {
+  success: true
+}
+
 export default function TelemarketingPage() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<TelemarketingRecord[]>([])
@@ -41,21 +64,23 @@ export default function TelemarketingPage() {
   const [pageSize, setPageSize] = useState(10)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingRecord, setEditingRecord] = useState<TelemarketingRecord | null>(null)
-  const [form] = Form.useForm()
+  const [form] = Form.useForm<TelemarketingFormValues>()
   const [convertRecord, setConvertRecord] = useState<TelemarketingRecord | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const formRequestIdRef = useRef('')
 
   // Load data
   const loadData = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/telemarketing?page=${page}&pageSize=${pageSize}`)
-      const json = await res.json()
-      if (json.success) {
-        setData(json.data.list)
-        setTotal(json.data.total)
-      }
+      const result = await apiRequest<TelemarketingListResponse>(
+        `/api/telemarketing?page=${page}&pageSize=${pageSize}`
+      )
+      setData(result.data.list)
+      setTotal(result.data.total)
     } catch (error) {
-      console.error('Failed to load data:', error)
+      message.error(error instanceof Error ? error.message : '加载电销记录失败')
     } finally {
       setLoading(false)
     }
@@ -66,57 +91,51 @@ export default function TelemarketingPage() {
   }, [page, pageSize])
 
   // Handle create/edit
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: TelemarketingFormValues) => {
+    if (submitting) return
+    setSubmitting(true)
     try {
-      let res
-      if (editingRecord) {
-        // Update existing record
-        res = await fetch(`/api/telemarketing?id=${editingRecord.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(values),
-        })
-      } else {
-        // Create new record
-        res = await fetch('/api/telemarketing', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(values),
-        })
-      }
-
-      const json = await res.json()
-      if (json.success) {
-        message.success(editingRecord ? '更新成功' : '创建成功')
-        setModalVisible(false)
-        form.resetFields()
-        setEditingRecord(null)
-        loadData()
-      } else {
-        message.error(json.error || '操作失败')
-      }
+      const url = editingRecord
+        ? `/api/telemarketing?id=${editingRecord.id}`
+        : '/api/telemarketing'
+      await apiRequest<TelemarketingMutationResponse>(url, {
+        method: editingRecord ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-request-id': formRequestIdRef.current,
+        },
+        body: JSON.stringify(values),
+      }, {
+        requestKey: `telemarketing-form-${editingRecord?.id || 'new'}-${formRequestIdRef.current}`,
+      })
+      message.success(editingRecord ? '更新成功' : '创建成功')
+      setModalVisible(false)
+      form.resetFields()
+      setEditingRecord(null)
+      await loadData()
     } catch (error) {
-      console.error('Submit failed:', error)
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '保存电销记录失败')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   // Handle delete
   const handleDelete = async (id: string) => {
+    if (deletingId) return
+    setDeletingId(id)
     try {
-      const res = await fetch(`/api/telemarketing?id=${id}`, {
+      await apiRequest<TelemarketingMutationResponse>(`/api/telemarketing?id=${id}`, {
         method: 'DELETE',
+      }, {
+        requestKey: `telemarketing-delete-${id}`,
       })
-      const json = await res.json()
-      if (json.success) {
-        message.success('删除成功')
-        loadData()
-      } else {
-        message.error(json.error || '删除失败')
-      }
+      message.success('删除成功')
+      await loadData()
     } catch (error) {
-      console.error('Delete failed:', error)
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '删除电销记录失败')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -239,6 +258,7 @@ export default function TelemarketingPage() {
             size="small"
             icon={<EditOutlined />}
             onClick={() => {
+              formRequestIdRef.current = crypto.randomUUID()
               setEditingRecord(record)
               form.setFieldsValue(record)
               setModalVisible(true)
@@ -260,6 +280,7 @@ export default function TelemarketingPage() {
             title="确认删除"
             description="确定要删除这条电销记录吗?"
             onConfirm={() => handleDelete(record.id)}
+            okButtonProps={{ loading: deletingId === record.id }}
           >
             <Button
               type="link"
@@ -284,6 +305,7 @@ export default function TelemarketingPage() {
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => {
+              formRequestIdRef.current = crypto.randomUUID()
               setEditingRecord(null)
               form.resetFields()
               setModalVisible(true)
@@ -362,12 +384,15 @@ export default function TelemarketingPage() {
         title={editingRecord ? '编辑电销记录' : '新增电销记录'}
         open={modalVisible}
         onCancel={() => {
+          if (submitting) return
           setModalVisible(false)
           form.resetFields()
           setEditingRecord(null)
         }}
         footer={null}
         width={600}
+        closable={!submitting}
+        maskClosable={!submitting}
       >
         <Form
           form={form}
@@ -430,10 +455,10 @@ export default function TelemarketingPage() {
 
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit">
+              <Button type="primary" htmlType="submit" loading={submitting}>
                 {editingRecord ? '更新' : '创建'}
               </Button>
-              <Button onClick={() => setModalVisible(false)}>
+              <Button onClick={() => setModalVisible(false)} disabled={submitting}>
                 取消
               </Button>
             </Space>
