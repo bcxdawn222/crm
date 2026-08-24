@@ -1,13 +1,53 @@
-import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { defineAbility } from '@/lib/casl'
-import { uploadToOSS, generateOSSKey } from '@/lib/oss'
-import { saveFile, generateFileKey } from '@/lib/fileStorage'
-import { recordAuditEvent } from '@/lib/audit/record'
-import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { Prisma } from '@prisma/client'
+import { z } from 'zod'
 
-// GET /api/customers/[id]/contract-archives/route.ts - 获取客户的合同备案列表
+import { auth } from '@/lib/auth'
+import { defineAbility } from '@/lib/casl'
+import { ContractArchiveError, createContractArchive } from '@/lib/contracts/archive'
+import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { parsePagination } from '@/lib/http/pagination'
+import { prisma } from '@/lib/prisma'
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+])
+const CONTRACT_TYPES = ['SALES', 'SERVICE', 'COOPERATION', 'OTHER'] as const
+const optionalDate = z.preprocess(
+  (value) => value === '' || value === null ? undefined : value,
+  z.coerce.date().optional()
+)
+const optionalAmount = z.preprocess(
+  (value) => value === '' || value === null ? undefined : value,
+  z.coerce.number().min(0).max(99_999_999.99).optional()
+)
+const metadataSchema = z.object({
+  contractName: z.string().trim().min(1, '合同名称为必填项').max(200),
+  contractType: z.preprocess(
+    (value) => value === '' || value === null ? undefined : value,
+    z.enum(CONTRACT_TYPES).optional()
+  ),
+  signDate: optionalDate,
+  effectiveDate: optionalDate,
+  expiryDate: optionalDate,
+  contractAmount: optionalAmount,
+  remarks: z.string().trim().max(10_000).optional(),
+}).refine(
+  (data) => !data.effectiveDate || !data.expiryDate || data.expiryDate >= data.effectiveDate,
+  '合同到期日期不能早于生效日期'
+)
+
+async function findCustomer(customerId: string) {
+  return prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { id: true, salesId: true, operationManagerId: true },
+  })
+}
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -15,103 +55,66 @@ export async function GET(
   const requestId = getRequestId(request)
   try {
     const session = await auth()
-    
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
     }
-
-    const customerId = params.id
-    const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const pageSize = parseInt(searchParams.get('pageSize') || '10')
-    const showAllVersions = searchParams.get('showAllVersions') === 'true'
-
-    // Check permissions
-    const permissions = session.user?.permissions || []
-    const ability = defineAbility(permissions)
-    
-    // Get customer to check ownership
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
-      include: {
-        sales: { select: { id: true } },
-        operationManager: { select: { id: true } }
-      }
-    })
-
+    const ability = defineAbility(session.user.permissions || [])
+    const customer = await findCustomer(params.id)
     if (!customer) {
-      return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
+      return jsonWithRequestId({ error: '客户不存在' }, requestId, { status: 404 })
+    }
+    const canView = customer.salesId === session.user.id
+      || customer.operationManagerId === session.user.id
+      || ability.can('manage', 'all')
+    if (!canView) {
+      return jsonWithRequestId({ error: '无权查看合同备案' }, requestId, { status: 403 })
     }
 
-    // Permission check: only sales owner, operation manager, or admin can view
-    const isOwner = customer.salesId === session.user.id
-    const isOpManager = customer.operationManagerId === session.user.id
-    const isAdmin = ability.can('manage', 'all')
-    
-    if (!isOwner && !isOpManager && !isAdmin) {
-      return NextResponse.json({ error: 'No permission to view' }, { status: 403 })
+    const searchParams = new URL(request.url).searchParams
+    const pagination = parsePagination(searchParams)
+    if (!pagination) {
+      return jsonWithRequestId({ error: '分页参数不正确' }, requestId, { status: 400 })
     }
+    const where: Prisma.ContractArchiveWhereInput = { customerId: params.id }
+    if (searchParams.get('showAllVersions') !== 'true') where.isLatest = true
 
-    // Build query conditions
-    const where: any = { customerId }
-    
-    // By default, only show latest versions
-    if (!showAllVersions) {
-      where.isLatest = true
-    }
-
-    // Query total count
-    const total = await prisma.contractArchive.count({ where })
-
-    // Query list with pagination
-    const archives = await prisma.contractArchive.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        archivedUser: {
-          select: {
-            id: true,
-            realName: true,
-          }
-        }
-      }
+    const [total, archives] = await prisma.$transaction([
+      prisma.contractArchive.count({ where }),
+      prisma.contractArchive.findMany({
+        where,
+        skip: (pagination.page - 1) * pagination.pageSize,
+        take: pagination.pageSize,
+        orderBy: { createdAt: 'desc' },
+        include: { archivedUser: { select: { id: true, realName: true } } },
+      }),
+    ])
+    const contractNames = [...new Set(archives.map((archive) => archive.contractName))]
+    const counts = contractNames.length === 0 ? [] : await prisma.contractArchive.groupBy({
+      by: ['contractName'],
+      where: { customerId: params.id, contractName: { in: contractNames } },
+      _count: { _all: true },
     })
+    const countByName = new Map(counts.map((item) => [item.contractName, item._count._all]))
+    const list = archives.map((archive) => ({
+      ...archive,
+      totalVersions: countByName.get(archive.contractName) ?? 1,
+      hasOldVersions: (countByName.get(archive.contractName) ?? 1) > 1,
+    }))
 
-    // Check if each archive has old versions
-    const archivesWithVersionInfo = await Promise.all(
-      archives.map(async (archive) => {
-        const versionCount = await prisma.contractArchive.count({
-          where: {
-            customerId: archive.customerId,
-            contractName: archive.contractName,
-          }
-        })
-        return {
-          ...archive,
-          hasOldVersions: versionCount > 1,
-          totalVersions: versionCount,
-        }
-      })
-    )
-
-    return NextResponse.json({
+    return jsonWithRequestId({
       success: true,
       data: {
-        list: archivesWithVersionInfo,
+        list,
         total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-      }
-    })
+        ...pagination,
+        totalPages: Math.ceil(total / pagination.pageSize),
+      },
+    }, requestId)
   } catch (error) {
     return serverErrorResponse(error, 'GET /api/customers/[id]/contract-archives', requestId)
   }
 }
 
-// POST /api/customers/[id]/contract-archives - 上传合同备案
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
@@ -119,145 +122,75 @@ export async function POST(
   const requestId = getRequestId(request)
   try {
     const session = await auth()
-    
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
     }
-
-    const customerId = params.id
-
-    // Check permissions
-    const permissions = session.user?.permissions || []
-    const ability = defineAbility(permissions)
-    
-    // Get customer to check ownership
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId }
-    })
-
+    const ability = defineAbility(session.user.permissions || [])
+    const customer = await findCustomer(params.id)
     if (!customer) {
-      return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
+      return jsonWithRequestId({ error: '客户不存在' }, requestId, { status: 404 })
+    }
+    if (customer.salesId !== session.user.id && ability.cannot('manage', 'all')) {
+      return jsonWithRequestId({ error: '无权上传合同备案' }, requestId, { status: 403 })
     }
 
-    // Permission check: only sales owner or admin can upload
-    const isOwner = customer.salesId === session.user.id
-    const isAdmin = ability.can('manage', 'all')
-    
-    if (!isOwner && !isAdmin) {
-      return NextResponse.json({ error: 'No permission to upload' }, { status: 403 })
+    let formData: FormData
+    try {
+      formData = await request.formData()
+    } catch {
+      return jsonWithRequestId({ error: '上传内容不是有效表单' }, requestId, { status: 400 })
     }
-
-    // Parse form data
-    const formData = await request.formData()
-    const file = formData.get('file') as File
-    const contractName = formData.get('contractName') as string
-    const contractType = formData.get('contractType') as string
-    const signDate = formData.get('signDate') as string
-    const effectiveDate = formData.get('effectiveDate') as string
-    const expiryDate = formData.get('expiryDate') as string
-    const contractAmount = formData.get('contractAmount') as string
-    const remarks = formData.get('remarks') as string
-
-    if (!file || !contractName) {
-      return NextResponse.json({ 
-        error: 'File and contract name are required' 
-      }, { status: 400 })
+    const file = formData.get('file')
+    if (!(file instanceof File)) {
+      return jsonWithRequestId({ error: '请选择合同文件' }, requestId, { status: 400 })
     }
-
-    // Validate file type
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'image/jpeg',
-      'image/png'
-    ]
-    
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json({ 
-        error: '不支持的文件类型，仅支持 PDF、Word、JPG、PNG 格式' 
-      }, { status: 400 })
+    if (file.size <= 0 || file.size > MAX_FILE_SIZE) {
+      return jsonWithRequestId({ error: '合同文件必须在 50MB 以内' }, requestId, { status: 400 })
     }
-
-    // Validate file size (50MB)
-    const maxSize = 50 * 1024 * 1024
-    if (file.size > maxSize) {
-      return NextResponse.json({ 
-        error: '文件大小不能超过 50MB' 
-      }, { status: 400 })
+    if (!ALLOWED_MIME_TYPES.has(file.type)) {
+      return jsonWithRequestId({ error: '仅支持 PDF、Word、JPG、PNG 文件' }, requestId, { status: 400 })
     }
-
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
-    // 保存文件到本地存储
-    const fileKey = generateFileKey(customerId, file.name)
-    const fileUrl = await saveFile(buffer, fileKey)
-
-    // Check if there's an existing archive with the same contract name
-    const existingArchive = await prisma.contractArchive.findFirst({
-      where: {
-        customerId,
-        contractName,
-        isLatest: true
-      },
-      orderBy: { version: 'desc' }
+    const parsed = metadataSchema.safeParse({
+      contractName: formData.get('contractName'),
+      contractType: formData.get('contractType'),
+      signDate: formData.get('signDate'),
+      effectiveDate: formData.get('effectiveDate'),
+      expiryDate: formData.get('expiryDate'),
+      contractAmount: formData.get('contractAmount'),
+      remarks: formData.get('remarks'),
     })
-
-    // Generate archive number
-    const archiveNo = `CA-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-
-    // Create new archive record
-    const newArchive = await prisma.$transaction(async (tx) => {
-      const created = await tx.contractArchive.create({
-        data: {
-          archiveNo,
-          customerId,
-          version: existingArchive ? existingArchive.version + 1 : 1,
-          isLatest: true,
-          parentArchiveId: existingArchive?.id || null,
-          contractName,
-          contractType: contractType || null,
-          signDate: signDate ? new Date(signDate) : null,
-          effectiveDate: effectiveDate ? new Date(effectiveDate) : null,
-          expiryDate: expiryDate ? new Date(expiryDate) : null,
-          contractAmount: contractAmount ? parseFloat(contractAmount) : null,
-          fileName: file.name,
-          ossUrl: fileUrl,
-          ossKey: fileKey,
-          fileSize: file.size,
-          fileType: file.name.split('.').pop() || 'bin',
-          archivedBy: session.user.id,
-          remarks: remarks || null,
-        }
-      })
-
-      if (existingArchive) {
-        await tx.contractArchive.update({
-          where: { id: existingArchive.id },
-          data: { isLatest: false }
-        })
-      }
-      await recordAuditEvent(tx, {
-        actorId: session.user.id,
-        action: 'CREATE',
-        entityType: 'ContractArchive',
-        entityId: created.id,
-        beforeData: existingArchive,
-        afterData: created,
-        reason: 'CONTRACT_ARCHIVED',
+    if (!parsed.success) {
+      return jsonWithRequestId(
+        { error: parsed.error.issues[0]?.message ?? '合同信息不正确', requestId },
         requestId,
-      })
-      return created
-    })
+        { status: 400 }
+      )
+    }
 
+    const { archive, replayed } = await createContractArchive({
+      ...parsed.data,
+      customerId: params.id,
+      fileName: file.name,
+      fileType: file.name.split('.').pop()?.toLowerCase() || 'bin',
+      fileSize: file.size,
+      file: Buffer.from(await file.arrayBuffer()),
+      actorId: session.user.id,
+      requestId,
+    })
     return jsonWithRequestId({
       success: true,
-      data: newArchive,
-      message: '合同备案成功'
-    }, requestId)
+      data: archive,
+      replayed,
+      message: replayed ? '合同备案已存在，返回原记录' : '合同备案成功',
+    }, requestId, { status: replayed ? 200 : 201 })
   } catch (error) {
+    if (error instanceof ContractArchiveError) {
+      return jsonWithRequestId(
+        { error: error.message, code: error.code, requestId },
+        requestId,
+        { status: error.status }
+      )
+    }
     return serverErrorResponse(error, 'POST /api/customers/[id]/contract-archives', requestId)
   }
 }

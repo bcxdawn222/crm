@@ -1,10 +1,8 @@
-import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { prisma } from '@/lib/prisma'
 
-// GET /api/contract-archives/[id]/versions - 获取合同备案的版本历史
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -12,43 +10,30 @@ export async function GET(
   const requestId = getRequestId(request)
   try {
     const session = await auth()
-    
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
     }
-
-    const archiveId = params.id
-
-    // Get the archive to find its contract name and customer
-    const currentArchive = await prisma.contractArchive.findUnique({
-      where: { id: archiveId }
+    const current = await prisma.contractArchive.findUnique({
+      where: { id: params.id },
+      include: { customer: { select: { salesId: true, operationManagerId: true } } },
     })
-
-    if (!currentArchive) {
-      return NextResponse.json({ error: 'Archive not found' }, { status: 404 })
+    if (!current) {
+      return jsonWithRequestId({ error: '合同备案不存在' }, requestId, { status: 404 })
+    }
+    const ability = defineAbility(session.user.permissions || [])
+    const canRead = current.customer.salesId === session.user.id
+      || current.customer.operationManagerId === session.user.id
+      || ability.can('manage', 'all')
+    if (!canRead) {
+      return jsonWithRequestId({ error: '无权查看合同版本' }, requestId, { status: 403 })
     }
 
-    // Get all versions of this contract (same customer + same contract name)
     const versions = await prisma.contractArchive.findMany({
-      where: {
-        customerId: currentArchive.customerId,
-        contractName: currentArchive.contractName
-      },
+      where: { customerId: current.customerId, contractName: current.contractName },
       orderBy: { version: 'desc' },
-      include: {
-        archivedUser: {
-          select: {
-            id: true,
-            realName: true
-          }
-        }
-      }
+      include: { archivedUser: { select: { id: true, realName: true } } },
     })
-
-    return jsonWithRequestId({
-      success: true,
-      data: versions
-    }, requestId)
+    return jsonWithRequestId({ success: true, data: versions }, requestId)
   } catch (error) {
     return serverErrorResponse(error, 'GET /api/contract-archives/[id]/versions', requestId)
   }

@@ -209,3 +209,15 @@ conclusion: fail
 - 本地 MySQL Windows 服务启动曾返回 `OpenService FAILED 5: Access is denied`；随后仍通过项目 `dbstart` 入口设置已有 direct 模式参数，使用原 `my.ini` 用户态启动，未创建或迁移其他数据目录。最终测试日志位于 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-flow-20260824-150254.log`。
 - `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build` 和 `data-reachability --profile test` 均退出码 0。构建第一次因运行中的 test 服务占用 Prisma Windows DLL 退出码 1，停止服务后串行重跑通过；最终测试库 `Customer`、`FollowUp`、`Order`、`Payment`、`File`、`ContractArchive` 均为 0，关联孤儿项和金额异常均为 0。
 - 任务 8 仍未整体完成：电销转客户、普通客户转移、合同版本、订单与回款重复点击、删除/停用历史追溯及管理员、经理、销售、受限用户完整关联夹具仍待后续验收。
+
+## Apply working evidence - 2026-08-24 15:56
+
+- 付款页面已拆分为页面容器、类型定义和新增收款弹窗：src/app/(dashboard)/finance/payments/page.tsx 为 177 行，payment-form-modal.tsx 为 164 行，payment-types.ts 为 46 行；收款表单在一次打开周期内复用同一个 x-request-id，提交期间按钮保持 loading，成功后刷新列表。
+- python scripts\manage.py typecheck --profile stable：退出码 0，日志为 D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260824-155046.log。
+- python scripts\manage.py migrate --profile test：退出码 0，仅将 20260824151500_add_write_idempotency 应用到 crm_system_test，日志为 D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-migrate-20260824-155121.log；稳定库没有执行本轮迁移。
+- python scripts\manage.py data-flow --profile test：最终退出码 0，日志为 D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-flow-20260824-155408.log。真实验收覆盖订单相同请求号重放、回款相同请求号重放、合同并发重复上传、合同第二版本父子关系、下载内容、预览地址、删除最新版本后旧版本恢复、删除全部版本、导入顺序/并发重复与非法整批回滚、合作客户标记/重复标记/更新。
+- 本轮首次执行数据流检查时发现验收脚本对 Windows MySQL batch 输出的制表符解析错误；实际数据库行已存在，修正检查器使用竖线分隔后重新执行通过。该修复没有放宽业务断言，也没有修改稳定数据库。
+- python scripts\manage.py data-reachability --profile test：退出码 0，日志为 D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260824-155520.log；核心表 15 张，外键孤儿项、异常订单金额和负回款均为 0。test 数据库 Customer、Order、Payment、ContractArchive 等业务夹具已清理。
+- python scripts\manage.py routes --profile test、python scripts\manage.py button-audit --profile test、python scripts\manage.py runtime-test --profile test 和 python scripts\manage.py build --profile test 均退出码 0；构建日志为 D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-155556.log，构建基线仍为仓库现有 Next.js 14.2.35，本轮没有执行框架升级。
+- storage/test 中本轮及历史 test 合同文件已清理并重新创建空目录。public/uploads/contracts 仍有旧公共上传目录文件，stable/test 数据库当前均无 ContractArchive 引用；由于该目录可能包含用户原始文件，本轮未自动删除，需在发布清理阶段人工确认后处理。
+- 当前仍不能宣称任务 8 整体完成：电销转客户、普通客户转移、删除/停用历史追溯、多角色关联夹具、完整权限矩阵、Playwright 全量按钮验收、长连接、性能、安全和 stable 发布演练仍未完成。prisma/schema.prisma 当前 648 行，属于现有 Prisma 单文件结构，后续需单独评估拆分方式。

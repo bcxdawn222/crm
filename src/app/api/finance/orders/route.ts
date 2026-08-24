@@ -5,9 +5,22 @@ import { defineAbility } from '@/lib/casl'
 import { buildDataFilter } from '@/lib/data-permission'
 import { parsePagination } from '@/lib/http/pagination'
 import { CustomerStatus, OrderStatus, Prisma } from '@prisma/client'
-import { randomUUID } from 'crypto'
-import { recordAuditEvent } from '@/lib/audit/record'
+import { z } from 'zod'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { createOrder, CreateOrderError } from '@/lib/orders/create'
+
+const createOrderSchema = z.object({
+  customerId: z.string().uuid('客户 ID 格式不正确'),
+  contractNo: z.string().trim().max(50).optional(),
+  contractAmount: z.coerce.number().positive('合同金额必须大于 0').max(99_999_999.99),
+  currency: z.enum(['CNY', 'USD', 'EUR']).default('CNY'),
+  signDate: z.coerce.date(),
+  deliveryDate: z.coerce.date().optional(),
+  remarks: z.string().trim().max(10_000).optional(),
+}).refine(
+  (data) => !data.deliveryDate || data.deliveryDate >= data.signDate,
+  '交付日期不能早于签约日期'
+)
 
 // GET /api/finance/orders - Get order list
 export async function GET(request: Request) {
@@ -136,41 +149,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No permission to create order' }, { status: 403 })
     }
 
-    const body = await request.json() as {
-      customerId?: string
-      contractNo?: string
-      contractAmount?: number | string
-      currency?: string
-      signDate?: string
-      deliveryDate?: string
-      remarks?: string
+    let payload: unknown
+    try {
+      payload = await request.json()
+    } catch {
+      return jsonWithRequestId({ error: '请求内容不是有效 JSON', requestId }, requestId, { status: 400 })
     }
-    const { customerId, contractNo, contractAmount, currency, signDate, deliveryDate, remarks } = body
-
-    // Validate required fields
-    if (!customerId || contractAmount === undefined || contractAmount === '' || !signDate) {
-      return NextResponse.json({ error: 'Customer, amount and sign date are required' }, { status: 400 })
+    const parsed = createOrderSchema.safeParse(payload)
+    if (!parsed.success) {
+      return jsonWithRequestId(
+        { error: parsed.error.issues[0]?.message ?? '订单参数不正确', requestId },
+        requestId,
+        { status: 400 }
+      )
     }
-
-    const amountNum = Number(contractAmount)
-    if (!Number.isFinite(amountNum) || amountNum <= 0) {
-      return NextResponse.json({ error: 'Contract amount must be greater than zero' }, { status: 400 })
-    }
-
-    const signDateValue = new Date(signDate)
-    const deliveryDateValue = deliveryDate ? new Date(deliveryDate) : null
-    if (
-      Number.isNaN(signDateValue.getTime()) ||
-      (deliveryDateValue && Number.isNaN(deliveryDateValue.getTime()))
-    ) {
-      return NextResponse.json({ error: 'Order date is invalid' }, { status: 400 })
-    }
-
-    const supportedCurrencies = ['CNY', 'USD', 'EUR']
-    const normalizedCurrency = currency || 'CNY'
-    if (!supportedCurrencies.includes(normalizedCurrency)) {
-      return NextResponse.json({ error: 'Currency is invalid' }, { status: 400 })
-    }
+    const { customerId } = parsed.data
 
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
@@ -197,45 +190,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No permission to create an order for this customer' }, { status: 403 })
     }
 
-    // Generate order number
-    const orderNo = `ORD-${Date.now()}-${randomUUID().slice(0, 8)}`
-
-    // Create order
-    const order = await prisma.$transaction(async (tx) => {
-      const created = await tx.order.create({
-        data: {
-          orderNo,
-          customerId,
-          contractNo,
-          contractAmount: amountNum,
-          paidAmount: 0,
-          unpaidAmount: amountNum,
-          signDate: signDateValue,
-          deliveryDate: deliveryDateValue,
-          currency: normalizedCurrency,
-          remarks,
-          salesId: session.user.id,
-          status: 'CONFIRMED',
-        }
-      })
-      await recordAuditEvent(tx, {
-        actorId: session.user.id,
-        action: 'CREATE',
-        entityType: 'Order',
-        entityId: created.id,
-        afterData: created,
-        reason: 'ORDER_CREATED',
-        requestId,
-      })
-      return created
+    const { order, replayed } = await createOrder({
+      ...parsed.data,
+      salesId: session.user.id,
+      requestId,
     })
 
     return jsonWithRequestId({
       success: true,
       data: order,
-      message: 'Order created successfully'
-    }, requestId)
+      replayed,
+      message: replayed ? '订单已存在，返回原记录' : 'Order created successfully'
+    }, requestId, { status: replayed ? 200 : 201 })
   } catch (error) {
+    if (error instanceof CreateOrderError) {
+      return jsonWithRequestId(
+        { error: error.message, code: error.code, requestId },
+        requestId,
+        { status: error.status }
+      )
+    }
     return serverErrorResponse(error, 'POST /api/finance/orders', requestId)
   }
 }

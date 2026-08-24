@@ -1,13 +1,9 @@
-import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { defineAbility } from '@/lib/casl'
-import { getSignedUrl } from '@/lib/oss'
-import { getFileUrl } from '@/lib/fileStorage'
 import { recordAuditEvent } from '@/lib/audit/record'
+import { auth } from '@/lib/auth'
+import { defineAbility } from '@/lib/casl'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { prisma } from '@/lib/prisma'
 
-// GET /api/contract-archives/[id]/preview - 预览合同文件(PDF)
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -15,70 +11,44 @@ export async function GET(
   const requestId = getRequestId(request)
   try {
     const session = await auth()
-    
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
     }
-
-    const archiveId = params.id
-
-    // Get archive record
     const archive = await prisma.contractArchive.findUnique({
-      where: { id: archiveId },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            salesId: true,
-            operationManagerId: true
-          }
-        }
-      }
+      where: { id: params.id },
+      include: { customer: { select: { salesId: true, operationManagerId: true } } },
     })
-
     if (!archive) {
-      return NextResponse.json({ error: 'Archive not found' }, { status: 404 })
+      return jsonWithRequestId({ error: '合同备案不存在' }, requestId, { status: 404 })
+    }
+    const ability = defineAbility(session.user.permissions || [])
+    const canRead = archive.customer.salesId === session.user.id
+      || archive.customer.operationManagerId === session.user.id
+      || ability.can('manage', 'all')
+    if (!canRead) {
+      return jsonWithRequestId({ error: '无权预览合同文件' }, requestId, { status: 403 })
     }
 
-    // Permission check
-    const permissions = session.user?.permissions || []
-    const ability = defineAbility(permissions)
-    
-    const isOwner = archive.customer.salesId === session.user.id
-    const isOpManager = archive.customer.operationManagerId === session.user.id
-    const isAdmin = ability.can('manage', 'all')
-    
-    if (!isOwner && !isOpManager && !isAdmin) {
-      return NextResponse.json({ error: 'No permission to preview' }, { status: 403 })
-    }
-
-    // 仅支持PDF预览
+    const downloadUrl = `/api/contract-archives/${archive.id}/download`
     if (archive.fileType !== 'pdf') {
-      return NextResponse.json({ 
-        error: '仅支持PDF文件预览',
-        downloadUrl: await getFileUrl(archive.ossUrl)
-      }, { status: 400 })
+      return jsonWithRequestId({ error: '仅支持 PDF 文件预览', downloadUrl }, requestId, { status: 400 })
     }
-
-    // 生成本地文件URL(本地存储直接返回路径)
-    const fileUrl = await getFileUrl(archive.ossUrl)
     await recordAuditEvent(prisma, {
       actorId: session.user.id,
       action: 'PREVIEW',
       entityType: 'ContractArchive',
-      entityId: archiveId,
+      entityId: archive.id,
       afterData: { fileName: archive.fileName, fileType: archive.fileType },
       reason: 'CONTRACT_FILE_PREVIEWED',
       requestId,
     })
-
     return jsonWithRequestId({
       success: true,
       data: {
-        previewUrl: fileUrl,
+        previewUrl: `${downloadUrl}?inline=1`,
         fileName: archive.fileName,
-        fileType: archive.fileType
-      }
+        fileType: archive.fileType,
+      },
     }, requestId)
   } catch (error) {
     return serverErrorResponse(error, 'GET /api/contract-archives/[id]/preview', requestId)

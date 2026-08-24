@@ -14,7 +14,7 @@ export interface CreatePaymentInput {
   invoiceType?: InvoiceType
   remarks?: string
   operatorId: string
-  requestId?: string
+  requestId: string
 }
 
 
@@ -30,12 +30,50 @@ export class CreatePaymentError extends Error {
 }
 
 
+function matchesInput(payment: {
+  orderId: string
+  amount: Prisma.Decimal
+  paymentMethod: PaymentMethod
+  paymentDate: Date
+  invoiceNo: string | null
+  invoiceType: InvoiceType | null
+  remarks: string | null
+  operatorId: string
+}, input: CreatePaymentInput): boolean {
+  return payment.orderId === input.orderId
+    && payment.amount.equals(input.amount)
+    && payment.paymentMethod === input.paymentMethod
+    && payment.paymentDate.getTime() === input.paymentDate.getTime()
+    && payment.invoiceNo === (input.invoiceNo || null)
+    && payment.invoiceType === (input.invoiceType || null)
+    && payment.remarks === (input.remarks || null)
+    && payment.operatorId === input.operatorId
+}
+
+async function replayForRequest(input: CreatePaymentInput) {
+  const existing = await prisma.payment.findUnique({ where: { requestId: input.requestId } })
+  if (!existing) return null
+  if (!matchesInput(existing, input)) {
+    throw new CreatePaymentError('请求号已用于另一笔收款', 409, 'PAYMENT_REQUEST_CONFLICT')
+  }
+  return existing
+}
+
 export async function createPayment(input: CreatePaymentInput) {
   const amount = new Prisma.Decimal(input.amount.toFixed(2))
+  const replay = await replayForRequest(input)
+  if (replay) return { payment: replay, replayed: true }
 
   try {
-    return await prisma.$transaction(
+    const payment = await prisma.$transaction(
       async (tx) => {
+        const existing = await tx.payment.findUnique({ where: { requestId: input.requestId } })
+        if (existing) {
+          if (!matchesInput(existing, input)) {
+            throw new CreatePaymentError('请求号已用于另一笔收款', 409, 'PAYMENT_REQUEST_CONFLICT')
+          }
+          return existing
+        }
         const order = await tx.order.findUnique({ where: { id: input.orderId } })
         if (!order) {
           throw new CreatePaymentError('订单不存在', 404, 'ORDER_NOT_FOUND')
@@ -51,6 +89,7 @@ export async function createPayment(input: CreatePaymentInput) {
         const payment = await tx.payment.create({
           data: {
             paymentNo: `PAY-${Date.now()}-${randomUUID().slice(0, 8)}`,
+            requestId: input.requestId,
             orderId: input.orderId,
             amount,
             paymentMethod: input.paymentMethod,
@@ -86,12 +125,18 @@ export async function createPayment(input: CreatePaymentInput) {
         timeout: 10_000,
       }
     )
+    return { payment, replayed: false }
   } catch (error) {
     if (error instanceof CreatePaymentError) {
       throw error
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
       throw new CreatePaymentError('订单金额正在更新，请刷新后重试', 409, 'PAYMENT_CONFLICT')
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const existing = await replayForRequest(input)
+      if (existing) return { payment: existing, replayed: true }
+      throw new CreatePaymentError('收款正在创建，请刷新后重试', 409, 'PAYMENT_CONFLICT')
     }
     throw error
   }

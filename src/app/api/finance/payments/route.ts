@@ -156,7 +156,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const payment = await createPayment({
+    const { payment, replayed } = await createPayment({
       ...parsed.data,
       operatorId: session.user.id,
       requestId,
@@ -165,8 +165,9 @@ export async function POST(request: Request) {
     return jsonWithRequestId({
       success: true,
       data: payment,
-      message: 'Payment created successfully'
-    }, requestId)
+      replayed,
+      message: replayed ? '收款已存在，返回原记录' : 'Payment created successfully'
+    }, requestId, { status: replayed ? 200 : 201 })
   } catch (error) {
     if (error instanceof CreatePaymentError) {
       return jsonWithRequestId(

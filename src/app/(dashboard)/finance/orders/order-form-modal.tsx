@@ -55,6 +55,7 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
   const [isSubmitting, setIsSubmitting] = useState(false)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const requestSequenceRef = useRef(0)
+  const submissionIdRef = useRef('')
 
   const preservedCustomer = order?.customer
     ? {
@@ -98,6 +99,7 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
     if (!open) return
 
     form.resetFields()
+    submissionIdRef.current = crypto.randomUUID()
     form.setFieldsValue(order
       ? {
           customerId: order.customerId,
@@ -129,7 +131,10 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
         order ? `/api/finance/orders/${order.id}` : '/api/finance/orders',
         {
           method: order ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-request-id': submissionIdRef.current,
+          },
           body: JSON.stringify(values),
         }
       )

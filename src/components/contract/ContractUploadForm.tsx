@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Modal, Form, Input, DatePicker, InputNumber, Select, Upload, message, Button, Space } from 'antd'
 import { InboxOutlined, UploadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -23,6 +23,11 @@ export default function ContractUploadForm({
   const [form] = Form.useForm()
   const [uploading, setUploading] = useState(false)
   const [fileList, setFileList] = useState<any[]>([])
+  const submissionIdRef = useRef('')
+
+  useEffect(() => {
+    if (visible) submissionIdRef.current = crypto.randomUUID()
+  }, [visible])
 
   // Handle submit
   const handleSubmit = async (values: any) => {
@@ -47,6 +52,7 @@ export default function ContractUploadForm({
 
       const res = await fetch(`/api/customers/${customerId}/contract-archives`, {
         method: 'POST',
+        headers: { 'x-request-id': submissionIdRef.current },
         body: formData
       })
 

@@ -4,6 +4,7 @@ import datetime as dt
 import os
 import sys
 import urllib.request
+from pathlib import Path
 from uuid import uuid4
 
 
@@ -13,6 +14,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
 from quality.crm_http import build_opener, json_body, login, request, require
 from quality.data_flows.customer_extension import run_customer_extension_flow
+from quality.data_flows.finance_contract import run_finance_contract_flow
 from runtime.mysql_client import parse_database_url, run_mysql
 
 
@@ -104,19 +106,20 @@ def main() -> int:
         )
 
         order_request_id = f"data-flow-order-{marker}"
+        order_payload = {
+            "customerId": customer_id,
+            "contractNo": f"TEST-{marker}",
+            "contractAmount": 1000,
+            "currency": "CNY",
+            "signDate": dt.date.today().isoformat(),
+            "remarks": "仅用于 test 数据链路验收",
+        }
         order_result = request(
             opener,
             BASE_URL,
             "/api/finance/orders",
             method="POST",
-            payload={
-                "customerId": customer_id,
-                "contractNo": f"TEST-{marker}",
-                "contractAmount": 1000,
-                "currency": "CNY",
-                "signDate": dt.date.today().isoformat(),
-                "remarks": "仅用于 test 数据链路验收",
-            },
+            payload=order_payload,
             request_id=order_request_id,
         )
         order = json_body(order_result)
@@ -126,20 +129,31 @@ def main() -> int:
             order_result.headers.get("x-request-id") == order_request_id,
             "订单响应缺少 x-request-id",
         )
+        order_replay = json_body(request(
+            opener,
+            BASE_URL,
+            "/api/finance/orders",
+            method="POST",
+            payload=order_payload,
+            request_id=order_request_id,
+        ))
+        require(order_replay.get("replayed") is True, "订单重复请求未返回原记录")
+        require(str(order_replay["data"]["id"]) == order_id, "订单重复请求生成了不同记录")
 
         payment_request_id = f"data-flow-payment-{marker}"
+        payment_payload = {
+            "orderId": order_id,
+            "amount": 250,
+            "paymentMethod": "BANK_TRANSFER",
+            "paymentDate": dt.date.today().isoformat(),
+            "remarks": "仅用于 test 数据链路验收",
+        }
         payment_result = request(
             opener,
             BASE_URL,
             "/api/finance/payments",
             method="POST",
-            payload={
-                "orderId": order_id,
-                "amount": 250,
-                "paymentMethod": "BANK_TRANSFER",
-                "paymentDate": dt.date.today().isoformat(),
-                "remarks": "仅用于 test 数据链路验收",
-            },
+            payload=payment_payload,
             request_id=payment_request_id,
         )
         payment = json_body(payment_result)
@@ -149,6 +163,16 @@ def main() -> int:
             payment_result.headers.get("x-request-id") == payment_request_id,
             "回款响应缺少 x-request-id",
         )
+        payment_replay = json_body(request(
+            opener,
+            BASE_URL,
+            "/api/finance/payments",
+            method="POST",
+            payload=payment_payload,
+            request_id=payment_request_id,
+        ))
+        require(payment_replay.get("replayed") is True, "回款重复请求未返回原记录")
+        require(str(payment_replay["data"]["id"]) == payment_id, "回款重复请求生成了不同记录")
 
         order_row = database_value(
             database_url,
@@ -171,6 +195,16 @@ def main() -> int:
             f"SELECT COUNT(*) FROM FollowUp WHERE id={sql_quote(follow_up_id)} AND customerId={sql_quote(customer_id)}",
         )
         require(follow_up_row == "1", "数据库未找到刚创建的跟进记录")
+        run_finance_contract_flow(
+            Path(ROOT),
+            database_url,
+            BASE_URL,
+            opener,
+            marker,
+            customer_id,
+            USERNAME,
+            PASSWORD,
+        )
         run_customer_extension_flow(database_url, BASE_URL, opener, marker, USERNAME, PASSWORD)
         print(
             "业务数据核对通过，开始清理 test 夹具: "

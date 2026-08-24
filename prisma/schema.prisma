@@ -389,6 +389,7 @@ enum LeadStatus {
 model Order {
   id            String        @id @default(uuid())
   orderNo       String        @unique @db.VarChar(50)
+  requestId     String?       @unique @db.VarChar(100)
   customerId    String
   salesId       String
   contractNo    String?       @db.VarChar(50)
@@ -426,6 +427,7 @@ enum OrderStatus {
 model Payment {
   id            String        @id @default(uuid())
   paymentNo     String        @unique @db.VarChar(50)
+  requestId     String?       @unique @db.VarChar(100)
   orderId       String
   amount        Decimal       @db.Decimal(10, 2)
   paymentMethod PaymentMethod
@@ -601,6 +603,7 @@ enum FileCategory {
 model ContractArchive {
   id              String        @id @default(uuid())
   archiveNo       String        @unique @db.VarChar(50)  // 备案号
+  requestId       String?       @unique @db.VarChar(100)
   
   customerId      String        // 关联客户ID
   version         Int           @default(1)              // 版本号
@@ -621,6 +624,7 @@ model ContractArchive {
   ossKey          String        @db.VarChar(300)  // OSS对象键
   fileSize        Int           // 文件大小(字节)
   fileType        String        @db.VarChar(20)   // 文件类型(pdf/doc/docx/jpg/png)
+  fileHash        String        @db.VarChar(64)
   
   // 备案信息
   archivedBy      String        // 备案人ID
@@ -640,4 +644,5 @@ model ContractArchive {
   @@index([archivedBy])
   @@index([isLatest])
   @@index([createdAt])
+  @@unique([customerId, contractName, version])
 }

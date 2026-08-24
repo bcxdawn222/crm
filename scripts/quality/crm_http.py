@@ -35,21 +35,38 @@ def multipart_file(
     content: bytes,
     content_type: str,
 ) -> tuple[bytes, str]:
+    return multipart_form({}, field_name, file_name, content, content_type)
+
+
+def multipart_form(
+    fields: Mapping[str, str],
+    field_name: str,
+    file_name: str,
+    content: bytes,
+    content_type: str,
+) -> tuple[bytes, str]:
     boundary = f"----crm-flow-{secrets.token_hex(12)}"
-    body = b"\r\n".join(
-        (
+    parts: list[bytes] = []
+    for name, value in fields.items():
+        parts.extend((
             f"--{boundary}".encode("ascii"),
-            (
-                f'Content-Disposition: form-data; name="{field_name}"; '
-                f'filename="{file_name}"'
-            ).encode("utf-8"),
-            f"Content-Type: {content_type}".encode("ascii"),
+            f'Content-Disposition: form-data; name="{name}"'.encode("utf-8"),
             b"",
-            content,
-            f"--{boundary}--".encode("ascii"),
-            b"",
-        )
-    )
+            value.encode("utf-8"),
+        ))
+    parts.extend((
+        f"--{boundary}".encode("ascii"),
+        (
+            f'Content-Disposition: form-data; name="{field_name}"; '
+            f'filename="{file_name}"'
+        ).encode("utf-8"),
+        f"Content-Type: {content_type}".encode("ascii"),
+        b"",
+        content,
+        f"--{boundary}--".encode("ascii"),
+        b"",
+    ))
+    body = b"\r\n".join(parts)
     return body, f"multipart/form-data; boundary={boundary}"
 
 
