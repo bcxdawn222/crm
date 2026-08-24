@@ -1,15 +1,9 @@
 from __future__ import annotations
 
 import datetime as dt
-import http.cookiejar
-import json
 import os
 import sys
-import urllib.error
-import urllib.parse
 import urllib.request
-from dataclasses import dataclass
-from typing import Any, Mapping
 from uuid import uuid4
 
 
@@ -17,6 +11,7 @@ sys.dont_write_bytecode = True
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
+from quality.crm_http import build_opener, json_body, login, request, require
 from runtime.mysql_client import parse_database_url, run_mysql
 
 
@@ -27,78 +22,6 @@ BASE_URL = os.environ.get(
 ).rstrip("/")
 USERNAME = os.environ.get("CRM_SMOKE_USERNAME", "admin")
 PASSWORD = os.environ.get("CRM_SMOKE_PASSWORD", "123456")
-
-
-@dataclass(frozen=True)
-class HttpResult:
-    status: int
-    headers: Mapping[str, str]
-    body: bytes
-
-
-class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str):
-        return None
-
-
-def request(
-    opener: urllib.request.OpenerDirector,
-    path: str,
-    *,
-    method: str = "GET",
-    payload: object | None = None,
-    form: Mapping[str, str] | None = None,
-    request_id: str | None = None,
-) -> HttpResult:
-    body = None
-    headers: dict[str, str] = {}
-    if payload is not None:
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-    elif form is not None:
-        body = urllib.parse.urlencode(form).encode("utf-8")
-        headers["Content-Type"] = "application/x-www-form-urlencoded"
-    if request_id:
-        headers["x-request-id"] = request_id
-    req = urllib.request.Request(f"{BASE_URL}{path}", data=body, method=method, headers=headers)
-    try:
-        with opener.open(req, timeout=30) as response:
-            return HttpResult(response.status, response.headers, response.read())
-    except urllib.error.HTTPError as error:
-        return HttpResult(error.code, error.headers, error.read())
-
-
-def json_body(result: HttpResult) -> dict[str, Any]:
-    payload = json.loads(result.body.decode("utf-8"))
-    if not isinstance(payload, dict):
-        raise RuntimeError("接口响应不是 JSON 对象")
-    return payload
-
-
-def require(condition: bool, message: str) -> None:
-    if not condition:
-        raise RuntimeError(message)
-
-
-def login(opener: urllib.request.OpenerDirector) -> None:
-    csrf = json_body(request(opener, "/api/auth/csrf"))
-    token = csrf.get("csrfToken")
-    require(isinstance(token, str) and token, "CSRF token 获取失败")
-    result = request(
-        opener,
-        "/api/auth/callback/credentials",
-        method="POST",
-        form={
-            "csrfToken": token,
-            "username": USERNAME,
-            "password": PASSWORD,
-            "redirect": "false",
-            "callbackUrl": f"{BASE_URL}/",
-        },
-    )
-    require(result.status in {200, 302, 303}, f"登录失败，HTTP {result.status}")
-    session = json_body(request(opener, "/api/auth/session"))
-    require(isinstance(session.get("user"), dict), "登录后没有获得有效 session")
 
 
 def sql_quote(value: str) -> str:
@@ -124,27 +47,25 @@ def main() -> int:
     payment_id: str | None = None
 
     try:
-        opener = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
-            NoRedirectHandler(),
-        )
-        login(opener)
+        opener = build_opener()
+        login(opener, BASE_URL, USERNAME, PASSWORD)
 
         customer_request_id = f"data-flow-customer-{marker}"
         customer_result = request(
-                opener,
-                "/api/customers",
-                method="POST",
-                payload={
-                    "name": f"数据链路客户-{marker}",
-                    "company": "CRM test verification",
-                    "phone": phone,
-                    "email": f"data-flow-{marker}@example.com",
-                    "category": "潜在客户",
-                    "source": "OTHER",
-                    "notes": "仅用于 test 数据链路验收",
-                },
-                request_id=customer_request_id,
+            opener,
+            BASE_URL,
+            "/api/customers",
+            method="POST",
+            payload={
+                "name": f"数据链路客户-{marker}",
+                "company": "CRM test verification",
+                "phone": phone,
+                "email": f"data-flow-{marker}@example.com",
+                "category": "潜在客户",
+                "source": "OTHER",
+                "notes": "仅用于 test 数据链路验收",
+            },
+            request_id=customer_request_id,
         )
         customer = json_body(customer_result)
         require(customer.get("success") is True, f"客户创建失败: {customer}")
@@ -154,13 +75,14 @@ def main() -> int:
             "客户响应缺少 x-request-id",
         )
 
-        customer_detail = json_body(request(opener, f"/api/customers/{customer_id}"))
+        customer_detail = json_body(request(opener, BASE_URL, f"/api/customers/{customer_id}"))
         require(customer_detail.get("success") is True, "客户创建后无法读取详情")
         require(customer_detail["data"]["phone"] == phone, "客户详情未返回刚写入的电话")
 
         follow_up_request_id = f"data-flow-follow-up-{marker}"
         follow_up_result = request(
             opener,
+            BASE_URL,
             f"/api/customers/{customer_id}/follow-ups",
             method="POST",
             payload={
@@ -182,18 +104,19 @@ def main() -> int:
 
         order_request_id = f"data-flow-order-{marker}"
         order_result = request(
-                opener,
-                "/api/finance/orders",
-                method="POST",
-                payload={
-                    "customerId": customer_id,
-                    "contractNo": f"TEST-{marker}",
-                    "contractAmount": 1000,
-                    "currency": "CNY",
-                    "signDate": dt.date.today().isoformat(),
-                    "remarks": "仅用于 test 数据链路验收",
-                },
-                request_id=order_request_id,
+            opener,
+            BASE_URL,
+            "/api/finance/orders",
+            method="POST",
+            payload={
+                "customerId": customer_id,
+                "contractNo": f"TEST-{marker}",
+                "contractAmount": 1000,
+                "currency": "CNY",
+                "signDate": dt.date.today().isoformat(),
+                "remarks": "仅用于 test 数据链路验收",
+            },
+            request_id=order_request_id,
         )
         order = json_body(order_result)
         require(order.get("success") is True, f"订单创建失败: {order}")
@@ -205,17 +128,18 @@ def main() -> int:
 
         payment_request_id = f"data-flow-payment-{marker}"
         payment_result = request(
-                opener,
-                "/api/finance/payments",
-                method="POST",
-                payload={
-                    "orderId": order_id,
-                    "amount": 250,
-                    "paymentMethod": "BANK_TRANSFER",
-                    "paymentDate": dt.date.today().isoformat(),
-                    "remarks": "仅用于 test 数据链路验收",
-                },
-                request_id=payment_request_id,
+            opener,
+            BASE_URL,
+            "/api/finance/payments",
+            method="POST",
+            payload={
+                "orderId": order_id,
+                "amount": 250,
+                "paymentMethod": "BANK_TRANSFER",
+                "paymentDate": dt.date.today().isoformat(),
+                "remarks": "仅用于 test 数据链路验收",
+            },
+            request_id=payment_request_id,
         )
         payment = json_body(payment_result)
         require(payment.get("success") is True, f"回款创建失败: {payment}")

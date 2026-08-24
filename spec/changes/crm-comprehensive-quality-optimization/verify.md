@@ -134,3 +134,12 @@ conclusion: fail
 - `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build`：均退出码 0；构建产物包含 `/api/customers/[id]/follow-ups`。
 - 修复跟进弹窗的 Ant Design `destroyOnClose` 弃用警告，并修复侧边栏客户管理父菜单与子菜单重复 key。Playwright 环境在 Windows 上无法使用 Bash wrapper，因为系统未安装 WSL 发行版，改用同一 `@playwright/cli` 的 `npx` 入口完成验证。
 - 当前未覆盖：文件、消息、导入、转移、公海、权限矩阵和 Playwright 全量按钮验收仍不能宣称完成。
+
+## Apply working evidence - 2026-08-24 12:28
+
+- 新增 `python scripts\manage.py content-flow --profile test`，真实执行 PDF 上传、磁盘对象检查、`File` 数据库记录检查、下载内容与下载次数检查、文件删除、消息列表、单条已读、全部已读、消息删除和审计动作检查。
+- 消息单条已读、全部已读和删除接口现在统一回传 `x-request-id`，错误写入服务端日志；业务更新和 `MESSAGE_READ`、`MESSAGE_READ_ALL`、`MESSAGE_DELETED` 审计记录位于同一 Prisma 事务。
+- 首次 `data-flow` 返回 HTTP 500，服务日志记录交互事务超过 5 秒；再次执行时登录失败，随后 `data-reachability` 和端口检查确认本地 `3306` 已无监听。通过项目既有 direct 模式重新启动本地 MySQL 后，`data-reachability`、`data-flow` 均退出码 0，说明阻塞来自数据库进程退出，而不是通过放宽断言绕过。
+- `python scripts\manage.py content-flow --profile test` 修复前退出码 1，明确失败于“单条已读响应缺少 x-request-id”；修复后连续两次退出码 0，文件与消息审计动作符合预期，测试文件、消息、文件元数据和本轮审计夹具已清理。
+- `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build` 均退出码 0；运行中执行 typecheck 曾因 Prisma 引擎 DLL 被 Next.js 占用而失败，停止 test 服务后串行复验通过。
+- 当前未覆盖：导入、客户转移、公海、权限矩阵和 Playwright 全量按钮验收；任务 8 仍保持未完成。

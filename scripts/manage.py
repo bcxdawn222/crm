@@ -118,6 +118,7 @@ def main() -> int:
             "button-audit",
             "data-reachability",
             "data-flow",
+            "content-flow",
             "runtime-test",
             "e2e",
             "perf",
@@ -239,6 +240,12 @@ def main() -> int:
             return 2
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "data_flow_test.py")]
         return run_sequence((("data-flow", command),), logger)
+    if args.action == "content-flow":
+        if profile.name != "test":
+            logger.error("content-flow 只允许 --profile test")
+            return 2
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "content_flow_test.py")]
+        return run_sequence((("content-flow", command),), logger)
     if args.action == "runtime-test":
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "runtime_checks.py")]
         return run_sequence((("runtime-test", command),), logger)
