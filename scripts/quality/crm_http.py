@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import http.cookiejar
 import json
+import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -26,6 +27,30 @@ def build_opener() -> urllib.request.OpenerDirector:
         urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
         NoRedirectHandler(),
     )
+
+
+def multipart_file(
+    field_name: str,
+    file_name: str,
+    content: bytes,
+    content_type: str,
+) -> tuple[bytes, str]:
+    boundary = f"----crm-flow-{secrets.token_hex(12)}"
+    body = b"\r\n".join(
+        (
+            f"--{boundary}".encode("ascii"),
+            (
+                f'Content-Disposition: form-data; name="{field_name}"; '
+                f'filename="{file_name}"'
+            ).encode("utf-8"),
+            f"Content-Type: {content_type}".encode("ascii"),
+            b"",
+            content,
+            f"--{boundary}--".encode("ascii"),
+            b"",
+        )
+    )
+    return body, f"multipart/form-data; boundary={boundary}"
 
 
 def request(

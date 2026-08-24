@@ -751,7 +751,7 @@ export default function CustomersPage() {
           <ul style={{ marginBottom: 24, paddingLeft: 20, color: '#999', lineHeight: 1.8 }}>
             <li>支持 .xlsx, .xls, .csv 格式</li>
             <li>第一行为表头，包含：姓名、公司、电话、邮箱等字段</li>
-            <li>姓名为必填项</li>
+            <li>姓名和电话为必填项</li>
             <li>单次最多导入1000条记录</li>
           </ul>
           

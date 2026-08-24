@@ -12,6 +12,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
 from quality.crm_http import build_opener, json_body, login, request, require
+from quality.data_flows.customer_extension import run_customer_extension_flow
 from runtime.mysql_client import parse_database_url, run_mysql
 
 
@@ -170,6 +171,7 @@ def main() -> int:
             f"SELECT COUNT(*) FROM FollowUp WHERE id={sql_quote(follow_up_id)} AND customerId={sql_quote(customer_id)}",
         )
         require(follow_up_row == "1", "数据库未找到刚创建的跟进记录")
+        run_customer_extension_flow(database_url, BASE_URL, opener, marker, USERNAME, PASSWORD)
         print(
             "业务数据核对通过，开始清理 test 夹具: "
             f"customer={customer_id}, followUp={follow_up_id}, order={order_id}, payment={payment_id}"

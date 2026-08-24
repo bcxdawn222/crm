@@ -199,3 +199,13 @@ conclusion: fail
 
 - 任务 7 的 7.1 至 7.8 已全部完成，一级任务“Mock 页面与死按钮修复”同步标记完成。
 - 任务 8 已完成基础业务写入、文件/消息、用户、角色、设置、公海和受限客户范围等部分链路，以及只读数据库质量门禁；因导入、合作客户、合同版本、批量重复写入和完整多角色矩阵仍未完成，任务 8 保持未完成。
+
+## Apply working evidence - 2026-08-24 15:00
+
+- 客户导入从逐行写入改为先解析整批、校验全部行、检查文件内重复和数据库现有电话/邮箱冲突，再在单个 Prisma 事务中批量创建客户并记录 `CustomerImport` 审计；任一行非法时整批返回 400，不再保留已通过行形成半批数据。
+- 导入限制已明确为 `.xlsx/.xls/.csv`、5 MB、1000 行；姓名和电话必填，字段长度、邮箱、客户分类和来源均执行强类型校验。导入写事务使用按 profile 区分的 MySQL 命名锁和 `Serializable` 隔离，两个同时到达的相同批次实测结果为一个 HTTP 201、一个 HTTP 409，数据库只有两条客户记录和一条成功导入审计。
+- 合作客户列表现在应用统一数据范围；标记和更新要求 `customer:update`、目标数据可访问、状态满足前置条件。合同与回访日期会与数据库现值合并校验，运营负责人必须为有效账号；状态更新、客户写入和审计位于同一事务，重复标记返回 409。
+- 扩展 `python scripts\manage.py data-flow --profile test`，真实覆盖正常导入、顺序重复导入、非法行整批回滚、双请求并发导入、标记合作、重复标记、合作信息更新、列表重新读取、数据库字段、成功审计、失败无审计和 `requestId`。2026-08-24 15:03 最终执行退出码 0，所有本轮客户、订单、回款、跟进和审计夹具均已清理。
+- 本地 MySQL Windows 服务启动曾返回 `OpenService FAILED 5: Access is denied`；随后仍通过项目 `dbstart` 入口设置已有 direct 模式参数，使用原 `my.ini` 用户态启动，未创建或迁移其他数据目录。最终测试日志位于 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-flow-20260824-150254.log`。
+- `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build` 和 `data-reachability --profile test` 均退出码 0。构建第一次因运行中的 test 服务占用 Prisma Windows DLL 退出码 1，停止服务后串行重跑通过；最终测试库 `Customer`、`FollowUp`、`Order`、`Payment`、`File`、`ContractArchive` 均为 0，关联孤儿项和金额异常均为 0。
+- 任务 8 仍未整体完成：电销转客户、普通客户转移、合同版本、订单与回款重复点击、删除/停用历史追溯及管理员、经理、销售、受限用户完整关联夹具仍待后续验收。
