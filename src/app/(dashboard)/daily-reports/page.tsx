@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, Table, Button, Space, DatePicker, Modal, Form, Input, message, Tag, Divider } from 'antd'
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
+import type { Dayjs } from 'dayjs'
+import { apiRequest } from '@/lib/http/client'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input
@@ -33,6 +35,13 @@ interface DailyReport {
   }
 }
 
+interface DailyReportFormValues {
+  reportDate: Dayjs
+  content: string
+  tomorrowPlan?: string
+  issues?: string
+}
+
 export default function DailyReportsPage() {
   const [loading, setLoading] = useState(false)
   const [reports, setReports] = useState<DailyReport[]>([])
@@ -43,7 +52,9 @@ export default function DailyReportsPage() {
   const [modalVisible, setModalVisible] = useState(false)
   const [viewModalVisible, setViewModalVisible] = useState(false)
   const [currentReport, setCurrentReport] = useState<DailyReport | null>(null)
-  const [form] = Form.useForm()
+  const [form] = Form.useForm<DailyReportFormValues>()
+  const [submitting, setSubmitting] = useState(false)
+  const requestIdRef = useRef('')
 
   // 加载日报列表
   const loadReports = async () => {
@@ -58,17 +69,14 @@ export default function DailyReportsPage() {
         params.append('endDate', dateRange[1].format('YYYY-MM-DD'))
       }
 
-      const res = await fetch(`/api/daily-reports?${params}`)
-      const data = await res.json()
-
-      if (data.success) {
-        setReports(data.data.list)
-        setTotal(data.data.total)
-      } else {
-        message.error(data.error || '加载失败')
-      }
+      const data = await apiRequest<{
+        success: true
+        data: { list: DailyReport[]; total: number }
+      }>(`/api/daily-reports?${params}`)
+      setReports(data.data.list)
+      setTotal(data.data.total)
     } catch (error) {
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '加载日报失败')
     } finally {
       setLoading(false)
     }
@@ -92,6 +100,7 @@ export default function DailyReportsPage() {
 
   // 打开新增弹窗
   const handleOpenModal = () => {
+    requestIdRef.current = crypto.randomUUID()
     form.resetFields()
     form.setFieldsValue({
       reportDate: dayjs(),
@@ -100,28 +109,30 @@ export default function DailyReportsPage() {
   }
 
   // 提交表单
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: DailyReportFormValues) => {
+    if (submitting) return
+    setSubmitting(true)
     try {
-      const res = await fetch('/api/daily-reports', {
+      await apiRequest<{ success: true }>('/api/daily-reports', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-request-id': requestIdRef.current,
+        },
         body: JSON.stringify({
           ...values,
           reportDate: values.reportDate.format('YYYY-MM-DD'),
         }),
+      }, {
+        requestKey: `daily-report-create-${requestIdRef.current}`,
       })
-
-      const data = await res.json()
-
-      if (data.success) {
-        message.success('提交成功')
-        setModalVisible(false)
-        loadReports()
-      } else {
-        message.error(data.error || '操作失败')
-      }
+      message.success('提交成功')
+      setModalVisible(false)
+      await loadReports()
     } catch (error) {
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '提交日报失败')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -264,9 +275,13 @@ export default function DailyReportsPage() {
       <Modal
         title="提交日报"
         open={modalVisible}
-        onCancel={() => setModalVisible(false)}
+        onCancel={() => {
+          if (!submitting) setModalVisible(false)
+        }}
         footer={null}
         width={700}
+        closable={!submitting}
+        maskClosable={!submitting}
       >
         <Form
           form={form}
@@ -298,7 +313,7 @@ export default function DailyReportsPage() {
           </Form.Item>
 
           <Form.Item>
-            <Button type="primary" htmlType="submit" block>
+            <Button type="primary" htmlType="submit" block loading={submitting}>
               提交
             </Button>
           </Form.Item>

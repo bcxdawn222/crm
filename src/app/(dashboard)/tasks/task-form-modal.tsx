@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, DatePicker, Form, Input, message, Modal, Select, Spin } from 'antd'
 import type { Dayjs } from 'dayjs'
 import { useSession } from 'next-auth/react'
+import { apiRequest } from '@/lib/http/client'
 
 interface AssigneeOption {
   id: string
@@ -14,16 +15,8 @@ interface AssigneeOption {
   isSelf: boolean
 }
 
-interface AssigneeResponse {
-  success?: boolean
-  data?: { list: AssigneeOption[] }
-  error?: string
-}
-
-interface SubmitResponse {
-  success?: boolean
-  error?: string
-}
+interface AssigneeResponse { success: true; data: { list: AssigneeOption[] } }
+interface SubmitResponse { success: true }
 
 interface TaskFormValues {
   title: string
@@ -48,6 +41,7 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const requestSequenceRef = useRef(0)
+  const submissionIdRef = useRef('')
   const isSales = session?.user.roles.includes('sales') ?? false
 
   async function loadAssignees(keyword = '') {
@@ -58,12 +52,8 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
     try {
       const params = new URLSearchParams({ page: '1', pageSize: '20' })
       if (keyword.trim()) params.set('keyword', keyword.trim())
-      const response = await fetch(`/api/tasks/assignees?${params}`)
-      const result = await response.json() as AssigneeResponse
+      const result = await apiRequest<AssigneeResponse>(`/api/tasks/assignees?${params}`)
       if (requestSequence !== requestSequenceRef.current) return
-      if (!response.ok || !result.success || !result.data) {
-        throw new Error(result.error || '负责人加载失败')
-      }
 
       setAssignees(result.data.list)
       const self = result.data.list.find((assignee) => assignee.isSelf)
@@ -80,6 +70,7 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
   useEffect(() => {
     if (!open) return
     form.resetFields()
+    submissionIdRef.current = crypto.randomUUID()
     form.setFieldsValue({ priority: 'MEDIUM' })
     void loadAssignees()
 
@@ -94,27 +85,28 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
   }
 
   async function handleSubmit(values: TaskFormValues) {
+    if (isSubmitting) return
     setIsSubmitting(true)
     try {
-      const response = await fetch('/api/tasks', {
+      await apiRequest<SubmitResponse>('/api/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-request-id': submissionIdRef.current,
+        },
         body: JSON.stringify({
           ...values,
           dueDate: values.dueDate?.format('YYYY-MM-DD') || null,
         }),
+      }, {
+        requestKey: `task-create-${submissionIdRef.current}`,
       })
-      const result = await response.json() as SubmitResponse
-      if (!response.ok || !result.success) {
-        message.error(result.error || '操作失败')
-        return
-      }
 
       message.success('创建成功')
       onClose()
       onSaved()
     } catch (error) {
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '创建任务失败')
     } finally {
       setIsSubmitting(false)
     }
@@ -128,7 +120,18 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
   }))
 
   return (
-    <Modal title="创建任务" open={open} onCancel={onClose} footer={null} width={600} destroyOnClose>
+    <Modal
+      title="创建任务"
+      open={open}
+      onCancel={() => {
+        if (!isSubmitting) onClose()
+      }}
+      footer={null}
+      width={600}
+      destroyOnClose
+      closable={!isSubmitting}
+      maskClosable={!isSubmitting}
+    >
       <Form form={form} layout="vertical" onFinish={handleSubmit}>
         <Form.Item name="title" label="任务标题" rules={[{ required: true, message: '请输入任务标题' }]}>
           <Input placeholder="请输入任务标题" />

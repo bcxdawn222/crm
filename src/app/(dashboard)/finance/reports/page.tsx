@@ -1,11 +1,21 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Table, DatePicker, Button, Space } from 'antd'
+import { Card, Row, Col, Statistic, DatePicker, Button, Space, message } from 'antd'
 import { DollarOutlined, RiseOutlined, FileTextOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
+import { apiRequest } from '@/lib/http/client'
+
 const { RangePicker } = DatePicker
+
+interface FinanceSummary {
+  totalOrders: number
+  totalAmount: number
+  paidAmount: number
+  unpaidAmount: number
+  completionRate: number
+}
 
 export default function ReportsPage() {
   const [loading, setLoading] = useState(false)
@@ -13,7 +23,7 @@ export default function ReportsPage() {
     dayjs().startOf('month'),
     dayjs().endOf('month'),
   ])
-  const [summary, setSummary] = useState({
+  const [summary, setSummary] = useState<FinanceSummary>({
     totalOrders: 0,
     totalAmount: 0,
     paidAmount: 0,
@@ -30,14 +40,12 @@ export default function ReportsPage() {
         endDate: dateRange[1].format('YYYY-MM-DD'),
       })
 
-      const res = await fetch(`/api/finance/reports/summary?${params}`)
-      const data = await res.json()
-
-      if (data.success) {
-        setSummary(data.data)
-      }
+      const data = await apiRequest<{ success: true; data: FinanceSummary }>(
+        `/api/finance/reports/summary?${params}`,
+      )
+      setSummary(data.data)
     } catch (error) {
-      console.error('加载统计数据失败:', error)
+      message.error(error instanceof Error ? error.message : '加载财务报表失败')
     } finally {
       setLoading(false)
     }

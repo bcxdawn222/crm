@@ -6,6 +6,7 @@ import { PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 
 import { usePermission } from '@/hooks/usePermission'
+import { apiRequest } from '@/lib/http/client'
 import { TaskFormModal } from './task-form-modal'
 
 type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
@@ -26,9 +27,8 @@ interface TaskRecord {
 }
 
 interface TaskListResponse {
-  success?: boolean
-  data?: { list: TaskRecord[]; total: number }
-  error?: string
+  success: true
+  data: { list: TaskRecord[]; total: number }
 }
 
 const PRIORITY_MAP: Record<TaskPriority, { text: string; color: string }> = {
@@ -65,16 +65,11 @@ export default function TasksPage() {
       })
       if (targetStatus) params.set('status', targetStatus)
 
-      const response = await fetch(`/api/tasks?${params}`)
-      const result = await response.json() as TaskListResponse
-      if (!response.ok || !result.success || !result.data) {
-        message.error(result.error || '加载失败')
-        return
-      }
+      const result = await apiRequest<TaskListResponse>(`/api/tasks?${params}`)
       setTasks(result.data.list)
       setTotal(result.data.total)
     } catch (error) {
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '加载任务失败')
     } finally {
       setLoading(false)
     }

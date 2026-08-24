@@ -4,6 +4,7 @@ import { Card, List, Tag, Badge, Button, Empty } from 'antd'
 import { BellOutlined, PhoneOutlined, FileTextOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { apiRequest } from '@/lib/http/client'
 
 interface ReminderItem {
   type: string
@@ -25,25 +26,24 @@ export default function SmartReminders() {
   const loadReminders = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/reminders')
-      const result = await res.json()
-      
-      if (result.success) {
-        // 合并所有类型的提醒,取前5条
-        const allReminders: ReminderItem[] = [
-          ...result.data.overdueFollowUp.map((reminder: ReminderItem) => ({ ...reminder, type: 'OVERDUE' })),
-          ...result.data.expiringContracts.map((reminder: ReminderItem) => ({ ...reminder, type: 'CONTRACT' })),
-          ...result.data.upcomingVisits.map((reminder: ReminderItem) => ({ ...reminder, type: 'VISIT' }))
-        ]
-        
-        // 按优先级排序
-        allReminders.sort((a, b) => {
-          const priorityOrder: Record<ReminderItem['priority'], number> = { HIGH: 0, MEDIUM: 1, LOW: 2 }
-          return priorityOrder[a.priority] - priorityOrder[b.priority]
-        })
-        
-        setReminders(allReminders.slice(0, 5))
-      }
+      const result = await apiRequest<{
+        success: true
+        data: {
+          overdueFollowUp: ReminderItem[]
+          expiringContracts: ReminderItem[]
+          upcomingVisits: ReminderItem[]
+        }
+      }>('/api/reminders')
+      const allReminders: ReminderItem[] = [
+        ...result.data.overdueFollowUp.map((reminder) => ({ ...reminder, type: 'OVERDUE' })),
+        ...result.data.expiringContracts.map((reminder) => ({ ...reminder, type: 'CONTRACT' })),
+        ...result.data.upcomingVisits.map((reminder) => ({ ...reminder, type: 'VISIT' })),
+      ]
+      allReminders.sort((a, b) => {
+        const priorityOrder: Record<ReminderItem['priority'], number> = { HIGH: 0, MEDIUM: 1, LOW: 2 }
+        return priorityOrder[a.priority] - priorityOrder[b.priority]
+      })
+      setReminders(allReminders.slice(0, 5))
     } catch (error) {
       console.error('Failed to load reminders:', error)
     } finally {

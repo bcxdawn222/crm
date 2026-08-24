@@ -3,6 +3,7 @@
 import { Card, Radio, Spin } from 'antd'
 import ReactECharts from 'echarts-for-react'
 import { useState, useEffect } from 'react'
+import { apiRequest } from '@/lib/http/client'
 
 interface TrendDataPoint {
   date: string
@@ -23,12 +24,11 @@ export default function RevenueTrendChart() {
   const loadTrendData = async (selectedPeriod: string) => {
     try {
       setLoading(true)
-      const res = await fetch(`/api/statistics/trend?period=${selectedPeriod}`)
-      const result = await res.json()
-      
-      if (result.success) {
-        setData(result.data.dataPoints)
-      }
+      const result = await apiRequest<{
+        success: true
+        data: { dataPoints: TrendDataPoint[] }
+      }>(`/api/statistics/trend?period=${selectedPeriod}`)
+      setData(result.data.dataPoints)
     } catch (error) {
       console.error('Failed to load trend data:', error)
     } finally {

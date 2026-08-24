@@ -3,6 +3,7 @@
 import { Card, Spin } from 'antd'
 import ReactECharts from 'echarts-for-react'
 import { useState, useEffect } from 'react'
+import { apiRequest } from '@/lib/http/client'
 
 interface FunnelStage {
   stage: string
@@ -23,12 +24,10 @@ export default function FunnelChart() {
   const loadFunnelData = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/statistics/funnel')
-      const result = await res.json()
-      
-      if (result.success) {
-        setData(result.data.stages)
-      }
+      const result = await apiRequest<{ success: true; data: { stages: FunnelStage[] } }>(
+        '/api/statistics/funnel'
+      )
+      setData(result.data.stages)
     } catch (error) {
       console.error('Failed to load funnel data:', error)
     } finally {

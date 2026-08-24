@@ -5,6 +5,7 @@ import { Card, Tabs, message, Spin } from 'antd'
 import SalesOverview from '@/components/statistics/SalesOverview'
 import FunnelAnalysis from '@/components/statistics/FunnelAnalysis'
 import TrendChart from '@/components/statistics/TrendChart'
+import { apiRequest } from '@/lib/http/client'
 
 interface SalesOverviewData {
   monthlyRevenue: number
@@ -41,16 +42,12 @@ export default function StatisticsPage() {
   const loadSalesOverview = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/statistics/sales-overview')
-      const data = await res.json()
-      if (data.success) {
-        setSalesOverview(data.data)
-      } else {
-        message.error(data.error || '加载失败')
-      }
+      const data = await apiRequest<{ success: true; data: SalesOverviewData }>(
+        '/api/statistics/sales-overview'
+      )
+      setSalesOverview(data.data)
     } catch (error) {
-      console.error(error)
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '加载销售总览失败')
     } finally {
       setLoading(false)
     }
@@ -60,16 +57,10 @@ export default function StatisticsPage() {
   const loadFunnelData = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/statistics/funnel')
-      const data = await res.json()
-      if (data.success) {
-        setFunnelData(data.data)
-      } else {
-        message.error(data.error || '加载失败')
-      }
+      const data = await apiRequest<{ success: true; data: FunnelData }>('/api/statistics/funnel')
+      setFunnelData(data.data)
     } catch (error) {
-      console.error(error)
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '加载销售漏斗失败')
     } finally {
       setLoading(false)
     }

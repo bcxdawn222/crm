@@ -10,6 +10,7 @@ import {
   ArrowDownOutlined
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
+import { apiRequest } from '@/lib/http/client'
 
 interface KPIData {
   monthlyRevenue: number
@@ -30,17 +31,10 @@ export default function KPICards() {
     try {
       setLoading(true)
       // 复用销售业绩总览API
-      const res = await fetch('/api/statistics/sales-overview')
-      const result = await res.json()
-      
-      if (result.success) {
-        setData({
-          monthlyRevenue: result.data.monthlyRevenue,
-          monthlyOrders: result.data.monthlyOrders,
-          monthlyNewCustomers: result.data.monthlyNewCustomers,
-          revenueGrowth: result.data.revenueGrowth,
-        })
-      }
+      const result = await apiRequest<{ success: true; data: KPIData }>(
+        '/api/statistics/sales-overview'
+      )
+      setData(result.data)
     } catch (error) {
       console.error('Failed to load KPI data:', error)
     } finally {

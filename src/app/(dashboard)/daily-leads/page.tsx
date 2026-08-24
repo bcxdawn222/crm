@@ -6,6 +6,9 @@ import { SearchOutlined, ReloadOutlined, UserAddOutlined } from '@ant-design/ico
 import type { ColumnsType } from 'antd/es/table'
 import dayjs, { Dayjs } from 'dayjs'
 import { Resizable } from 'react-resizable'
+
+import { apiRequest } from '@/lib/http/client'
+
 import 'react-resizable/css/styles.css'
 
 const { RangePicker } = DatePicker
@@ -86,6 +89,18 @@ interface DailyLeadStat {
   bySource: Record<string, number>
 }
 
+interface SalesOption {
+  id: string
+  realName: string
+  username: string
+}
+
+interface DailyLeadResponse {
+  success: true
+  data: DailyLeadStat[]
+  total: number
+}
+
 export default function DailyLeadsPage() {
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<DailyLeadStat[]>([])
@@ -94,7 +109,7 @@ export default function DailyLeadsPage() {
   const [pageSize, setPageSize] = useState(10)
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [salesId, setSalesId] = useState<string | undefined>(undefined)
-  const [salesList, setSalesList] = useState<any[]>([])
+  const [salesList, setSalesList] = useState<SalesOption[]>([])
   const [modalVisible, setModalVisible] = useState(false)
   const [selectedCustomers, setSelectedCustomers] = useState<Customer[]>([])
   const [selectedDate, setSelectedDate] = useState<string>('')
@@ -113,13 +128,10 @@ export default function DailyLeadsPage() {
 
   const loadSalesList = async () => {
     try {
-      const res = await fetch('/api/users?role=sales')
-      if (res.ok) {
-        const data = await res.json()
-        setSalesList(data.data || [])
-      }
+      const data = await apiRequest<{ success: true; data: SalesOption[] }>('/api/users?role=sales')
+      setSalesList(data.data)
     } catch (error) {
-      console.error('Failed to load sales list:', error)
+      message.error(error instanceof Error ? error.message : '加载销售人员失败')
     }
   }
 
@@ -141,17 +153,11 @@ export default function DailyLeadsPage() {
         params.append('salesId', salesId)
       }
 
-      const res = await fetch(`/api/daily-leads?${params}`)
-      const data = await res.json()
-
-      if (data.success) {
-        setStats(data.data)
-        setTotal(data.total)
-      } else {
-        throw new Error(data.error || 'Failed to load data')
-      }
-    } catch (error: any) {
-      console.error('Failed to load daily leads:', error)
+      const data = await apiRequest<DailyLeadResponse>(`/api/daily-leads?${params}`)
+      setStats(data.data)
+      setTotal(data.total)
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '加载每日客资失败')
     } finally {
       setLoading(false)
     }
@@ -448,22 +454,17 @@ function CustomerDetailTable({ customers, onTransfer }: { customers: Customer[],
       cancelText: '取消',
       onOk: async () => {
         setTransferring(customerId)
+        const requestId = crypto.randomUUID()
         try {
-          const res = await fetch('/api/customers/transfer', {
+          await apiRequest<{ success: true }>('/api/customers/transfer', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'x-request-id': requestId },
             body: JSON.stringify({ customerId }),
-          })
-          const data = await res.json()
-          if (data.success) {
-            message.success('客户已成功转入您的名下')
-            onTransfer?.(customerId)
-          } else {
-            message.error(data.error || '转移失败')
-          }
+          }, { requestKey: `daily-lead-transfer:${customerId}:${requestId}` })
+          message.success('客户已成功转入您的名下')
+          onTransfer?.(customerId)
         } catch (error) {
-          console.error('Transfer failed:', error)
-          message.error('网络错误,请稍后重试')
+          message.error(error instanceof Error ? error.message : '转移失败')
         } finally {
           setTransferring(null)
         }

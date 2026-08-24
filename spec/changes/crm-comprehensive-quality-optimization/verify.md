@@ -281,3 +281,12 @@ conclusion: fail
 - `python scripts\manage.py content-flow --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-content-flow-20260824-174548.log`；文件、消息和合同版本链路均已通过并清理夹具。
 - `python scripts\manage.py build --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-174618.log`。
 - 任务 9 仍未整体完成：任务、日报、统计、提醒和部分客户相关组件仍有直接 `fetch`；401 草稿恢复、断网恢复、长时间会话和浏览器级全量按钮验收尚未覆盖。
+
+## Apply working evidence - 2026-08-24 17:55
+
+- 任务、负责人搜索、日报、销售总览、销售漏斗、统计趋势、首页 KPI、首页收入趋势和首页提醒已接入 `src/lib/http/client.ts`；任务与日报写入使用固定请求号、`requestKey` 和提交中状态，避免重复点击并发提交。
+- 每日客资的销售列表、统计列表和公海客户认领，以及财务报表汇总已接入统一请求层；页面保留原字段和接口，接口失败改为显示结构化业务错误，不再静默写控制台或统一显示无法定位的“网络错误”。
+- `rg -n "\\bfetch\\(" src/app src/components` 无输出；业务页面和组件已没有直接 `fetch`，`src/lib/http/client.ts` 内部执行网络请求的 `fetch` 保留。
+- `python scripts\\manage.py routes --profile test`、`python scripts\\manage.py button-audit --profile test`、`python scripts\\manage.py data-reachability --profile test` 均退出码 0；日志分别为 `D:\\Desktop\\CRM系统代码 (2)\\CRM系统代码\\logs\\test\\manage-routes-20260824-175143.log`、`D:\\Desktop\\CRM系统代码 (2)\\CRM系统代码\\logs\\test\\manage-button-audit-20260824-175144.log`、`D:\\Desktop\\CRM系统代码 (2)\\CRM系统代码\\logs\\test\\manage-data-reachability-20260824-175145.log`。数据可达性报告显示 test 业务夹具为 0，外键孤儿项、异常订单金额和负回款均为 0。
+- `python scripts\\manage.py typecheck --profile stable` 退出码 0，日志为 `D:\\Desktop\\CRM系统代码 (2)\\CRM系统代码\\logs\\stable\\manage-typecheck-20260824-175408.log`；最终 `python scripts\\manage.py routes --profile test`、`python scripts\\manage.py button-audit --profile test` 和 `python scripts\\manage.py build --profile test` 均退出码 0，日志分别为 `D:\\Desktop\\CRM系统代码 (2)\\CRM系统代码\\logs\\test\\manage-routes-20260824-175454.log`、`D:\\Desktop\\CRM系统代码 (2)\\CRM系统代码\\logs\\test\\manage-button-audit-20260824-175455.log`、`D:\\Desktop\\CRM系统代码 (2)\\CRM系统代码\\logs\\test\\manage-build-20260824-175455.log`。
+- 任务 9.2 已完成。任务 9 仍未整体完成：401 草稿保存与登录回跳恢复、离线状态与恢复刷新、敏感草稿白名单，以及长时间空闲、慢请求、断网和重复点击集成测试尚未完成。

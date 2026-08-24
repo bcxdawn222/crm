@@ -4,6 +4,7 @@ import { Card, Radio } from 'antd'
 import type { RadioChangeEvent } from 'antd'
 import ReactECharts from 'echarts-for-react'
 import { useEffect, useState } from 'react'
+import { apiRequest } from '@/lib/http/client'
 
 interface TrendDataPoint {
   date: string
@@ -28,11 +29,10 @@ export default function TrendChart() {
   const loadTrendData = async (selectedPeriod: string) => {
     try {
       setLoading(true)
-      const res = await fetch(`/api/statistics/trend?period=${selectedPeriod}`)
-      const data = await res.json()
-      if (data.success) {
-        setTrendData(data.data)
-      }
+      const data = await apiRequest<{ success: true; data: TrendData }>(
+        `/api/statistics/trend?period=${selectedPeriod}`
+      )
+      setTrendData(data.data)
     } catch (error) {
       console.error('Failed to load trend data:', error)
     } finally {
