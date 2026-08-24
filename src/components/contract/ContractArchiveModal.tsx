@@ -8,6 +8,7 @@ import dayjs from 'dayjs'
 import ContractUploadForm from './ContractUploadForm'
 import VersionHistoryModal from './VersionHistoryModal'
 import PDFPreviewModal from './PDFPreviewModal'
+import { ApiError, apiRequest } from '@/lib/http/client'
 
 const { TextArea } = Input
 
@@ -58,6 +59,7 @@ export default function ContractArchiveModal({
   const [previewVisible, setPreviewVisible] = useState(false)
   const [previewUrl, setPreviewUrl] = useState('')
   const [showAllVersions, setShowAllVersions] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // Load archives
   const loadArchives = async () => {
@@ -69,18 +71,14 @@ export default function ContractArchiveModal({
         showAllVersions: showAllVersions.toString()
       })
       
-      const res = await fetch(`/api/customers/${customerId}/contract-archives?${params}`)
-      const json = await res.json()
-      
-      if (json.success) {
-        setArchives(json.data.list)
-        setTotal(json.data.total)
-      } else {
-        message.error(json.error || '加载失败')
-      }
+      const result = await apiRequest<{
+        success: true
+        data: { list: ContractArchive[]; total: number }
+      }>(`/api/customers/${customerId}/contract-archives?${params}`)
+      setArchives(result.data.list)
+      setTotal(result.data.total)
     } catch (error) {
-      console.error('Failed to load archives:', error)
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '加载合同备案失败')
     } finally {
       setLoading(false)
     }
@@ -100,28 +98,23 @@ export default function ContractArchiveModal({
   // Handle preview
   const handlePreview = async (archive: ContractArchive) => {
     try {
-      const res = await fetch(`/api/contract-archives/${archive.id}/preview`)
-      const json = await res.json()
-      
-      if (json.success) {
-        setPreviewUrl(json.data.previewUrl)
-        setPreviewVisible(true)
-      } else {
-        message.error(json.error || '预览失败')
-        // If not PDF, offer download
-        if (json.downloadUrl) {
-          Modal.confirm({
-            title: '文件类型不支持预览',
-            content: '该文件类型不支持在线预览，是否下载查看？',
-            onOk: () => {
-              window.open(json.downloadUrl, '_blank')
-            }
-          })
-        }
-      }
+      const result = await apiRequest<{ success: true; data: { previewUrl: string } }>(
+        `/api/contract-archives/${archive.id}/preview`
+      )
+      setPreviewUrl(result.data.previewUrl)
+      setPreviewVisible(true)
     } catch (error) {
-      console.error('Failed to get preview URL:', error)
-      message.error('网络错误')
+      const payload = error instanceof ApiError && typeof error.payload === 'object' && error.payload !== null
+        ? error.payload as { downloadUrl?: string }
+        : undefined
+      message.error(error instanceof Error ? error.message : '预览失败')
+      if (payload?.downloadUrl) {
+        Modal.confirm({
+          title: '文件类型不支持预览',
+          content: '该文件类型不支持在线预览，是否下载查看？',
+          onOk: () => window.open(payload.downloadUrl, '_blank'),
+        })
+      }
     }
   }
 
@@ -134,22 +127,19 @@ export default function ContractArchiveModal({
       okType: 'danger',
       cancelText: '取消',
       onOk: async () => {
+        if (deletingId) return
+        setDeletingId(archive.id)
         try {
-          const res = await fetch(`/api/contract-archives/${archive.id}`, {
+          await apiRequest<{ success: true }>(`/api/contract-archives/${archive.id}`, {
             method: 'DELETE'
-          })
-          const json = await res.json()
-          
-          if (json.success) {
-            message.success('删除成功')
-            loadArchives()
-            onSuccess()
-          } else {
-            message.error(json.error || '删除失败')
-          }
+          }, { requestKey: `contract-delete-${archive.id}` })
+          message.success('删除成功')
+          await loadArchives()
+          onSuccess()
         } catch (error) {
-          console.error('Failed to delete:', error)
-          message.error('网络错误')
+          message.error(error instanceof Error ? error.message : '删除合同备案失败')
+        } finally {
+          setDeletingId(null)
         }
       }
     })
@@ -272,6 +262,7 @@ export default function ContractArchiveModal({
             danger
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record)}
+            loading={deletingId === record.id}
           >
             删除
           </Button>

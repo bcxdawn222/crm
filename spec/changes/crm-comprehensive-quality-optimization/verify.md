@@ -272,3 +272,12 @@ conclusion: fail
 - `python scripts\manage.py routes --profile test`、`python scripts\manage.py button-audit --profile test` 均退出码 0，日志分别为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-routes-20260824-174115.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-button-audit-20260824-174125.log`。
 - `python scripts\manage.py build --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-174148.log`；构建路由包含 `/api/customers/operation-manager-options`。
 - 任务 9 仍未整体完成：客户合同组件、文件、消息、提醒、任务、日报、统计等页面仍有直接 `fetch`，401 草稿恢复、离线恢复和长时间会话测试尚未覆盖。
+
+## Apply working evidence - 2026-08-24 17:47
+
+- 合同备案列表、上传表单和版本历史组件已切换到 `apiRequest`；合同上传、删除使用固定请求号和 `requestKey`，上传/删除期间禁止关闭弹窗或重复提交。
+- `ApiError` 现在保留结构化错误载荷，合同 PDF 之外的预览失败仍能读取服务端返回的 `downloadUrl`，用户可以选择下载，不会因为统一请求层丢失恢复入口。
+- `python scripts\manage.py typecheck --profile stable`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260824-174517.log`。
+- `python scripts\manage.py content-flow --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-content-flow-20260824-174548.log`；文件、消息和合同版本链路均已通过并清理夹具。
+- `python scripts\manage.py build --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-174618.log`。
+- 任务 9 仍未整体完成：任务、日报、统计、提醒和部分客户相关组件仍有直接 `fetch`；401 草稿恢复、断网恢复、长时间会话和浏览器级全量按钮验收尚未覆盖。

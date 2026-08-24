@@ -22,13 +22,15 @@ export class ApiError extends Error {
   readonly code: ApiErrorCode
   readonly status: number
   readonly requestId: string
+  readonly payload: unknown
 
-  constructor(message: string, code: ApiErrorCode, status: number, requestId: string) {
+  constructor(message: string, code: ApiErrorCode, status: number, requestId: string, payload?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.code = code
     this.status = status
     this.requestId = requestId
+    this.payload = payload
   }
 }
 
@@ -102,7 +104,13 @@ async function executeRequest<T>(
       if (!response.ok) {
         const currentRequestId = requestIdFrom(response, payload)
         if (response.status === 401 && options.redirectOnUnauthorized) redirectToLogin()
-        throw new ApiError(requestMessage(payload, `请求失败（${response.status}）`), errorCode(response.status), response.status, currentRequestId)
+        throw new ApiError(
+          requestMessage(payload, `请求失败（${response.status}）`),
+          errorCode(response.status),
+          response.status,
+          currentRequestId,
+          payload,
+        )
       }
       return payload as T
     } catch (error) {

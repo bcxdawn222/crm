@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Modal, Form, Input, DatePicker, InputNumber, Select, Upload, message, Button, Space } from 'antd'
 import { InboxOutlined, UploadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { apiRequest } from '@/lib/http/client'
 
 const { TextArea } = Input
 
@@ -50,24 +51,18 @@ export default function ContractUploadForm({
       formData.append('contractAmount', values.contractAmount?.toString() || '')
       formData.append('remarks', values.remarks || '')
 
-      const res = await fetch(`/api/customers/${customerId}/contract-archives`, {
+      await apiRequest<{ success: true }>(`/api/customers/${customerId}/contract-archives`, {
         method: 'POST',
         headers: { 'x-request-id': submissionIdRef.current },
         body: formData
+      }, {
+        requestKey: `contract-upload-${customerId}-${submissionIdRef.current}`,
       })
-
-      const json = await res.json()
-
-      if (json.success) {
-        onSuccess()
-        form.resetFields()
-        setFileList([])
-      } else {
-        message.error(json.error || '上传失败')
-      }
+      onSuccess()
+      form.resetFields()
+      setFileList([])
     } catch (error) {
-      console.error('Upload failed:', error)
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '上传合同失败')
     } finally {
       setUploading(false)
     }
@@ -114,6 +109,8 @@ export default function ContractUploadForm({
       footer={null}
       width={700}
       destroyOnClose
+      closable={!uploading}
+      maskClosable={!uploading}
     >
       <Form
         form={form}
@@ -209,6 +206,7 @@ export default function ContractUploadForm({
         <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
           <Space>
             <Button onClick={() => {
+              if (uploading) return
               onClose()
               form.resetFields()
               setFileList([])

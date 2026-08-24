@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Modal, Timeline, Card, Tag, Button, Space, message } from 'antd'
 import { DownloadOutlined, EyeOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { apiRequest } from '@/lib/http/client'
 
 interface ArchiveVersion {
   id: string
@@ -45,17 +46,12 @@ export default function VersionHistoryModal({
     
     setLoading(true)
     try {
-      const res = await fetch(`/api/contract-archives/${archiveId}/versions`)
-      const json = await res.json()
-      
-      if (json.success) {
-        setVersions(json.data)
-      } else {
-        message.error(json.error || '加载失败')
-      }
+      const result = await apiRequest<{ success: true; data: ArchiveVersion[] }>(
+        `/api/contract-archives/${archiveId}/versions`
+      )
+      setVersions(result.data)
     } catch (error) {
-      console.error('Failed to load versions:', error)
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '加载合同版本失败')
     } finally {
       setLoading(false)
     }
