@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     // Check permissions - Admin can view roles
     const permissions = session.user?.permissions || []
     const ability = defineAbility(permissions)
-    if (ability.cannot('read', 'role')) {
+    if (ability.cannot('read', 'role') && ability.cannot('update', 'role')) {
       return NextResponse.json({ error: 'No permission to access' }, { status: 403 })
     }
 

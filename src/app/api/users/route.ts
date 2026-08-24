@@ -1,78 +1,110 @@
-import { NextResponse } from 'next/server'
-import type { Prisma } from '@prisma/client'
+import bcrypt from 'bcryptjs'
+import { Prisma } from '@prisma/client'
+
+import { recordAuditEvent } from '@/lib/audit/record'
 import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
+import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { prisma } from '@/lib/prisma'
+import {
+  assertManagerAssignment,
+  assertRolesExist,
+  createUserSchema,
+  nullableValue,
+  UserAdminError,
+  userAdminSelect,
+  userAuditSnapshot,
+} from '@/lib/users/admin'
 
 export const dynamic = 'force-dynamic'
 
-// GET /api/users - 获取用户列表
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.user?.id) {
+      return jsonWithRequestId({ error: '未授权' }, requestId, { status: 401 })
     }
-
-    // Check permissions
     const permissions = session.user?.permissions || []
     const ability = defineAbility(permissions)
     if (ability.cannot('read', 'user')) {
-      return NextResponse.json({ error: 'No permission to access' }, { status: 403 })
+      return jsonWithRequestId({ error: '无权查看用户' }, requestId, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role')
-
-    // Build query
-    const where: Prisma.UserWhereInput = {
-      status: 'ACTIVE'
-    }
-
-    // If role filter is specified, find users with that role
+    const includeInactive = searchParams.get('includeInactive') === 'true'
+    const where: Prisma.UserWhereInput = includeInactive ? {} : { status: 'ACTIVE' }
     if (role) {
-      where.roles = {
-        some: {
-          role: {
-            name: role
-          }
-        }
-      }
+      where.roles = { some: { role: { name: role } } }
     }
 
     const users = await prisma.user.findMany({
       where,
-      select: {
-        id: true,
-        username: true,
-        realName: true,
-        email: true,
-        phone: true,
-        department: true,
-        position: true,
-        roles: {
-          include: {
-            role: {
-              select: {
-                name: true,
-                displayName: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
+      select: userAdminSelect,
+      orderBy: { createdAt: 'desc' },
     })
-
-    return NextResponse.json({
-      success: true,
-      data: users
-    })
+    return jsonWithRequestId({ success: true, data: users }, requestId)
   } catch (error) {
-    console.error('Failed to get users:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/users', requestId)
+  }
+}
+
+export async function POST(request: Request) {
+  const requestId = getRequestId(request)
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return jsonWithRequestId({ error: '未授权' }, requestId, { status: 401 })
+    }
+    const ability = defineAbility(session.user.permissions || [])
+    if (ability.cannot('create', 'user')) {
+      return jsonWithRequestId({ error: '无权创建用户' }, requestId, { status: 403 })
+    }
+    if (ability.cannot('update', 'role')) {
+      return jsonWithRequestId({ error: '无权为用户分配角色' }, requestId, { status: 403 })
+    }
+    const body: unknown = await request.json()
+    const parsed = createUserSchema.safeParse(body)
+    if (!parsed.success) {
+      return jsonWithRequestId({ error: parsed.error.issues[0]?.message || '用户信息不正确' }, requestId, { status: 400 })
+    }
+    const password = await bcrypt.hash(parsed.data.password, 10)
+    const created = await prisma.$transaction(async (tx) => {
+      await assertRolesExist(tx, parsed.data.roleIds)
+      await assertManagerAssignment(tx, undefined, parsed.data.managerId)
+      const user = await tx.user.create({
+        data: {
+          username: parsed.data.username,
+          email: parsed.data.email,
+          password,
+          realName: parsed.data.realName,
+          phone: nullableValue(parsed.data.phone),
+          department: nullableValue(parsed.data.department),
+          position: nullableValue(parsed.data.position),
+          manager: parsed.data.managerId ? { connect: { id: parsed.data.managerId } } : undefined,
+          roles: { create: parsed.data.roleIds.map((roleId) => ({ roleId })) },
+        },
+        select: userAdminSelect,
+      })
+      await recordAuditEvent(tx, {
+        actorId: session.user.id,
+        action: 'USER_CREATED',
+        entityType: 'User',
+        entityId: user.id,
+        afterData: userAuditSnapshot(user),
+        requestId,
+      })
+      return user
+    })
+    return jsonWithRequestId({ success: true, data: created }, requestId, { status: 201 })
+  } catch (error) {
+    if (error instanceof UserAdminError) {
+      return jsonWithRequestId({ error: error.message }, requestId, { status: error.status })
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return jsonWithRequestId({ error: '用户名或邮箱已存在' }, requestId, { status: 409 })
+    }
+    return serverErrorResponse(error, 'POST /api/users', requestId)
   }
 }

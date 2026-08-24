@@ -143,3 +143,13 @@ conclusion: fail
 - `python scripts\manage.py content-flow --profile test` 修复前退出码 1，明确失败于“单条已读响应缺少 x-request-id”；修复后连续两次退出码 0，文件与消息审计动作符合预期，测试文件、消息、文件元数据和本轮审计夹具已清理。
 - `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build` 均退出码 0；运行中执行 typecheck 曾因 Prisma 引擎 DLL 被 Next.js 占用而失败，停止 test 服务后串行复验通过。
 - 当前未覆盖：导入、客户转移、公海、权限矩阵和 Playwright 全量按钮验收；任务 8 仍保持未完成。
+
+## Apply working evidence - 2026-08-24 12:50
+
+- 用户管理页已接入真实创建、编辑、停用和角色分配；新增 `/api/users/[id]`，用户与角色替换、状态变更和 `AuditEvent` 位于同一事务，当前登录账号不能停用或锁定自己。
+- 用户列表与写入响应使用显式 Prisma select，不包含 `password`；创建或重置密码使用 bcrypt 哈希，审计快照也不记录密码内容。
+- 新增 `python scripts\manage.py user-flow --profile test`。首次退出码 1，原因是现有数据库管理员拥有 `role:manage`，但种子权限漏建 `role:view`，导致角色列表 403；修正角色读取权限关系并补充种子定义后退出码 0。
+- `user-flow` 已验证创建、重复创建 409、无重复行、编辑、角色替换、停用、密码非明文、列表不返回密码、`USER_CREATED`、`USER_UPDATED`、`USER_DISABLED` 审计动作和夹具清理。
+- Playwright 真实按钮验收完成新增、编辑和停用。首次打开编辑弹窗时发现表单保留刚输入的明文初始密码；修复为每次打开先重置表单并清空密码后，复验编辑弹窗密码为空，编辑和停用均成功，页面控制台错误数为 0。
+- 浏览器测试用户及对应审计记录已从 `crm_system_test` 清理，测试应用、MySQL 和 Playwright 会话均已停止。
+- `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build` 均退出码 0；构建包含 `/api/users/[id]`。

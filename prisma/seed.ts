@@ -113,6 +113,7 @@ async function main() {
     { code: 'user:create', name: '创建用户', module: 'user' },
     { code: 'user:update', name: '更新用户', module: 'user' },
     { code: 'user:delete', name: '删除用户', module: 'user' },
+    { code: 'role:view', name: '查看角色', module: 'role' },
     { code: 'role:manage', name: '管理角色', module: 'role' },
     
     // 系统设置
