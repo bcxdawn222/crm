@@ -121,6 +121,7 @@ def main() -> int:
             "content-flow",
             "user-flow",
             "role-flow",
+            "settings-flow",
             "runtime-test",
             "e2e",
             "perf",
@@ -260,6 +261,12 @@ def main() -> int:
             return 2
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "role_flow_test.py")]
         return run_sequence((("role-flow", command),), logger)
+    if args.action == "settings-flow":
+        if profile.name != "test":
+            logger.error("settings-flow 只允许 --profile test")
+            return 2
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "settings_flow_test.py")]
+        return run_sequence((("settings-flow", command),), logger)
     if args.action == "runtime-test":
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "runtime_checks.py")]
         return run_sequence((("runtime-test", command),), logger)

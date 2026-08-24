@@ -1,45 +1,87 @@
 'use client'
 
-import { Card, Form, Input, Button, message } from 'antd'
+import { Button, Form, Input, message, Spin } from 'antd'
+import { useCallback, useEffect, useState } from 'react'
+
+import { usePermission } from '@/hooks/usePermission'
+import { apiRequest } from '@/lib/http/client'
+import type { SettingsFormValues, SettingsResponse } from './types'
+
 
 export default function SettingsPage() {
-  const [form] = Form.useForm()
+  const { can } = usePermission()
+  const canEdit = can('update', 'setting')
+  const [form] = Form.useForm<SettingsFormValues>()
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
 
-  const handleSubmit = async (values: any) => {
-    message.success('设置保存成功')
+  const loadSettings = useCallback(async () => {
+    setLoading(true)
+    try {
+      const result = await apiRequest<SettingsResponse>('/api/settings')
+      form.setFieldsValue(result.data)
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '加载系统设置失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [form])
+
+  useEffect(() => {
+    void loadSettings()
+  }, [loadSettings])
+
+  const saveSettings = async (values: SettingsFormValues) => {
+    setSaving(true)
+    try {
+      const result = await apiRequest<SettingsResponse>(
+        '/api/settings',
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) },
+        { requestKey: 'settings-save' },
+      )
+      form.setFieldsValue(result.data)
+      message.success('设置保存成功')
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '保存系统设置失败')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <div>
-      <Card title="系统设置">
-        <Form
+    <section style={{ maxWidth: 720 }}>
+      <h1 style={{ margin: '0 0 16px', fontSize: 22 }}>系统设置</h1>
+      <Spin spinning={loading}>
+        <Form<SettingsFormValues>
           form={form}
           layout="vertical"
-          onFinish={handleSubmit}
-          initialValues={{
-            systemName: 'CRM客户管理系统',
-            companyName: '公司名称',
-          }}
+          disabled={!canEdit}
+          onFinish={saveSettings}
         >
           <Form.Item
             name="systemName"
             label="系统名称"
-            rules={[{ required: true, message: '请输入系统名称' }]}
+            rules={[
+              { required: true, message: '请输入系统名称' },
+              { max: 100, message: '系统名称不能超过 100 个字符' },
+            ]}
           >
-            <Input />
+            <Input maxLength={100} />
           </Form.Item>
-
-          <Form.Item name="companyName" label="公司名称">
-            <Input />
+          <Form.Item
+            name="companyName"
+            label="公司名称"
+            rules={[{ max: 200, message: '公司名称不能超过 200 个字符' }]}
+          >
+            <Input maxLength={200} />
           </Form.Item>
-
-          <Form.Item>
-            <Button type="primary" htmlType="submit">
-              保存设置
-            </Button>
-          </Form.Item>
+          {canEdit ? (
+            <Form.Item>
+              <Button type="primary" htmlType="submit" loading={saving}>保存设置</Button>
+            </Form.Item>
+          ) : null}
         </Form>
-      </Card>
-    </div>
+      </Spin>
+    </section>
   )
 }

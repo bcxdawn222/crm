@@ -163,3 +163,12 @@ conclusion: fail
 - 浏览器验收未产生新的角色管理控制台错误；已有登录页 `favicon.ico` 404、Ant Design `Card` 弃用警告和密码输入框 autocomplete 提示属于既存问题，不计为本任务通过项。
 - 浏览器会话、test 应用和本地 MySQL 均已停止，`.playwright-cli` 临时产物已清理。
 - `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build` 均退出码 0；生产构建包含 `/api/roles/[id]`，`/admin/roles` First Load JS 约 363 kB。
+
+## Apply working evidence - 2026-08-24 13:32
+
+- 系统设置已从前端默认值和假成功提示改为真实持久化：新增 `SystemSetting` 表，只允许 `systemName`、`companyName` 两个字段；新增迁移 `20260824132000_add_system_setting`，并提供同目录 `rollback.sql`。
+- 新增 `GET/PUT /api/settings`。接口要求登录，读取允许 `setting:view` 或 `setting:update`，修改要求 `setting:update`；请求体使用严格白名单校验，未知字段返回 400；更新和 `SETTINGS_UPDATED` 审计记录位于同一 Prisma 事务。
+- 新增 `python scripts\manage.py settings-flow --profile test`，首次执行发现未登录请求会被现有中间件按全站契约返回 307 登录跳转；测试已按实际认证行为精确断言，不修改中间件。第二次执行退出码 0：系统设置写入、重新读取、数据库值、审计记录、白名单拒绝和原值恢复均通过。
+- Playwright 真实浏览器验收通过：登录后打开 `/admin/settings`，修改系统名称和公司名称，页面显示“设置保存成功”；刷新页面后两个字段仍回显修改值。随后已删除页面验收产生的设置记录和审计记录，测试库恢复为 `SystemSetting=0`、设置审计=0。
+- `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build` 均退出码 0；生产构建包含 `/api/settings`，`/admin/settings` First Load JS 约 231 kB。
+- 稳定库尚未执行 `prisma migrate deploy`，避免在未进入发布门禁前改变稳定数据库结构；迁移和回滚文件已提交，发布阶段需先备份再执行。

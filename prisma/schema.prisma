@@ -46,6 +46,7 @@ model User {
   contractArchives ContractArchive[] @relation("ContractArchiver")  // 备案的合同
   telemarketingLists TelemarketingList[] @relation("SalesTelemarketing")
   auditEvents   AuditEvent[] @relation("AuditActor")
+  updatedSettings SystemSetting[] @relation("SettingUpdater")
   
   // ========== 公海池认领配额 ==========
   maxActiveCustomers Int      @default(50)    // 最大活跃客户数
@@ -137,6 +138,19 @@ model AuditEvent {
   @@index([entityType, entityId, createdAt])
   @@index([actorId, createdAt])
   @@index([action, createdAt])
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique @db.VarChar(100)
+  value     String   @db.Text
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  updater User? @relation("SettingUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@index([updatedBy])
 }
 
 // ==================== 客户管理 ====================
