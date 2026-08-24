@@ -75,8 +75,48 @@ def run_finance_contract_flow(
     stored_keys: list[str] = []
     first_content = f"%PDF-1.4\ncontract-v1-{marker}".encode("utf-8")
     second_content = f"%PDF-1.4\ncontract-v2-{marker}".encode("utf-8")
+    customer_dir = root / "storage" / "test" / "contracts" / customer_id
 
     try:
+        invalid_id = f"data-flow-contract-invalid-{marker}"
+        request_ids.append(invalid_id)
+        invalid_body, invalid_type = multipart_form(
+            {
+                "contractName": contract_name,
+                "contractType": "SALES",
+            },
+            "file",
+            f"contract-invalid-{marker}.exe",
+            b"invalid-contract-content",
+            "application/octet-stream",
+        )
+        invalid_upload = request(
+            opener,
+            base_url,
+            f"/api/customers/{customer_id}/contract-archives",
+            method="POST",
+            body=invalid_body,
+            content_type=invalid_type,
+            request_id=invalid_id,
+        )
+        require(invalid_upload.status == 400, "非法合同文件没有被拒绝")
+        require(invalid_upload.headers.get("x-request-id") == invalid_id, "非法合同响应缺少请求号")
+        require(
+            database_value(
+                database_url,
+                f"SELECT COUNT(*) FROM ContractArchive WHERE requestId={sql_quote(invalid_id)}",
+            ) == "0",
+            "非法合同上传留下了元数据",
+        )
+        require(
+            database_value(
+                database_url,
+                f"SELECT COUNT(*) FROM AuditEvent WHERE requestId={sql_quote(invalid_id)}",
+            ) == "0",
+            "非法合同上传写入了成功审计",
+        )
+        require(not customer_dir.exists() or not list(customer_dir.glob("*")), "非法合同上传留下了文件")
+
         concurrent_id = f"data-flow-contract-v1-{marker}"
         request_ids.append(concurrent_id)
         openers = [build_opener(), build_opener()]
@@ -115,7 +155,6 @@ def run_finance_contract_flow(
             "AND reason='CONTRACT_ARCHIVED'",
         )
         require(first_audit == "1", "合同重复提交产生了多条成功审计")
-        customer_dir = root / "storage" / "test" / "contracts" / customer_id
         require(len(list(customer_dir.glob("*"))) == 1, "合同重复提交留下了多余文件")
 
         second_idempotency = f"data-flow-contract-v2-{marker}"
@@ -199,6 +238,32 @@ def run_finance_contract_flow(
             f"SELECT COUNT(*) FROM ContractArchive WHERE customerId={sql_quote(customer_id)}",
         ) == "0", "合同版本元数据未清理")
         require(not customer_dir.exists() or not list(customer_dir.glob("*")), "合同文件未全部清理")
+        deletion_audits = database_value(
+            database_url,
+            "SELECT COUNT(*) FROM AuditEvent "
+            f"WHERE requestId IN ({sql_quote(delete_second_id)},{sql_quote(delete_first_id)}) "
+            "AND reason='CONTRACT_ARCHIVE_DELETED' AND beforeData IS NOT NULL",
+        )
+        require(deletion_audits == "2", "合同删除后审计快照不完整")
+
+        missing_delete_id = f"data-flow-contract-delete-missing-{marker}"
+        request_ids.append(missing_delete_id)
+        missing_delete = request(
+            opener,
+            base_url,
+            f"/api/contract-archives/{first_id}",
+            method="DELETE",
+            request_id=missing_delete_id,
+        )
+        require(missing_delete.status == 404, "重复删除合同没有返回不存在")
+        require(missing_delete.headers.get("x-request-id") == missing_delete_id, "合同删除失败响应缺少请求号")
+        require(
+            database_value(
+                database_url,
+                f"SELECT COUNT(*) FROM AuditEvent WHERE requestId={sql_quote(missing_delete_id)}",
+            ) == "0",
+            "合同删除失败写入了成功审计",
+        )
         print("订单、回款幂等与合同版本链路验收通过")
     finally:
         if archive_ids:

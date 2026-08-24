@@ -12,6 +12,8 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from quality.reachability_contracts import run_reachability_contracts
+
 
 @dataclass(frozen=True)
 class QualityCheck:
@@ -131,6 +133,8 @@ def main() -> int:
     if _run_prisma_probe() != 0:
         return 1
     if _check_required_tables() != 0:
+        return 1
+    if run_reachability_contracts(ROOT) != 0:
         return 1
     _print_table_counts()
     return _check_relations()

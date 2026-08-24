@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
 from quality.crm_http import build_opener, json_body, login, request, require
 from quality.data_flows.customer_extension import run_customer_extension_flow
+from quality.data_flows.history_consistency import run_history_consistency_flow
 from quality.data_flows.customer_transfer import run_customer_transfer_flow
 from quality.data_flows.finance_contract import run_finance_contract_flow
 from runtime.mysql_client import parse_database_url, run_mysql
@@ -208,6 +209,16 @@ def main() -> int:
         )
         run_customer_extension_flow(database_url, BASE_URL, opener, marker, USERNAME, PASSWORD)
         run_customer_transfer_flow(database_url, BASE_URL, opener, marker)
+        run_history_consistency_flow(
+            database_url,
+            BASE_URL,
+            opener,
+            marker,
+            customer_id,
+            follow_up_id,
+            order_id,
+            payment_id,
+        )
         print(
             "业务数据核对通过，开始清理 test 夹具: "
             f"customer={customer_id}, followUp={follow_up_id}, order={order_id}, payment={payment_id}"

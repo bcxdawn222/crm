@@ -231,3 +231,23 @@ conclusion: fail
 - `python scripts\manage.py data-reachability --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260824-170419.log`；核心业务表检查通过，业务夹具数量为 0，外键孤儿项、异常订单金额和负回款均为 0。
 - `python scripts\manage.py routes --profile test`、`python scripts\manage.py button-audit --profile test` 和 `python scripts\manage.py build --profile test` 均退出码 0；构建日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-170513.log`，生产路由表包含 `/api/customers/[id]/transfer`、`/api/customers/transfer-options` 和 `/api/telemarketing/convert`。
 - 任务 8.3 已完成。任务 8.5 的删除、停用、归档历史追溯和任务 8.6 的其余失败写入链路仍需单独证据，因此任务 8 整体保持未完成。
+
+## Apply working evidence - 2026-08-24 17:16
+
+- 扩展 `data-flow` 的失败写入和历史追溯验收：超额回款返回 `AMOUNT_EXCEEDS_UNPAID`，响应带请求号，`Payment` 无新记录、订单金额保持 `250.00|750.00`、无成功审计；非法合同文件返回 400，`ContractArchive`、审计和 `storage/test/contracts` 均无残留。
+- 客户软删除后直接查询数据库确认状态为 `INACTIVE`，原客户的 1 条跟进、1 条订单和 1 条回款仍可追溯，`CUSTOMER_SOFT_DELETED` 审计同时保留前后快照；合同删除后两条 `CONTRACT_ARCHIVE_DELETED` 审计均保留 `beforeData`，删除最新版本后上一版本恢复为最新。
+- `python scripts\manage.py data-flow --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-flow-20260824-171430.log`；包含电销转化、客户转移、导入、合作客户、订单、回款、合同版本、失败写入和历史追溯，test 夹具已清理。
+- `python scripts\manage.py content-flow --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-content-flow-20260824-171448.log`；文件对象、文件元数据、消息和审计夹具均已清理。
+- `python scripts\manage.py user-flow --profile test` 和 `python scripts\manage.py public-pool-flow --profile test` 均退出码 0，日志分别为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-user-flow-20260824-171324.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-public-pool-flow-20260824-171332.log`。
+- `python scripts\manage.py data-reachability --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260824-171510.log`；核心表 15 张，业务夹具为 0，外键孤儿项、异常订单金额和负回款均为 0。
+- `python scripts\manage.py routes --profile test`、`python scripts\manage.py button-audit --profile test` 均退出码 0，日志分别为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-routes-20260824-171526.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-button-audit-20260824-171534.log`。test 服务随后通过 `python scripts\manage.py stop --profile test` 停止，未残留 PID、端口或锁。
+- 任务 8.5、8.6、8.7 已完成。任务 8.1 的统一多角色最小夹具和任务 8.2 的页面入口到 API、数据库行、审计事件逐链路报告仍未完成，因此任务 8 整体保持未完成。
+
+## Apply working evidence - 2026-08-24 17:21
+
+- `data-reachability` 新增 12 条销售业务链路契约，逐条检查页面入口、Route Handler、业务实现、Prisma 模型和审计标识，覆盖客户创建、客户跟进、订单、回款、合同、文件、消息、电销转化、客户转移、公海认领、客户导入和合作客户更新。
+- 第一次执行 `python scripts\manage.py data-reachability --profile test` 因回款契约漏填 `Payment` 模型参数退出码 1；根据 traceback 修正检查器后重新执行退出码 0。最终日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260824-171953.log`，12 条链路契约、15 张核心表和数据库质量检查均通过。
+- 多角色最小夹具由可重复清理的 test flow 组成：管理员及客户/跟进/订单/回款/合同由 `data-flow` 覆盖，销售主管和两名下属销售由客户转移流程覆盖，受限用户由 `scope-flow` 覆盖，文件与消息由 `content-flow` 覆盖，用户停用和公海归档分别由 `user-flow`、`public-pool-flow` 覆盖。
+- `python scripts\manage.py scope-flow --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-scope-flow-20260824-172026.log`；受限用户无法在列表或详情读取管理员客户，角色、用户、客户和审计夹具均已清理。
+- 现有 `File` 模型只通过 `uploadedBy` 关联用户，`Message` 模型只通过 `senderId`、`receiverId` 关联用户，均没有 `customerId`。本轮按原系统字段验证，没有为满足测试描述而新增客户关联字段。
+- 任务 8.1 至 8.7 已全部完成，一级任务“数据可达性与一致性”标记完成。该结论不代表任务 10 的完整权限矩阵或任务 15 的 Playwright 全量按钮验收已经完成。
