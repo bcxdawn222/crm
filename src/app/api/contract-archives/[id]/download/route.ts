@@ -1,6 +1,6 @@
 import { recordAuditEvent } from '@/lib/audit/record'
 import { auth } from '@/lib/auth'
-import { defineAbility } from '@/lib/casl'
+import { canReadContractArchive } from '@/lib/contracts/access'
 import { readContractFile } from '@/lib/fileStorage'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { prisma } from '@/lib/prisma'
@@ -31,11 +31,7 @@ export async function GET(
     if (!archive) {
       return jsonWithRequestId({ error: '合同备案不存在' }, requestId, { status: 404 })
     }
-    const ability = defineAbility(session.user.permissions || [])
-    const canRead = archive.customer.salesId === session.user.id
-      || archive.customer.operationManagerId === session.user.id
-      || ability.can('manage', 'all')
-    if (!canRead) {
+    if (!await canReadContractArchive(session.user, archive.customer)) {
       return jsonWithRequestId({ error: '无权下载合同文件' }, requestId, { status: 403 })
     }
 

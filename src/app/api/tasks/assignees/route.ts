@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
     const permissions = session.user.permissions || []
     const roles = session.user.roles || []
-    if (!permissions.includes('task:view') || !canCreateTask(permissions, roles)) {
+    if (!permissions.includes('task:view') || !canCreateTask(permissions)) {
       return NextResponse.json({ error: 'No permission to select task assignees' }, { status: 403 })
     }
 

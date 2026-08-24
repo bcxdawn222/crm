@@ -9,6 +9,7 @@ import ContractUploadForm from './ContractUploadForm'
 import VersionHistoryModal from './VersionHistoryModal'
 import PDFPreviewModal from './PDFPreviewModal'
 import { ApiError, apiRequest } from '@/lib/http/client'
+import { usePermission } from '@/hooks/usePermission'
 
 const { TextArea } = Input
 
@@ -48,6 +49,8 @@ export default function ContractArchiveModal({
   onClose,
   onSuccess
 }: ContractArchiveModalProps) {
+  const { can } = usePermission()
+  const canUpdateCustomer = can('update', 'customer')
   const [loading, setLoading] = useState(false)
   const [archives, setArchives] = useState<ContractArchive[]>([])
   const [total, setTotal] = useState(0)
@@ -256,7 +259,7 @@ export default function ContractArchiveModal({
               历史
             </Button>
           )}
-          <Button
+          {canUpdateCustomer && <Button
             type="link"
             size="small"
             danger
@@ -265,7 +268,7 @@ export default function ContractArchiveModal({
             loading={deletingId === record.id}
           >
             删除
-          </Button>
+          </Button>}
         </Space>
       )
     }
@@ -283,13 +286,13 @@ export default function ContractArchiveModal({
       >
         <div style={{ marginBottom: 16 }}>
           <Space>
-            <Button
+            {canUpdateCustomer && <Button
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => setUploadModalVisible(true)}
             >
               新增备案
-            </Button>
+            </Button>}
             <Button
               icon={<ReloadOutlined />}
               onClick={loadArchives}

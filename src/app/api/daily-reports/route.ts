@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { defineAbility } from '@/lib/casl'
-import { getUserAndSubordinateIds } from '@/lib/data-permission'
+import { getAccessibleUserIds } from '@/lib/data-permission'
 import { Prisma } from '@prisma/client'
 
 // GET /api/daily-reports - Get daily report list
@@ -14,15 +13,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check permissions - all roles can view reports now
     const permissions = session.user?.permissions || []
-    const ability = defineAbility(permissions)
-    if (ability.cannot('read', 'report')) {
-      // Finance role doesn't have report:view permission, but we allow them to view
-      const userRoles = session.user?.roles || []
-      if (!userRoles.includes('finance')) {
-        return NextResponse.json({ error: 'No permission to access' }, { status: 403 })
-      }
+    if (!permissions.includes('report:daily:view')) {
+      return NextResponse.json({ error: 'No permission to access' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -35,9 +28,9 @@ export async function GET(request: Request) {
     const where: Prisma.DailyReportWhereInput = {}
     
     // Apply hierarchical data filter based on user role
-    const userRoles = session.user?.roles || []
-    if (userRoles.includes('sales_manager') || userRoles.includes('sales')) {
-      where.userId = { in: await getUserAndSubordinateIds(session.user.id) }
+    const accessibleUserIds = await getAccessibleUserIds(session.user.id, session.user.roles)
+    if (accessibleUserIds !== null) {
+      where.userId = { in: accessibleUserIds }
     }
     // Admin and Finance can view all reports
 
@@ -106,8 +99,7 @@ export async function POST(request: Request) {
 
     // Check permissions
     const permissions = session.user?.permissions || []
-    const ability = defineAbility(permissions)
-    if (ability.cannot('create', 'report')) {
+    if (!permissions.includes('report:daily:create')) {
       return NextResponse.json({ error: 'No permission to create daily report' }, { status: 403 })
     }
 

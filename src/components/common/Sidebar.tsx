@@ -18,6 +18,7 @@ import {
   BarChartOutlined,
 } from '@ant-design/icons'
 import { usePermission } from '@/hooks/usePermission'
+import { hasAnyPermission } from '@/lib/access/page-access'
 
 const { Sider } = Layout
 
@@ -64,7 +65,7 @@ const menuItems = [
       {
         key: '/telemarketing',
         label: <Link href="/telemarketing">电销名单</Link>,
-        permission: 'customer:create',
+        permissions: ['lead:view'],
       },
       {
         key: '/customers/cooperating',
@@ -77,7 +78,7 @@ const menuItems = [
     key: '/finance',
     icon: <DollarOutlined />,
     label: '财务管理',
-    permission: 'order:view',
+    permissions: null,
     children: [
       {
         key: '/finance/orders',
@@ -124,7 +125,7 @@ const menuItems = [
     key: '/admin',
     icon: <SettingOutlined />,
     label: '系统管理',
-    permission: 'user:view',
+    permissions: null,
     children: [
       {
         key: '/admin/users',
@@ -134,7 +135,7 @@ const menuItems = [
       {
         key: '/admin/roles',
         label: <Link href="/admin/roles">角色管理</Link>,
-        permission: 'role:manage',
+        permissions: ['role:view', 'role:manage'],
       },
       {
         key: '/admin/settings',
@@ -153,7 +154,8 @@ interface MenuItem {
   key: string
   icon?: React.ReactNode
   label: React.ReactNode
-  permission: string | null
+  permission?: string | null
+  permissions?: readonly string[] | null
   children?: MenuItem[]
 }
 
@@ -164,7 +166,9 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const filterMenuByPermission = (items: MenuItem[]): MenuItem[] => {
     return items
       .map(item => {
-        if (item.permission && !permissions.includes(item.permission)) {
+        const requiredPermissions = item.permissions
+          ?? (item.permission ? [item.permission] : [])
+        if (requiredPermissions.length > 0 && !hasAnyPermission(permissions, requiredPermissions)) {
           return null
         }
         

@@ -14,6 +14,7 @@ export interface CreateOrderInput {
   deliveryDate?: Date
   remarks?: string
   salesId: string
+  actorId: string
   requestId: string
 }
 
@@ -94,7 +95,7 @@ export async function createOrder(input: CreateOrderInput) {
         },
       })
       await recordAuditEvent(tx, {
-        actorId: input.salesId,
+        actorId: input.actorId,
         action: 'CREATE',
         entityType: 'Order',
         entityId: created.id,

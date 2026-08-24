@@ -6,6 +6,7 @@ import { InvoiceType, PaymentMethod, Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { createPayment, CreatePaymentError } from '@/lib/payments/create'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { getAccessibleUserIds } from '@/lib/data-permission'
 
 
 const createPaymentSchema = z.object({
@@ -44,10 +45,10 @@ export async function GET(request: Request) {
     // Build query conditions
     const where: Prisma.PaymentWhereInput = {}
     
-    // Sales can only view their own payments
-    if (session.user.roles.includes('sales')) {
+    const accessibleUserIds = await getAccessibleUserIds(session.user.id, session.user.roles)
+    if (accessibleUserIds !== null) {
       where.order = {
-        salesId: session.user.id
+        salesId: { in: accessibleUserIds }
       }
     }
 
@@ -153,6 +154,22 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message ?? '收款参数不正确' },
         { status: 400 }
+      )
+    }
+
+    const accessibleUserIds = await getAccessibleUserIds(session.user.id, session.user.roles)
+    const accessibleOrder = await prisma.order.findFirst({
+      where: {
+        id: parsed.data.orderId,
+        ...(accessibleUserIds === null ? {} : { salesId: { in: accessibleUserIds } }),
+      },
+      select: { id: true },
+    })
+    if (!accessibleOrder) {
+      return jsonWithRequestId(
+        { error: '无权为该订单登记收款', requestId },
+        requestId,
+        { status: 403 }
       )
     }
 

@@ -6,6 +6,7 @@ import { UserAddOutlined, BarChartOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import PublicPoolDashboard from '@/components/dashboard/PublicPoolDashboard'
 import { apiRequest } from '@/lib/http/client'
+import { usePermission } from '@/hooks/usePermission'
 
 interface Customer {
   id: string
@@ -60,6 +61,8 @@ interface QuotaStatus {
 }
 
 export default function PublicPoolPage() {
+  const { can } = usePermission()
+  const canUpdateCustomer = can('update', 'customer')
   const [loading, setLoading] = useState(false)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [total, setTotal] = useState(0)
@@ -241,6 +244,7 @@ export default function PublicPoolPage() {
       width: 120,
       fixed: 'right',
       render: (_, record) => {
+        if (!canUpdateCustomer) return null
         const canClaim = quotaStatus?.canClaim || quotaStatus?.isAdmin || false
         return (
           <Button

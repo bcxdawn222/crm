@@ -8,6 +8,8 @@ import { removeSharedFile, storeSharedFile } from '@/lib/files/storage'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { parsePagination } from '@/lib/http/pagination'
 import { prisma } from '@/lib/prisma'
+import { getAccessibleUserIds } from '@/lib/data-permission'
+import type { Prisma } from '@prisma/client'
 
 
 export const dynamic = 'force-dynamic'
@@ -37,7 +39,10 @@ export async function GET(request: Request) {
     if (ability.cannot('read', 'file')) return jsonWithRequestId({ error: '无权查看文件' }, requestId, { status: 403 })
     const pagination = parsePagination(new URL(request.url).searchParams, { defaultPageSize: 20 })
     if (!pagination) return jsonWithRequestId({ error: '分页参数不正确' }, requestId, { status: 400 })
-    const where = ability.can('manage', 'all') ? {} : { OR: [{ isPublic: true }, { uploadedBy: session.user.id }] }
+    const accessibleUserIds = await getAccessibleUserIds(session.user.id, session.user.roles)
+    const where: Prisma.FileWhereInput = accessibleUserIds === null
+      ? {}
+      : { uploadedBy: { in: accessibleUserIds } }
     const [list, total] = await prisma.$transaction([
       prisma.file.findMany({
         where,

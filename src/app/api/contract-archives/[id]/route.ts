@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
-import { defineAbility } from '@/lib/casl'
 import { ContractArchiveError, deleteContractArchive } from '@/lib/contracts/archive'
+import { canWriteContractArchive } from '@/lib/contracts/access'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { prisma } from '@/lib/prisma'
 
@@ -21,8 +21,7 @@ export async function DELETE(
     if (!archive) {
       return jsonWithRequestId({ error: '合同备案不存在' }, requestId, { status: 404 })
     }
-    const ability = defineAbility(session.user.permissions || [])
-    if (archive.customer.salesId !== session.user.id && ability.cannot('manage', 'all')) {
+    if (!await canWriteContractArchive(session.user, archive.customer.salesId)) {
       return jsonWithRequestId({ error: '无权删除合同备案' }, requestId, { status: 403 })
     }
 

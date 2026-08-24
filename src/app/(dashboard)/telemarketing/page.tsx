@@ -9,6 +9,7 @@ import { useFormDraft } from '@/hooks/useFormDraft'
 import { isTelemarketingDraft, type TelemarketingDraft } from '@/lib/forms/crm-drafts'
 import { apiRequest } from '@/lib/http/client'
 import { TelemarketingConvertModal } from './telemarketing-convert-modal'
+import { usePermission } from '@/hooks/usePermission'
 
 const { TextArea } = Input
 
@@ -59,6 +60,10 @@ interface TelemarketingMutationResponse {
 }
 
 export default function TelemarketingPage() {
+  const { permissions } = usePermission()
+  const canCreate = permissions.includes('lead:create')
+  const canUpdate = permissions.includes('lead:update')
+  const canConvert = permissions.includes('lead:convert') && permissions.includes('customer:create')
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<TelemarketingRecord[]>([])
   const [total, setTotal] = useState(0)
@@ -276,20 +281,20 @@ export default function TelemarketingPage() {
       fixed: 'right',
       render: (_, record) => (
         <Space>
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => {
-              formRequestIdRef.current = crypto.randomUUID()
-              setEditingRecord(record)
-              form.setFieldsValue(record)
-              setModalVisible(true)
-            }}
-          >
-            编辑
-          </Button>
-          {!record.customerId && (
+          {canUpdate && <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => {
+                formRequestIdRef.current = crypto.randomUUID()
+                setEditingRecord(record)
+                form.setFieldsValue(record)
+                setModalVisible(true)
+              }}
+            >
+              编辑
+            </Button>}
+          {canConvert && !record.customerId && (
             <Button
               type="primary"
               size="small"
@@ -299,7 +304,7 @@ export default function TelemarketingPage() {
               转入客户
             </Button>
           )}
-          <Popconfirm
+          {canUpdate && <Popconfirm
             title="确认删除"
             description="确定要删除这条电销记录吗?"
             onConfirm={() => handleDelete(record.id)}
@@ -313,7 +318,7 @@ export default function TelemarketingPage() {
             >
               删除
             </Button>
-          </Popconfirm>
+          </Popconfirm>}
         </Space>
       ),
     },
@@ -323,7 +328,7 @@ export default function TelemarketingPage() {
     <div>
       <Card
         title="电销名单管理"
-        extra={
+        extra={canCreate ? (
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -336,7 +341,7 @@ export default function TelemarketingPage() {
           >
             新增电销记录
           </Button>
-        }
+        ) : null}
       >
         {/* Statistics */}
         <Row gutter={16} style={{ marginBottom: 24 }}>

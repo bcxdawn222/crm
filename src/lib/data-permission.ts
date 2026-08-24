@@ -1,5 +1,27 @@
 import { prisma } from './prisma'
 
+export interface TeamTreeNode {
+  id: string
+  username: string
+  realName: string
+  department: string | null
+  position: string | null
+  children?: TeamTreeNode[]
+}
+
+export async function getAccessibleUserIds(
+  userId: string,
+  userRoles: readonly string[]
+): Promise<string[] | null> {
+  if (userRoles.includes('admin') || userRoles.includes('finance')) {
+    return null
+  }
+  if (userRoles.includes('sales_manager') || userRoles.includes('sales')) {
+    return getUserAndSubordinateIds(userId)
+  }
+  return []
+}
+
 /**
  * 获取用户及其所有下属的ID列表(递归)
  * @param userId 用户ID
@@ -36,28 +58,10 @@ export async function getUserAndSubordinateIds(userId: string): Promise<string[]
  */
 export async function buildDataFilter(
   userId: string,
-  userRoles: string[]
-): Promise<{ salesId?: { in: string[] } } | {}> {
-  // Admin可以查看所有数据
-  if (userRoles.includes('admin')) {
-    return {}
-  }
-  
-  // Sales Manager和Sales只能查看自己和下属的数据
-  if (userRoles.includes('sales_manager') || userRoles.includes('sales')) {
-    const accessibleUserIds = await getUserAndSubordinateIds(userId)
-    return {
-      salesId: { in: accessibleUserIds }
-    }
-  }
-  
-  // Finance可以查看所有数据(财务需要全局视角)
-  if (userRoles.includes('finance')) {
-    return {}
-  }
-  
-  // 无明确数据范围的角色只能看到空集合，不能把缺少范围解释为全局访问。
-  return { salesId: { in: [] } }
+  userRoles: readonly string[]
+): Promise<{ salesId?: { in: string[] } }> {
+  const accessibleUserIds = await getAccessibleUserIds(userId, userRoles)
+  return accessibleUserIds === null ? {} : { salesId: { in: accessibleUserIds } }
 }
 
 /**
@@ -69,26 +73,11 @@ export async function buildDataFilter(
  */
 export async function canAccessSalesData(
   currentUserId: string,
-  currentUserRoles: string[],
+  currentUserRoles: readonly string[],
   targetSalesId: string
 ): Promise<boolean> {
-  // Admin可以访问所有数据
-  if (currentUserRoles.includes('admin')) {
-    return true
-  }
-  
-  // Finance可以访问所有数据
-  if (currentUserRoles.includes('finance')) {
-    return true
-  }
-  
-  // Sales Manager和Sales只能访问自己和下属的数据
-  if (currentUserRoles.includes('sales_manager') || currentUserRoles.includes('sales')) {
-    const accessibleUserIds = await getUserAndSubordinateIds(currentUserId)
-    return accessibleUserIds.includes(targetSalesId)
-  }
-  
-  return false
+  const accessibleUserIds = await getAccessibleUserIds(currentUserId, currentUserRoles)
+  return accessibleUserIds === null || accessibleUserIds.includes(targetSalesId)
 }
 
 /**
@@ -114,7 +103,7 @@ export async function getDirectSubordinates(userId: string) {
  * @param userId 用户ID
  * @returns 团队树结构
  */
-export async function getTeamTree(userId: string): Promise<any[]> {
+export async function getTeamTree(userId: string): Promise<TeamTreeNode[]> {
   const subordinates = await prisma.user.findMany({
     where: { managerId: userId },
     select: {
@@ -126,7 +115,7 @@ export async function getTeamTree(userId: string): Promise<any[]> {
     }
   })
   
-  const tree = []
+  const tree: TeamTreeNode[] = []
   for (const sub of subordinates) {
     const children = await getTeamTree(sub.id)
     tree.push({

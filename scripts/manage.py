@@ -34,6 +34,7 @@ TEST_FLOW_SCRIPTS = {
     "public-pool-flow": "public_pool_flow_test.py",
     "scope-flow": "scope_flow_test.py",
     "network-session-flow": "network_session_flow_test.py",
+    "permission-flow": "permission_flow_test.py",
 }
 
 
@@ -127,6 +128,7 @@ def main() -> int:
             "instance-status",
             "button-audit",
             "data-reachability",
+            "permission-matrix",
             *TEST_FLOW_SCRIPTS,
             "runtime-test",
             "e2e",
@@ -243,6 +245,9 @@ def main() -> int:
     if args.action == "data-reachability":
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "data_reachability.py")]
         return run_sequence((("data-reachability", command),), logger)
+    if args.action == "permission-matrix":
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "permission_matrix.py")]
+        return run_sequence((("permission-matrix", command),), logger)
     if args.action in TEST_FLOW_SCRIPTS:
         if profile.name != "test":
             logger.error("%s 只允许 --profile test", args.action)

@@ -8,6 +8,7 @@ import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { useFormDraft } from '@/hooks/useFormDraft'
 import { apiRequest } from '@/lib/http/client'
+import { PermissionGuard } from '@/components/common/PermissionGuard'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input
@@ -260,13 +261,15 @@ export default function DailyReportsPage() {
       <Card
         title="日报管理"
         extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => handleOpenModal()}
-          >
-            提交日报
-          </Button>
+          <PermissionGuard action="create" subject="report">
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => handleOpenModal()}
+            >
+              提交日报
+            </Button>
+          </PermissionGuard>
         }
       >
         {/* 搜索栏 */}

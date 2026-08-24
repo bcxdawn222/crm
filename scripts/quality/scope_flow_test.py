@@ -112,7 +112,22 @@ def main() -> int:
 
         detail_result = request(restricted_opener, BASE_URL, f"/api/customers/{customer_id}")
         require(detail_result.status == 403, "受限用户可以通过详情 API 读取范围外客户")
-        print("受限角色客户列表与详情数据范围验收通过")
+        forbidden_apis = (
+            "/api/statistics/sales-overview",
+            "/api/finance/orders?page=1&pageSize=10",
+            "/api/finance/payments?page=1&pageSize=10",
+            "/api/daily-reports?page=1&pageSize=10",
+            "/api/tasks?page=1&pageSize=10",
+            "/api/files?page=1&pageSize=10",
+        )
+        for path in forbidden_apis:
+            result = request(restricted_opener, BASE_URL, path)
+            require(result.status == 403, f"受限用户可以绕过权限访问 {path}: HTTP {result.status}")
+
+        admin_page = request(restricted_opener, BASE_URL, "/admin/users")
+        require(admin_page.status in {302, 303, 307, 308}, "受限用户可直接打开系统管理页面")
+        require(admin_page.headers.get("location", "").endswith("/403"), "系统管理页面未重定向到 403")
+        print("受限角色页面、API 与客户数据范围验收通过")
         return 0
     finally:
         if request_ids:

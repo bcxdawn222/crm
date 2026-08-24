@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
+import { buildDataFilter, getAccessibleUserIds } from '@/lib/data-permission'
 
 // GET /api/statistics/trend - 获取业绩趋势分析
 export async function GET(request: Request) {
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     // Check permissions
     const permissions = session.user?.permissions || []
     const ability = defineAbility(permissions)
-    if (ability.cannot('read', 'report')) {
+    if (!permissions.includes('report:view') || ability.cannot('read', 'report')) {
       return NextResponse.json({ error: 'No permission to access statistics' }, { status: 403 })
     }
 
@@ -25,14 +26,10 @@ export async function GET(request: Request) {
     const period = searchParams.get('period') || '30d' // 7d, 30d, 90d, ytd
     const granularity = searchParams.get('granularity') || 'day' // day, week, month
 
-    const userId = session.user.id
-    const roles = session.user.roles || []
     const now = new Date()
 
-    // 管理员/主管可以看全部数据,普通销售只看自己的
-    const whereCondition = roles.includes('ADMIN') || roles.includes('SALES_MANAGER')
-      ? {}
-      : { salesId: userId }
+    const whereCondition = await buildDataFilter(session.user.id, session.user.roles)
+    const accessibleUserIds = await getAccessibleUserIds(session.user.id, session.user.roles)
 
     // 计算时间范围
     let startDate: Date
@@ -106,7 +103,7 @@ export async function GET(request: Request) {
     // 获取跟进记录
     const followUps = await prisma.followUp.findMany({
       where: {
-        salesId: userId,
+        ...(accessibleUserIds === null ? {} : { salesId: { in: accessibleUserIds } }),
         createdAt: { gte: startDate }
       },
       select: {

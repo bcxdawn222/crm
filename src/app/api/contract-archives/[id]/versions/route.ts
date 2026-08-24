@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth'
-import { defineAbility } from '@/lib/casl'
+import { canReadContractArchive } from '@/lib/contracts/access'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { prisma } from '@/lib/prisma'
 
@@ -20,11 +20,7 @@ export async function GET(
     if (!current) {
       return jsonWithRequestId({ error: '合同备案不存在' }, requestId, { status: 404 })
     }
-    const ability = defineAbility(session.user.permissions || [])
-    const canRead = current.customer.salesId === session.user.id
-      || current.customer.operationManagerId === session.user.id
-      || ability.can('manage', 'all')
-    if (!canRead) {
+    if (!await canReadContractArchive(session.user, current.customer)) {
       return jsonWithRequestId({ error: '无权查看合同版本' }, requestId, { status: 403 })
     }
 

@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons'
 import { apiRequest } from '@/lib/http/client'
 import { FollowUpModal } from '@/components/customers/follow-up-modal'
+import { usePermission } from '@/hooks/usePermission'
 
 interface ReminderItem {
   type: string
@@ -72,6 +73,9 @@ interface DisabledResponse {
 }
 
 export default function RemindersPage() {
+  const { can } = usePermission()
+  const canCreateFollowUp = can('create', 'followUp')
+  const canUpdateCustomer = can('update', 'customer')
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('all')
   const [reminders, setReminders] = useState<{
@@ -180,6 +184,24 @@ export default function RemindersPage() {
     }
   }
 
+  const reminderActions = (item: ReminderItem, label: string) => {
+    if (!canCreateFollowUp && !canUpdateCustomer) return null
+    return (
+      <div style={{ display: 'flex', gap: 8 }}>
+        {canCreateFollowUp && (
+          <Button type="primary" size="small" onClick={() => handleFollowUp(item)}>
+            {label}
+          </Button>
+        )}
+        {canUpdateCustomer && (
+          <Button size="small" onClick={() => handleDisableReminder(item)}>
+            不再提醒
+          </Button>
+        )}
+      </div>
+    )
+  }
+
   const renderReminderCard = (item: ReminderItem) => {
     const priorityTag = (
       <Tag color={getPriorityColor(item.priority)} style={{ marginRight: 8 }}>
@@ -193,83 +215,19 @@ export default function RemindersPage() {
     switch (item.type) {
       case 'OVERDUE_FOLLOWUP':
         icon = <PhoneOutlined style={{ fontSize: 24, color: '#ff4d4f' }} />
-        actionButton = (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button 
-              type="primary" 
-              size="small"
-              onClick={() => handleFollowUp(item)}
-            >
-              立即跟进
-            </Button>
-            <Button 
-              size="small"
-              onClick={() => handleDisableReminder(item)}
-            >
-              不再提醒
-            </Button>
-          </div>
-        )
+        actionButton = reminderActions(item, '立即跟进')
         break
       case 'EXPIRING_CONTRACT':
         icon = <FileTextOutlined style={{ fontSize: 24, color: '#faad14' }} />
-        actionButton = (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button 
-              type="primary" 
-              size="small"
-              onClick={() => handleFollowUp(item)}
-            >
-              联系续签
-            </Button>
-            <Button 
-              size="small"
-              onClick={() => handleDisableReminder(item)}
-            >
-              不再提醒
-            </Button>
-          </div>
-        )
+        actionButton = reminderActions(item, '联系续签')
         break
       case 'UPCOMING_VISIT':
         icon = <CalendarOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-        actionButton = (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button 
-              type="primary" 
-              size="small"
-              onClick={() => handleFollowUp(item)}
-            >
-              查看计划
-            </Button>
-            <Button 
-              size="small"
-              onClick={() => handleDisableReminder(item)}
-            >
-              不再提醒
-            </Button>
-          </div>
-        )
+        actionButton = reminderActions(item, '查看计划')
         break
       case 'PLANNED_FOLLOWUP':
         icon = <ClockCircleOutlined style={{ fontSize: 24, color: '#52c41a' }} />
-        actionButton = (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button 
-              type="primary" 
-              size="small"
-              onClick={() => handleFollowUp(item)}
-            >
-              开始跟进
-            </Button>
-            <Button 
-              size="small"
-              onClick={() => handleDisableReminder(item)}
-            >
-              不再提醒
-            </Button>
-          </div>
-        )
+        actionButton = reminderActions(item, '开始跟进')
         break
     }
 
@@ -311,9 +269,9 @@ export default function RemindersPage() {
               </div>
             )}
           </div>
-          <div style={{ flexShrink: 0 }}>
+          {canUpdateCustomer && <div style={{ flexShrink: 0 }}>
             {actionButton}
-          </div>
+          </div>}
         </div>
       </Card>
     )

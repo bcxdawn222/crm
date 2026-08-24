@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
+import { buildDataFilter } from '@/lib/data-permission'
 
 // POST /api/reminders/enable - Enable reminders for a customer
 export async function POST(request: Request) {
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     const customer = await prisma.customer.findFirst({
       where: {
         id: customerId,
-        salesId: session.user.id,
+        ...await buildDataFilter(session.user.id, session.user.roles),
       },
     })
 
@@ -58,9 +59,6 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('Failed to enable reminders:', error)
-    return NextResponse.json({ 
-      error: 'Server error',
-      details: process.env.NODE_ENV === 'development' ? String(error) : undefined
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

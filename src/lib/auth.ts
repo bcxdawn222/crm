@@ -1,6 +1,11 @@
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { authenticateDatabaseUser } from '@/lib/auth/database-user'
+import {
+  authenticateDatabaseUser,
+  loadActiveDatabaseUserById,
+} from '@/lib/auth/database-user'
+import type { AuthenticatedDatabaseUser } from '@/lib/auth/database-user'
+import type { JWT } from 'next-auth/jwt'
 
 const DEFAULT_SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
 const MIN_SESSION_MAX_AGE_SECONDS = 60
@@ -19,6 +24,16 @@ function sessionMaxAgeSeconds(): number {
     )
   }
   return seconds
+}
+
+function synchronizeToken(token: JWT, user: AuthenticatedDatabaseUser): JWT {
+  token.id = user.id
+  token.username = user.username
+  token.email = user.email
+  token.realName = user.realName
+  token.roles = user.roles
+  token.permissions = user.permissions
+  return token
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -57,17 +72,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id
-        token.roles = user.roles
-        token.permissions = user.permissions
+        return synchronizeToken(token, user)
       }
-      return token
+      if (typeof token.id !== 'string') return null
+      const currentUser = await loadActiveDatabaseUserById(token.id)
+      return currentUser ? synchronizeToken(token, currentUser) : null
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string
-        session.user.roles = token.roles as string[]
-        session.user.permissions = token.permissions as string[]
+        session.user.username = token.username
+        session.user.email = token.email
+        session.user.realName = token.realName
+        session.user.roles = token.roles
+        session.user.permissions = token.permissions
       }
       return session
     }

@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
+import { buildDataFilter } from '@/lib/data-permission'
 
 // GET /api/statistics/funnel - 获取销售漏斗分析
 export async function GET(request: Request) {
@@ -17,17 +18,11 @@ export async function GET(request: Request) {
     // Check permissions
     const permissions = session.user?.permissions || []
     const ability = defineAbility(permissions)
-    if (ability.cannot('read', 'report')) {
+    if (!permissions.includes('report:view') || ability.cannot('read', 'report')) {
       return NextResponse.json({ error: 'No permission to access statistics' }, { status: 403 })
     }
 
-    const userId = session.user.id
-    const roles = session.user.roles || []
-
-    // 管理员/主管可以看全部数据,普通销售只看自己的
-    const whereCondition = roles.includes('ADMIN') || roles.includes('SALES_MANAGER')
-      ? {}
-      : { salesId: userId }
+    const whereCondition = await buildDataFilter(session.user.id, session.user.roles)
 
     // 获取所有客户
     const customers = await prisma.customer.findMany({
@@ -53,31 +48,37 @@ export async function GET(request: Request) {
     const now = new Date()
 
     // 定义漏斗阶段
-    const stages = [
+    const stages: Array<{
+      stage: string
+      name: string
+      filter: (customer: (typeof customers)[number]) => boolean
+    }> = [
       {
         stage: 'LEAD',
         name: '线索客户',
-        filter: (c: any) => c.status === 'ACTIVE' && !c.isPublic
+        filter: (customer) => customer.status === 'ACTIVE' && !customer.isPublic
       },
       {
         stage: 'CONTACTED',
         name: '已跟进',
-        filter: (c: any) => c.lastFollowUpAt !== null
+        filter: (customer) => customer.lastFollowUpAt !== null
       },
       {
         stage: 'PROPOSAL',
         name: '有订单',
-        filter: (c: any) => c.orders.length > 0
+        filter: (customer) => customer.orders.length > 0
       },
       {
         stage: 'NEGOTIATION',
         name: '待确认',
-        filter: (c: any) => c.orders.some((o: any) => o.status === 'PENDING' || o.status === 'CONFIRMED')
+        filter: (customer) => customer.orders.some(
+          (order) => order.status === 'PENDING' || order.status === 'CONFIRMED'
+        )
       },
       {
         stage: 'CLOSED_WON',
         name: '已成交',
-        filter: (c: any) => c.orders.some((o: any) => o.status === 'COMPLETED')
+        filter: (customer) => customer.orders.some((order) => order.status === 'COMPLETED')
       }
     ]
 

@@ -8,6 +8,7 @@ import dayjs, { Dayjs } from 'dayjs'
 import { Resizable } from 'react-resizable'
 
 import { apiRequest } from '@/lib/http/client'
+import { usePermission } from '@/hooks/usePermission'
 
 import 'react-resizable/css/styles.css'
 
@@ -102,6 +103,8 @@ interface DailyLeadResponse {
 }
 
 export default function DailyLeadsPage() {
+  const { can } = usePermission()
+  const canUpdateCustomer = can('update', 'customer')
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<DailyLeadStat[]>([])
   const [total, setTotal] = useState(0)
@@ -430,8 +433,9 @@ export default function DailyLeadsPage() {
         footer={null}
         destroyOnClose
       >
-        <CustomerDetailTable 
-          customers={selectedCustomers} 
+        <CustomerDetailTable
+          customers={selectedCustomers}
+          canUpdateCustomer={canUpdateCustomer}
           onTransfer={(customerId) => {
             // Refresh the stats after transfer
             loadStats()
@@ -443,7 +447,17 @@ export default function DailyLeadsPage() {
 }
 
 // Sub-component for customer detail table
-function CustomerDetailTable({ customers, onTransfer }: { customers: Customer[], onTransfer?: (customerId: string) => void }) {
+interface CustomerDetailTableProps {
+  customers: Customer[]
+  canUpdateCustomer: boolean
+  onTransfer?: (customerId: string) => void
+}
+
+function CustomerDetailTable({
+  customers,
+  canUpdateCustomer,
+  onTransfer,
+}: CustomerDetailTableProps) {
   const [transferring, setTransferring] = useState<string | null>(null)
 
   const handleTransfer = async (customerId: string) => {
@@ -557,7 +571,7 @@ function CustomerDetailTable({ customers, onTransfer }: { customers: Customer[],
       key: 'action',
       width: 120,
       fixed: 'right',
-      render: (_, record) => (
+      render: (_, record) => canUpdateCustomer ? (
         <Button
           type="primary"
           size="small"
@@ -568,7 +582,7 @@ function CustomerDetailTable({ customers, onTransfer }: { customers: Customer[],
         >
           转入我的客户
         </Button>
-      ),
+      ) : null,
     },
   ]
 

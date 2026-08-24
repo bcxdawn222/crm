@@ -50,6 +50,7 @@ def main() -> int:
     original_display_name = ""
     original_description: str | None = None
     original_permission_ids: list[str] = []
+    user_inactive = False
 
     try:
         role_payload = json_body(request(opener, BASE_URL, "/api/roles?includePermissions=true"))
@@ -156,8 +157,8 @@ def main() -> int:
 
         existing_session = json_body(request(user_opener, BASE_URL, "/api/auth/session"))
         require(
-            added_permission_code not in permission_codes(existing_session.get("user")),
-            "旧会话在未重新登录时获得了新增权限",
+            added_permission_code in permission_codes(existing_session.get("user")),
+            "角色更新后现有会话未立即获得最新权限",
         )
         refreshed_user = login(build_opener(), BASE_URL, username, raw_password)
         require(added_permission_code in permission_codes(refreshed_user), "重新登录后未获得新增权限")
@@ -194,9 +195,32 @@ def main() -> int:
             f"SELECT COUNT(*) FROM RolePermission WHERE roleId={sql_quote(role_id)}",
         )
         require(restored_count == str(len(original_permission_ids)), "角色权限数量未恢复")
-        print("角色权限与重新登录生效链路验收通过")
+        restored_session = json_body(request(user_opener, BASE_URL, "/api/auth/session"))
+        require(
+            added_permission_code not in permission_codes(restored_session.get("user")),
+            "角色撤权后现有会话仍保留已撤销权限",
+        )
+
+        database_value(
+            database_url,
+            f"UPDATE User SET status='INACTIVE' WHERE id={sql_quote(user_id)}",
+        )
+        user_inactive = True
+        inactive_result = request(user_opener, BASE_URL, "/api/tasks?page=1&pageSize=10")
+        require(inactive_result.status == 401, "用户停用后旧会话仍可访问受保护 API")
+        database_value(
+            database_url,
+            f"UPDATE User SET status='ACTIVE' WHERE id={sql_quote(user_id)}",
+        )
+        user_inactive = False
+        print("角色权限即时刷新与用户停用会话失效验收通过")
         return 0
     finally:
+        if user_inactive and user_id:
+            database_value(
+                database_url,
+                f"UPDATE User SET status='ACTIVE' WHERE id={sql_quote(user_id)}",
+            )
         if role_changed and role_id:
             restore_request_id = f"role-flow-finally-restore-{marker}"
             request_ids.append(restore_request_id)

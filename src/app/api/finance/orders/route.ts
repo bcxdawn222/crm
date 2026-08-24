@@ -54,11 +54,7 @@ export async function GET(request: Request) {
     const roles = session.user.roles || []
     const dataFilter = await buildDataFilter(session.user.id, roles)
     
-    // Sales Manager and Sales can only view their own and subordinates' orders
-    if (roles.includes('sales_manager') || roles.includes('sales')) {
-      Object.assign(where, dataFilter)
-    }
-    // Admin and Finance can view all orders
+    Object.assign(where, dataFilter)
 
     // Keyword search
     if (keyword) {
@@ -184,7 +180,7 @@ export async function POST(request: Request) {
         isPublic: false,
         ...customerDataFilter,
       },
-      select: { id: true },
+      select: { id: true, salesId: true },
     })
     if (!accessibleCustomer) {
       return NextResponse.json({ error: 'No permission to create an order for this customer' }, { status: 403 })
@@ -192,7 +188,8 @@ export async function POST(request: Request) {
 
     const { order, replayed } = await createOrder({
       ...parsed.data,
-      salesId: session.user.id,
+      salesId: accessibleCustomer.salesId,
+      actorId: session.user.id,
       requestId,
     })
 

@@ -67,9 +67,6 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error('Failed to get disabled reminders:', error)
-    return NextResponse.json({ 
-      error: 'Server error',
-      details: process.env.NODE_ENV === 'development' ? String(error) : undefined
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

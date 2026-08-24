@@ -313,3 +313,15 @@ conclusion: fail
 - `python scripts\manage.py settings-flow --profile test`、`content-flow`、`data-reachability`、`routes` 和 `button-audit` 均退出码 0。日志分别为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-settings-flow-20260824-220712.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-content-flow-20260824-220715.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260824-220721.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-routes-20260824-220726.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-button-audit-20260824-220726.log`；test 数据库 Customer、FollowUp、Lead、Order、Payment、File、Message、ContractArchive 均为 0，外键孤儿项、异常订单金额和负回款均为 0。
 - `python scripts\manage.py typecheck --profile stable` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260824-220843.log`；`python scripts\manage.py build --profile test` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-220849.log`。最终构建使用默认 8 小时会话配置。
 - Playwright 临时文件已逐项删除；`python scripts\manage.py instance-status --profile test` 显示 PID 不存在、端口未监听、锁为 False，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-instance-status-20260824-220949.log`。任务 9.1 至 9.8 全部完成。受项目“禁止子智能体”规则约束，本轮未调用独立 verifier，以上证据均由主流程实际命令和浏览器操作产生。
+
+## Apply working evidence - 2026-08-24 23:46
+
+- 新增统一页面访问契约 `src/lib/access/page-access.ts`，中间件与 Sidebar 共用同一权限集合；补齐提醒、统计、公海、每日客资、电销、消息路由，系统管理子页按 `user`、`role`、`setting` 精确匹配。
+- 新增 `getAccessibleUserIds`，统一管理员/财务全局、销售主管本人及递归下属、销售本人及递归下属、自定义受限角色空集合四种范围。订单、回款、财务汇总、统计、提醒、任务、文件、日报、每日客资和合同备案已按各自 Prisma 归属字段应用该范围。
+- 订单创建沿用客户 `salesId`；回款写入前校验订单范围；文件查看、下载和删除按 `uploadedBy` 校验；合同列表、版本、预览、下载、上传、删除统一使用 `src/lib/contracts/access.ts`。
+- 页面按钮补齐订单编辑/删除、回款新增、日报提交、电销增改删转、提醒跟进/禁用/恢复、公海认领、每日客资转入、合作客户编辑、合同上传/删除和任务创建权限显示；电销 API 改为精确使用 `lead:view/create/update/convert`。
+- `src/lib/auth.ts` 每次服务端 `auth()` 从数据库读取 ACTIVE 用户的最新角色与权限。`python scripts\manage.py permission-flow --profile test` 退出码 0：受限角色直接系统管理页面被重定向到 403，统计、订单、回款、日报、任务、文件 API 均返回 403；角色权限新增和撤销对现有会话立即生效；用户停用后旧会话访问任务 API 返回 401；夹具均已清理。日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-permission-flow-20260824-234224.log`。
+- `python scripts\manage.py permission-matrix --profile test` 退出码 0，生成 12 条模块契约文档 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\权限与数据范围矩阵.md`。日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-permission-matrix-20260824-234201.log`。
+- `python scripts\manage.py data-flow --profile test`、`content-flow`、`data-reachability`、`routes`、`button-audit` 均退出码 0；真实数据链路通过，test 业务夹具为 0，外键孤儿、异常订单金额和负回款均为 0。
+- `python scripts\manage.py typecheck --profile stable` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260824-234421.log`；`python scripts\manage.py build --profile test` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-234434.log`。
+- test 服务已停止，PID 不存在、端口未监听、锁为 False。受项目“禁止子智能体”规则约束，本轮未调用独立 verifier，证据来自主流程实际执行。

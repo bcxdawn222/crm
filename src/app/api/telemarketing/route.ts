@@ -3,7 +3,6 @@ import { z } from 'zod'
 
 import { recordAuditEvent } from '@/lib/audit/record'
 import { auth } from '@/lib/auth'
-import { defineAbility } from '@/lib/casl'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { parsePagination } from '@/lib/http/pagination'
 import { prisma } from '@/lib/prisma'
@@ -47,8 +46,7 @@ export async function GET(request: Request) {
   try {
     const session = await auth()
     if (!session) return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
-    const ability = defineAbility(session.user.permissions || [])
-    if (ability.cannot('read', 'customer')) {
+    if (!session.user.permissions.includes('lead:view')) {
       return jsonWithRequestId({ error: '无权查看电销名单' }, requestId, { status: 403 })
     }
 
@@ -98,8 +96,7 @@ export async function POST(request: Request) {
   try {
     const session = await auth()
     if (!session) return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
-    const ability = defineAbility(session.user.permissions || [])
-    if (ability.cannot('create', 'customer')) {
+    if (!session.user.permissions.includes('lead:create')) {
       return jsonWithRequestId({ error: '无权创建电销记录' }, requestId, { status: 403 })
     }
     const body = await requestBody(request)
@@ -132,8 +129,7 @@ export async function PUT(request: Request) {
   try {
     const session = await auth()
     if (!session) return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
-    const ability = defineAbility(session.user.permissions || [])
-    if (ability.cannot('update', 'lead')) {
+    if (!session.user.permissions.includes('lead:update')) {
       return jsonWithRequestId({ error: '无权更新电销记录' }, requestId, { status: 403 })
     }
     const id = recordId(request)
@@ -171,8 +167,7 @@ export async function DELETE(request: Request) {
   try {
     const session = await auth()
     if (!session) return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
-    const ability = defineAbility(session.user.permissions || [])
-    if (ability.cannot('update', 'lead')) {
+    if (!session.user.permissions.includes('lead:update')) {
       return jsonWithRequestId({ error: '无权删除电销记录' }, requestId, { status: 403 })
     }
     const id = recordId(request)

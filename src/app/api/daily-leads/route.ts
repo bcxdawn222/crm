@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
+import { Prisma } from '@prisma/client'
+import { buildDataFilter, canAccessSalesData } from '@/lib/data-permission'
 
 // GET /api/daily-leads - 获取每日新增客资统计
 export async function GET(request: Request) {
@@ -29,7 +31,9 @@ export async function GET(request: Request) {
     const pageSize = parseInt(searchParams.get('pageSize') || '10')
 
     // Build date filter
-    const where: any = {}
+    const where: Prisma.CustomerWhereInput = {
+      ...await buildDataFilter(session.user.id, session.user.roles),
+    }
     
     if (startDate && endDate) {
       where.createdAt = {
@@ -40,13 +44,10 @@ export async function GET(request: Request) {
 
     // Filter by sales person
     if (salesId) {
-      where.salesId = salesId
-    } else {
-      const userRoles = session.user?.roles || []
-      if (userRoles.includes('sales')) {
-        // Sales can only view their own data
-        where.salesId = session.user.id
+      if (!await canAccessSalesData(session.user.id, session.user.roles, salesId)) {
+        return NextResponse.json({ error: 'No permission to access this sales scope' }, { status: 403 })
       }
+      where.salesId = salesId
     }
 
     // Get daily statistics
@@ -72,17 +73,14 @@ export async function GET(request: Request) {
       page,
       pageSize
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Failed to get daily leads:', error)
-    return NextResponse.json({ 
-      error: 'Server error',
-      details: error.message 
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
 
 // Helper function to get daily lead statistics
-async function getDailyLeadStats(where: any, page: number, pageSize: number) {
+async function getDailyLeadStats(where: Prisma.CustomerWhereInput, page: number, pageSize: number) {
   const skip = (page - 1) * pageSize
   
   // Get customers grouped by date
@@ -113,7 +111,7 @@ async function getDailyLeadStats(where: any, page: number, pageSize: number) {
   })
 
   // Group by date
-  const groupedByDate: Record<string, any[]> = {}
+  const groupedByDate: Record<string, typeof customers> = {}
   customers.forEach(customer => {
     const dateKey = customer.createdAt.toISOString().split('T')[0]
     if (!groupedByDate[dateKey]) {

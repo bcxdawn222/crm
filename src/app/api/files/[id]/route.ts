@@ -6,6 +6,7 @@ import { defineAbility } from '@/lib/casl'
 import { readSharedFile, removeSharedFile, restoreSharedFile } from '@/lib/files/storage'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { prisma } from '@/lib/prisma'
+import { canAccessSalesData } from '@/lib/data-permission'
 
 
 export const dynamic = 'force-dynamic'
@@ -19,11 +20,12 @@ export async function GET(request: Request, { params }: RouteContext) {
   try {
     const session = await auth()
     if (!session?.user?.id) return jsonWithRequestId({ error: '未授权' }, requestId, { status: 401 })
-    const ability = defineAbility(session.user.permissions || [])
-    if (ability.cannot('read', 'file')) return jsonWithRequestId({ error: '无权下载文件' }, requestId, { status: 403 })
+    if (!session.user.permissions.includes('file:download')) {
+      return jsonWithRequestId({ error: '无权下载文件' }, requestId, { status: 403 })
+    }
     const file = await prisma.file.findUnique({ where: { id: params.id } })
     if (!file) return jsonWithRequestId({ error: '文件不存在' }, requestId, { status: 404 })
-    if (!file.isPublic && file.uploadedBy !== session.user.id && ability.cannot('manage', 'all')) {
+    if (!await canAccessSalesData(session.user.id, session.user.roles, file.uploadedBy)) {
       return jsonWithRequestId({ error: '无权下载文件' }, requestId, { status: 403 })
     }
     const content = await readSharedFile(file.path)
@@ -49,6 +51,9 @@ export async function DELETE(request: Request, { params }: RouteContext) {
     if (ability.cannot('delete', 'file')) return jsonWithRequestId({ error: '无权删除文件' }, requestId, { status: 403 })
     const file = await prisma.file.findUnique({ where: { id: params.id } })
     if (!file) return jsonWithRequestId({ error: '文件不存在' }, requestId, { status: 404 })
+    if (!await canAccessSalesData(session.user.id, session.user.roles, file.uploadedBy)) {
+      return jsonWithRequestId({ error: '无权删除文件' }, requestId, { status: 403 })
+    }
     const content = await readSharedFile(file.path)
     await removeSharedFile(file.path)
     try {

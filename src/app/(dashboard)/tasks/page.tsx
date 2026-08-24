@@ -46,7 +46,7 @@ const STATUS_MAP: Record<TaskStatus, { text: string; color: string }> = {
 }
 
 export default function TasksPage() {
-  const { can, roles } = usePermission()
+  const { can } = usePermission()
   const [loading, setLoading] = useState(false)
   const [tasks, setTasks] = useState<TaskRecord[]>([])
   const [total, setTotal] = useState(0)
@@ -54,7 +54,7 @@ export default function TasksPage() {
   const [pageSize, setPageSize] = useState(10)
   const [status, setStatus] = useState<TaskStatus>()
   const [modalVisible, setModalVisible] = useState(false)
-  const hasCreatePermission = can('create', 'task') || roles.includes('sales')
+  const hasCreatePermission = can('create', 'task')
 
   async function loadTasks(targetPage = page, targetStatus = status) {
     setLoading(true)

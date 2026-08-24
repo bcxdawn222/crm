@@ -5,6 +5,7 @@ import { defineAbility } from '@/lib/casl'
 import { parsePagination } from '@/lib/http/pagination'
 import { canCreateTask, findTaskAssigneeWithinScope } from '@/lib/tasks/assignee-scope'
 import { Prisma, TaskPriority, TaskStatus } from '@prisma/client'
+import { getAccessibleUserIds } from '@/lib/data-permission'
 
 // GET /api/tasks - Get task list
 export async function GET(request: Request) {
@@ -35,9 +36,9 @@ export async function GET(request: Request) {
     // Build query conditions
     const where: Prisma.TaskWhereInput = {}
     
-    // Sales can only view their own tasks
-    if (session.user.roles.includes('sales')) {
-      where.assigneeId = session.user.id
+    const accessibleUserIds = await getAccessibleUserIds(session.user.id, session.user.roles)
+    if (accessibleUserIds !== null) {
+      where.assigneeId = { in: accessibleUserIds }
     }
 
     // Keyword search
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
     // Check permissions
     const permissions = session.user?.permissions || []
     const roles = session.user.roles || []
-    if (!canCreateTask(permissions, roles)) {
+    if (!canCreateTask(permissions)) {
       return NextResponse.json({ error: 'No permission to create task' }, { status: 403 })
     }
 

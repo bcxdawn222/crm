@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
-import { buildDataFilter } from '@/lib/data-permission'
+import { buildDataFilter, getAccessibleUserIds } from '@/lib/data-permission'
 
 // GET /api/reminders - Get reminder list
 export async function GET(request: Request) {
@@ -27,6 +27,7 @@ export async function GET(request: Request) {
 
     // Build data filter based on user role
     const dataFilter = await buildDataFilter(userId, roles)
+    const accessibleUserIds = await getAccessibleUserIds(userId, roles)
 
     const now = new Date()
     const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
@@ -110,7 +111,7 @@ export async function GET(request: Request) {
     // 4. Get planned follow-up tasks (within 7 days)
     const plannedFollowUps = await prisma.followUp.findMany({
       where: {
-        salesId: userId,
+        ...(accessibleUserIds === null ? {} : { salesId: { in: accessibleUserIds } }),
         status: 'PLANNED',
         nextFollowUpAt: {
           gte: now,
@@ -216,9 +217,6 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error('Failed to get reminders:', error)
-    return NextResponse.json({ 
-      error: 'Server error',
-      details: process.env.NODE_ENV === 'development' ? String(error) : undefined
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

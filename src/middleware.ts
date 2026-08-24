@@ -1,21 +1,10 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
+import { hasPageAccess } from '@/lib/access/page-access'
 
 // 公开路由(不需要认证)
 const publicRoutes = ['/login', '/api/auth', '/api/health']
-
-// 路由权限映射
-const routePermissions: Record<string, string[]> = {
-  '/admin': ['user:view', 'role:manage', 'setting:view'],
-  '/customers': ['customer:view'],
-  '/finance/orders': ['order:view'],
-  '/finance/payments': ['payment:view'],
-  '/finance/reports': ['report:view'],
-  '/daily-reports': ['report:daily:view'],
-  '/tasks': ['task:view'],
-  '/files': ['file:view'],
-}
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
@@ -54,22 +43,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
   
-  // 检查路由权限
-  for (const [route, requiredPermissions] of Object.entries(routePermissions)) {
-    if (pathname.startsWith(route)) {
-      const userPermissions = (token.permissions as string[]) || []
-      
-      // 检查是否有任一所需权限
-      const hasPermission = requiredPermissions.some(permission =>
-        userPermissions.includes(permission)
-      )
-      
-      if (!hasPermission) {
-        return NextResponse.redirect(new URL('/403', request.url))
-      }
-      
-      break
-    }
+  const userPermissions = Array.isArray(token.permissions)
+    ? token.permissions.filter((permission): permission is string => typeof permission === 'string')
+    : []
+  if (!hasPageAccess(pathname, userPermissions)) {
+    return NextResponse.redirect(new URL('/403', request.url))
   }
   
   return NextResponse.next()

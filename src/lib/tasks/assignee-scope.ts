@@ -5,8 +5,8 @@ import { prisma } from '@/lib/prisma'
 
 const ASSIGNABLE_ROLE_NAMES = ['sales', 'sales_manager']
 
-export function canCreateTask(permissions: string[], roles: string[]): boolean {
-  return permissions.includes('task:create') || roles.includes('sales')
+export function canCreateTask(permissions: readonly string[]): boolean {
+  return permissions.includes('task:create')
 }
 
 export async function buildTaskAssigneeWhere(

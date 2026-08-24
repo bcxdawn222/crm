@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
+import { buildDataFilter } from '@/lib/data-permission'
 
 // GET /api/statistics/sales-overview - 获取销售业绩总览
 export async function GET(request: Request) {
@@ -17,12 +18,10 @@ export async function GET(request: Request) {
     // Check permissions
     const permissions = session.user?.permissions || []
     const ability = defineAbility(permissions)
-    if (ability.cannot('read', 'report')) {
+    if (!permissions.includes('report:view') || ability.cannot('read', 'report')) {
       return NextResponse.json({ error: 'No permission to access statistics' }, { status: 403 })
     }
 
-    const userId = session.user.id
-    const roles = session.user.roles || []
     const now = new Date()
     
     // 时间范围计算
@@ -31,10 +30,7 @@ export async function GET(request: Request) {
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
     const yearStart = new Date(now.getFullYear(), 0, 1)
 
-    // 管理员/主管可以看全部数据,普通销售只看自己的
-    const whereCondition = roles.includes('ADMIN') || roles.includes('SALES_MANAGER')
-      ? {}
-      : { salesId: userId }
+    const whereCondition = await buildDataFilter(session.user.id, session.user.roles)
 
     // ========== 本月业绩 ==========
     const monthlyRevenueResult = await prisma.order.aggregate({

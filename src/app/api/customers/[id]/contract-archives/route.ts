@@ -2,8 +2,8 @@ import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 
 import { auth } from '@/lib/auth'
-import { defineAbility } from '@/lib/casl'
 import { ContractArchiveError, createContractArchive } from '@/lib/contracts/archive'
+import { canReadContractArchive, canWriteContractArchive } from '@/lib/contracts/access'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { parsePagination } from '@/lib/http/pagination'
 import { prisma } from '@/lib/prisma'
@@ -58,15 +58,11 @@ export async function GET(
     if (!session) {
       return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
     }
-    const ability = defineAbility(session.user.permissions || [])
     const customer = await findCustomer(params.id)
     if (!customer) {
       return jsonWithRequestId({ error: '客户不存在' }, requestId, { status: 404 })
     }
-    const canView = customer.salesId === session.user.id
-      || customer.operationManagerId === session.user.id
-      || ability.can('manage', 'all')
-    if (!canView) {
+    if (!await canReadContractArchive(session.user, customer)) {
       return jsonWithRequestId({ error: '无权查看合同备案' }, requestId, { status: 403 })
     }
 
@@ -125,12 +121,11 @@ export async function POST(
     if (!session) {
       return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
     }
-    const ability = defineAbility(session.user.permissions || [])
     const customer = await findCustomer(params.id)
     if (!customer) {
       return jsonWithRequestId({ error: '客户不存在' }, requestId, { status: 404 })
     }
-    if (customer.salesId !== session.user.id && ability.cannot('manage', 'all')) {
+    if (!await canWriteContractArchive(session.user, customer.salesId)) {
       return jsonWithRequestId({ error: '无权上传合同备案' }, requestId, { status: 403 })
     }
 

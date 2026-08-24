@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
+import { Prisma } from '@prisma/client'
+import { buildDataFilter } from '@/lib/data-permission'
 
 // GET /api/finance/reports/summary - Get financial summary
 export async function GET(request: Request) {
@@ -17,7 +19,7 @@ export async function GET(request: Request) {
     // Check permissions
     const permissions = session.user?.permissions || []
     const ability = defineAbility(permissions)
-    if (ability.cannot('read', 'order')) {
+    if (!permissions.includes('report:view') || ability.cannot('read', 'report')) {
       return NextResponse.json({ error: 'No permission to access' }, { status: 403 })
     }
 
@@ -26,11 +28,8 @@ export async function GET(request: Request) {
     const endDate = searchParams.get('endDate') || ''
 
     // Build query conditions
-    const where: any = {}
-    
-    // Sales can only view their own orders
-    if (session.user.roles.includes('sales')) {
-      where.salesId = session.user.id
+    const where: Prisma.OrderWhereInput = {
+      ...await buildDataFilter(session.user.id, session.user.roles),
     }
 
     // Date range filter

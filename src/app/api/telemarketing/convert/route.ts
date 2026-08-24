@@ -2,7 +2,6 @@ import { CustomerLevel, CustomerSource } from '@prisma/client'
 import { z } from 'zod'
 
 import { auth } from '@/lib/auth'
-import { defineAbility } from '@/lib/casl'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import {
   convertTelemarketingToCustomer,
@@ -23,8 +22,8 @@ export async function POST(request: Request) {
     if (!session) {
       return jsonWithRequestId({ error: '未授权' }, requestId, { status: 401 })
     }
-    const ability = defineAbility(session.user.permissions)
-    if (ability.cannot('update', 'lead') || ability.cannot('create', 'customer')) {
+    if (!session.user.permissions.includes('lead:convert')
+      || !session.user.permissions.includes('customer:create')) {
       return jsonWithRequestId({ error: '无权转化电销记录' }, requestId, { status: 403 })
     }
 

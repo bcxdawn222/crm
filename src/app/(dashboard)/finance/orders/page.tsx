@@ -164,8 +164,12 @@ export default function OrdersPage() {
       render: (_, record) => (
         <Space size="small">
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleOpenModal(record)}>查看</Button>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleOpenModal(record)}>编辑</Button>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.id)}>删除</Button>
+          <PermissionGuard action="update" subject="order">
+            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleOpenModal(record)}>编辑</Button>
+          </PermissionGuard>
+          <PermissionGuard action="delete" subject="order">
+            <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.id)}>删除</Button>
+          </PermissionGuard>
         </Space>
       ),
     },

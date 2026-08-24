@@ -14,6 +14,7 @@ import {
   type CooperatingCustomerDraft,
 } from '@/lib/forms/crm-drafts'
 import { apiRequest } from '@/lib/http/client'
+import { usePermission } from '@/hooks/usePermission'
 
 const { TextArea } = Input
 
@@ -108,6 +109,8 @@ interface OperationManagerOption {
 }
 
 export default function CooperatingCustomersPage() {
+  const { can } = usePermission()
+  const canUpdateCustomer = can('update', 'customer')
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<CooperatingCustomer[]>([])
   const [total, setTotal] = useState(0)
@@ -441,7 +444,7 @@ export default function CooperatingCustomersPage() {
           >
             合同备案
           </Button>
-          <Button
+          {canUpdateCustomer && <Button
             type="link"
             size="small"
             icon={<EditOutlined />}
@@ -464,7 +467,7 @@ export default function CooperatingCustomersPage() {
             }}
           >
             编辑
-          </Button>
+          </Button>}
         </Space>
       ),
     },

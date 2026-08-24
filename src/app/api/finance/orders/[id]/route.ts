@@ -4,6 +4,22 @@ import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
 import { recordAuditEvent } from '@/lib/audit/record'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { canAccessSalesData } from '@/lib/data-permission'
+import { OrderStatus, Prisma } from '@prisma/client'
+import { z } from 'zod'
+
+const updateOrderSchema = z.object({
+  contractNo: z.string().trim().max(50).nullable().optional(),
+  contractAmount: z.coerce.number().positive().max(99_999_999.99).optional(),
+  currency: z.enum(['CNY', 'USD', 'EUR']).optional(),
+  signDate: z.coerce.date().nullable().optional(),
+  deliveryDate: z.coerce.date().nullable().optional(),
+  remarks: z.string().trim().max(10_000).nullable().optional(),
+  status: z.nativeEnum(OrderStatus).optional(),
+}).refine(
+  (data) => !data.signDate || !data.deliveryDate || data.deliveryDate >= data.signDate,
+  '交付日期不能早于签约日期'
+)
 
 // GET /api/finance/orders/[id] - 获取订单详情
 export async function GET(
@@ -62,8 +78,7 @@ export async function GET(
       return NextResponse.json({ error: '订单不存在' }, { status: 404 })
     }
 
-    // 普通销售只能查看自己的订单
-    if (session.user.roles.includes('sales') && order.salesId !== session.user.id) {
+    if (!await canAccessSalesData(session.user.id, session.user.roles, order.salesId)) {
       return NextResponse.json({ error: '无权查看该订单' }, { status: 403 })
     }
 
@@ -105,8 +120,20 @@ export async function PUT(
       return NextResponse.json({ error: '无权更新订单' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { contractNo, contractAmount, currency, signDate, deliveryDate, remarks, status } = body
+    let payload: unknown
+    try {
+      payload = await request.json()
+    } catch {
+      return jsonWithRequestId({ error: '请求内容不是有效 JSON', requestId }, requestId, { status: 400 })
+    }
+    const parsed = updateOrderSchema.safeParse(payload)
+    if (!parsed.success) {
+      return jsonWithRequestId(
+        { error: parsed.error.issues[0]?.message ?? '订单参数不正确', requestId },
+        requestId,
+        { status: 400 }
+      )
+    }
 
     // 检查订单是否存在
     const existingOrder = await prisma.order.findUnique({
@@ -117,28 +144,26 @@ export async function PUT(
       return NextResponse.json({ error: '订单不存在' }, { status: 404 })
     }
 
-    // 普通销售只能修改自己的订单
-    if (session.user.roles.includes('sales') && existingOrder.salesId !== session.user.id) {
+    if (!await canAccessSalesData(session.user.id, session.user.roles, existingOrder.salesId)) {
       return NextResponse.json({ error: '无权修改该订单' }, { status: 403 })
     }
 
     // 如果更新了合同金额,需要重新计算未付金额
-    let updateData: any = {
-      contractNo,
-      currency,
-      signDate: signDate ? new Date(signDate) : null,
-      deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
-      remarks,
-      status,
-    }
-
-    if (contractAmount && contractAmount !== existingOrder.contractAmount.toString()) {
-      const newContractAmount = parseFloat(contractAmount)
+    const updateData: Prisma.OrderUpdateInput = { ...parsed.data }
+    const { contractAmount } = parsed.data
+    if (contractAmount !== undefined && !existingOrder.contractAmount.equals(contractAmount)) {
+      const newContractAmount = contractAmount
       const paidAmount = existingOrder.paidAmount.toNumber()
       const newUnpaidAmount = newContractAmount - paidAmount
-      
-      updateData.contractAmount = newContractAmount
-      updateData.unpaidAmount = Math.max(0, newUnpaidAmount)
+      if (newUnpaidAmount < 0) {
+        return jsonWithRequestId(
+          { error: '合同金额不能低于已收金额', requestId },
+          requestId,
+          { status: 400 }
+        )
+      }
+      updateData.contractAmount = new Prisma.Decimal(newContractAmount.toFixed(2))
+      updateData.unpaidAmount = new Prisma.Decimal(newUnpaidAmount.toFixed(2))
     }
 
     // 更新订单
@@ -213,8 +238,7 @@ export async function DELETE(
       return NextResponse.json({ error: '该订单已有收款记录,无法删除' }, { status: 400 })
     }
 
-    // 普通销售只能删除自己的订单
-    if (session.user.roles.includes('sales') && existingOrder.salesId !== session.user.id) {
+    if (!await canAccessSalesData(session.user.id, session.user.roles, existingOrder.salesId)) {
       return NextResponse.json({ error: '无权删除该订单' }, { status: 403 })
     }
 

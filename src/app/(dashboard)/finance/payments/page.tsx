@@ -8,6 +8,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { apiRequest } from '@/lib/http/client'
 import { PaymentFormModal } from './payment-form-modal'
 import type { PaymentRecord } from './payment-types'
+import { PermissionGuard } from '@/components/common/PermissionGuard'
 
 export default function PaymentsPage() {
   const [loading, setLoading] = useState(false)
@@ -134,13 +135,15 @@ export default function PaymentsPage() {
       <Card
         title="收款管理"
         extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setModalVisible(true)}
-          >
-            新增收款
-          </Button>
+          <PermissionGuard action="create" subject="payment">
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setModalVisible(true)}
+            >
+              新增收款
+            </Button>
+          </PermissionGuard>
         }
       >
         {/* 表格 */}
