@@ -1,110 +1,111 @@
 'use client'
 
-import { Card, Table, Button, Space, Tag, message } from 'antd'
 import { EditOutlined } from '@ant-design/icons'
+import { Button, message, Space, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-interface Role {
-  id: string
-  name: string
-  displayName: string
-  description?: string
-  permissions: string[]
-  userCount: number
-  permissionCount: number
-}
+import { usePermission } from '@/hooks/usePermission'
+import { apiRequest } from '@/lib/http/client'
+import RoleEditModal from './RoleEditModal'
+import type {
+  PermissionOption,
+  RoleFormValues,
+  RoleItem,
+  RoleListResponse,
+  RoleMutationResponse,
+} from './types'
+
 
 export default function RolesPage() {
-  const [loading, setLoading] = useState(false)
-  const [roles, setRoles] = useState<Role[]>([])
+  const { can } = usePermission()
+  const canEdit = can('update', 'role')
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [roles, setRoles] = useState<RoleItem[]>([])
+  const [permissions, setPermissions] = useState<PermissionOption[]>([])
+  const [editingRole, setEditingRole] = useState<RoleItem | null>(null)
 
-  // Fetch roles from API
-  useEffect(() => {
-    fetchRoles()
-  }, [])
-
-  const fetchRoles = async () => {
+  const loadRoles = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/roles')
-      const json = await res.json()
-      if (json.success) {
-        setRoles(json.data)
-      } else {
-        message.error(json.error || 'Failed to load roles')
-      }
+      const result = await apiRequest<RoleListResponse>(`/api/roles${canEdit ? '?includePermissions=true' : ''}`)
+      setRoles(result.data)
+      setPermissions(result.availablePermissions || [])
     } catch (error) {
-      console.error('Fetch roles failed:', error)
-      message.error('Network error')
+      message.error(error instanceof Error ? error.message : '加载角色失败')
     } finally {
       setLoading(false)
     }
+  }, [canEdit])
+
+  useEffect(() => {
+    void loadRoles()
+  }, [loadRoles])
+
+  const saveRole = async (values: RoleFormValues) => {
+    if (!editingRole) return
+    setSubmitting(true)
+    try {
+      await apiRequest<RoleMutationResponse>(
+        `/api/roles/${editingRole.id}`,
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) },
+        { requestKey: `role-save:${editingRole.id}` },
+      )
+      message.success('角色已更新')
+      setEditingRole(null)
+      await loadRoles()
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '保存角色失败')
+    } finally {
+      setSubmitting(false)
+    }
   }
-  const columns: ColumnsType<Role> = [
-    {
-      title: '角色名称',
-      dataIndex: 'name',
-      key: 'name',
-      width: 150,
-    },
-    {
-      title: '显示名称',
-      dataIndex: 'displayName',
-      key: 'displayName',
-      width: 150,
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-    },
-    {
-      title: '用户数',
-      dataIndex: 'userCount',
-      key: 'userCount',
-      width: 80,
-      render: (count) => <Tag color="blue">{count}</Tag>,
-    },
-    {
-      title: '权限数',
-      dataIndex: 'permissionCount',
-      key: 'permissionCount',
-      width: 80,
-      render: (count) => <Tag color="green">{count}</Tag>,
-    },
+
+  const columns = useMemo<ColumnsType<RoleItem>>(() => [
+    { title: '角色标识', dataIndex: 'name', width: 150 },
+    { title: '显示名称', dataIndex: 'displayName', width: 150 },
+    { title: '描述', dataIndex: 'description', render: (value: string | null) => value || '-' },
+    { title: '用户数', dataIndex: 'userCount', width: 90, render: (count: number) => <Tag color="blue">{count}</Tag> },
+    { title: '权限数', dataIndex: 'permissionCount', width: 90, render: (count: number) => <Tag color="green">{count}</Tag> },
     {
       title: '权限',
       dataIndex: 'permissions',
-      key: 'permissions',
-      render: (permissions: string[]) =>
-        permissions.map((permission) => <Tag key={permission}>{permission}</Tag>),
+      width: 360,
+      render: (assigned: string[]) => (
+        <Space size={[0, 4]} wrap>{assigned.map((permission) => <Tag key={permission}>{permission}</Tag>)}</Space>
+      ),
     },
     {
       title: '操作',
       key: 'action',
       width: 100,
-      render: () => (
-        <Space size="small">
-          <Button type="link" size="small" icon={<EditOutlined />}>
-            编辑
-          </Button>
-        </Space>
-      ),
+      fixed: 'right',
+      render: (_, role) => canEdit ? (
+        <Button type="link" size="small" icon={<EditOutlined />} onClick={() => setEditingRole(role)}>编辑</Button>
+      ) : null,
     },
-  ]
+  ], [canEdit])
 
   return (
-    <div>
-      <Card title="角色管理">
-        <Table
-          columns={columns}
-          dataSource={roles}
-          rowKey="id"
-          loading={loading}
-          pagination={{ pageSize: 10 }}
-        />
-      </Card>
-    </div>
+    <section>
+      <h1 style={{ margin: '0 0 16px', fontSize: 22 }}>角色管理</h1>
+      <Table
+        columns={columns}
+        dataSource={roles}
+        rowKey="id"
+        loading={loading}
+        scroll={{ x: 1120 }}
+        pagination={{ pageSize: 10, showTotal: (total) => `共 ${total} 条` }}
+      />
+      <RoleEditModal
+        open={Boolean(editingRole)}
+        submitting={submitting}
+        role={editingRole}
+        permissions={permissions}
+        onCancel={() => setEditingRole(null)}
+        onSubmit={saveRole}
+      />
+    </section>
   )
 }

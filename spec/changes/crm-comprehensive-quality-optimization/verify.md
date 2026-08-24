@@ -153,3 +153,13 @@ conclusion: fail
 - Playwright 真实按钮验收完成新增、编辑和停用。首次打开编辑弹窗时发现表单保留刚输入的明文初始密码；修复为每次打开先重置表单并清空密码后，复验编辑弹窗密码为空，编辑和停用均成功，页面控制台错误数为 0。
 - 浏览器测试用户及对应审计记录已从 `crm_system_test` 清理，测试应用、MySQL 和 Playwright 会话均已停止。
 - `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build` 均退出码 0；构建包含 `/api/users/[id]`。
+
+## Apply working evidence - 2026-08-24 13:14
+
+- 角色管理页已接入真实编辑弹窗和 `PATCH /api/roles/:id`；可更新显示名称、描述及权限集合，权限按模块分组展示，保存后重新读取列表。
+- 角色更新、角色权限替换和 `ROLE_UPDATED` 审计记录位于同一 Prisma 事务；接口校验权限 ID 必须存在，内置 `admin` 角色必须保留数据库中的全部权限。
+- 新增 `python scripts\manage.py role-flow --profile test`，退出码 0。测试在 `crm_system_test` 创建临时销售用户，验证普通销售直接修改角色返回 403、管理员移除权限返回 400、被拒绝请求不产生成功审计、旧 JWT 不会自动获得新增权限、重新登录后获得新增权限，并恢复销售角色原值、删除临时用户及本轮审计记录。
+- Playwright 真实浏览器验收：管理员角色 46 个权限均选中且不可取消；销售角色显示名称和权限通过页面保存后，列表权限数由 24 更新为 25；随后通过同一页面恢复原显示名称和 24 项权限。
+- 浏览器验收未产生新的角色管理控制台错误；已有登录页 `favicon.ico` 404、Ant Design `Card` 弃用警告和密码输入框 autocomplete 提示属于既存问题，不计为本任务通过项。
+- 浏览器会话、test 应用和本地 MySQL 均已停止，`.playwright-cli` 临时产物已清理。
+- `python scripts\manage.py typecheck --profile stable`、`routes`、`button-audit`、`build` 均退出码 0；生产构建包含 `/api/roles/[id]`，`/admin/roles` First Load JS 约 363 kB。

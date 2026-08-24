@@ -120,6 +120,7 @@ def main() -> int:
             "data-flow",
             "content-flow",
             "user-flow",
+            "role-flow",
             "runtime-test",
             "e2e",
             "perf",
@@ -253,6 +254,12 @@ def main() -> int:
             return 2
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "user_flow_test.py")]
         return run_sequence((("user-flow", command),), logger)
+    if args.action == "role-flow":
+        if profile.name != "test":
+            logger.error("role-flow 只允许 --profile test")
+            return 2
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "role_flow_test.py")]
+        return run_sequence((("role-flow", command),), logger)
     if args.action == "runtime-test":
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "runtime_checks.py")]
         return run_sequence((("runtime-test", command),), logger)

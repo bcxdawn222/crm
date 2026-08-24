@@ -1,73 +1,42 @@
-import { NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
+import { defineAbility } from '@/lib/casl'
+import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { prisma } from '@/lib/prisma'
+import { roleAdminSelect, roleResponse } from '@/lib/roles/admin'
+
 
 export const dynamic = 'force-dynamic'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { defineAbility } from '@/lib/casl'
 
-// GET /api/roles - 获取角色列表
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.user?.id) {
+      return jsonWithRequestId({ error: '未授权' }, requestId, { status: 401 })
     }
-
-    // Check permissions - Admin can view roles
-    const permissions = session.user?.permissions || []
-    const ability = defineAbility(permissions)
+    const ability = defineAbility(session.user.permissions || [])
     if (ability.cannot('read', 'role') && ability.cannot('update', 'role')) {
-      return NextResponse.json({ error: 'No permission to access' }, { status: 403 })
+      return jsonWithRequestId({ error: '无权查看角色' }, requestId, { status: 403 })
     }
 
     const roles = await prisma.role.findMany({
-      include: {
-        _count: {
-          select: {
-            users: true,
-            permissions: true
-          }
-        },
-        permissions: {
-          include: {
-            permission: {
-              select: {
-                code: true,
-                name: true,
-                module: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'asc'
-      }
+      select: roleAdminSelect,
+      orderBy: { createdAt: 'asc' },
     })
+    const includePermissions = new URL(request.url).searchParams.get('includePermissions') === 'true'
+    const availablePermissions = includePermissions && ability.can('update', 'role')
+      ? await prisma.permission.findMany({
+          select: { id: true, code: true, name: true, module: true },
+          orderBy: [{ module: 'asc' }, { code: 'asc' }],
+        })
+      : undefined
 
-    // Format response
-    const formattedRoles = roles.map(role => ({
-      id: role.id,
-      name: role.name,
-      displayName: role.displayName,
-      description: role.description,
-      userCount: role._count.users,
-      permissionCount: role._count.permissions,
-      permissions: role.permissions.map(rp => rp.permission.code),
-      createdAt: role.createdAt,
-      updatedAt: role.updatedAt
-    }))
-
-    return NextResponse.json({
+    return jsonWithRequestId({
       success: true,
-      data: formattedRoles
-    })
-  } catch (error: any) {
-    console.error('Failed to get roles:', error)
-    return NextResponse.json({ 
-      error: 'Server error',
-      details: error.message 
-    }, { status: 500 })
+      data: roles.map(roleResponse),
+      ...(availablePermissions ? { availablePermissions } : {}),
+    }, requestId)
+  } catch (error) {
+    return serverErrorResponse(error, 'GET /api/roles', requestId)
   }
 }
