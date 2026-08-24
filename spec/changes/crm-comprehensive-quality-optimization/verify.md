@@ -179,3 +179,10 @@ conclusion: fail
 - `/api/customers/transfer` 已改为复用 `handlePublicPoolClaim`，因此每日客资入口与公海页面入口使用同一客户认领规则、事务和审计动作。
 - 新增 `python scripts\manage.py public-pool-flow --profile test`，退出码 0：创建客户、进入公海、重复归档 409、通过每日客资入口认领、重复认领 409、数据库状态、`ARCHIVED`/`CLAIMED` 流转历史和 `ARCHIVE_TO_PUBLIC_POOL`/`CLAIM` 审计均通过；测试客户和审计记录已清理。
 - 本轮只完成公海进入/认领链路；客户转移其他场景、导入、合作客户更新、合同版本和批量重复写入仍未宣称完成。
+
+## Apply working evidence - 2026-08-24 13:44
+
+- `data-reachability` 已从单一 `SELECT 1` 扩展为只读数据质量报告：检查 Prisma 数据库探针、15 张核心业务表、各表数据量、10 类外键关联孤儿行、订单金额一致性和负回款。
+- 首次执行因 Windows MySQL 的 `lower_case_table_names` 返回小写表名，脚本误报核心表缺失；修正为大小写无关比对后，发现 `Lead` 未转义导致 SQL 语法错误；修正为 `` `Lead` `` 后重新执行通过。这两次失败均为检查器问题，未修改业务数据。
+- `python scripts\manage.py data-reachability --profile test`：退出码 0。测试库网络和 Prisma 探针通过；核心表 15 张；孤立用户角色、角色权限、客户销售、跟进、线索、订单、回款、文件、消息、合同均为 0；异常订单金额和负回款均为 0。
+- 当前报告是数据库结构与数据质量门禁，不等同于全部页面按钮链路已完成；8.1 的多角色最小夹具、导入、合作客户、合同版本和批量重复写入仍待后续链路验收。
