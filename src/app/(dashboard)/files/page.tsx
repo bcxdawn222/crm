@@ -31,6 +31,8 @@ export default function FilesPage() {
   const { can } = usePermission()
   const [files, setFiles] = useState<FileItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadFiles = useCallback(async () => {
     setLoading(true)
@@ -49,10 +51,15 @@ export default function FilesPage() {
   }, [loadFiles])
 
   const uploadFile = async ({ file, onError, onSuccess }: UploadRequestOption) => {
+    if (uploading) {
+      onError?.(new Error('文件正在上传，请稍候'))
+      return
+    }
     if (!(file instanceof File)) {
       onError?.(new Error('请选择有效文件'))
       return
     }
+    setUploading(true)
     const formData = new FormData()
     formData.append('file', file)
     try {
@@ -64,13 +71,24 @@ export default function FilesPage() {
       const failure = error instanceof Error ? error : new Error('上传失败')
       onError?.(failure)
       message.error(failure.message)
+    } finally {
+      setUploading(false)
     }
   }
 
   const deleteFile = async (id: string) => {
-    await apiRequest<{ success: boolean }>(`/api/files/${id}`, { method: 'DELETE' }, { requestKey: `file-delete:${id}` })
-    message.success('文件已删除')
-    await loadFiles()
+    if (deletingId) return
+    setDeletingId(id)
+    try {
+      await apiRequest<{ success: boolean }>(`/api/files/${id}`, { method: 'DELETE' }, { requestKey: `file-delete:${id}` })
+      message.success('文件已删除')
+      await loadFiles()
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '删除文件失败')
+      throw error
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const columns: ColumnsType<FileItem> = [
@@ -88,8 +106,12 @@ export default function FilesPage() {
         <Space>
           <Button type="link" icon={<DownloadOutlined />} href={`/api/files/${record.id}`}>下载</Button>
           {can('delete', 'file') && (
-            <Popconfirm title="确认删除该文件？" onConfirm={() => void deleteFile(record.id)}>
-              <Button type="link" danger icon={<DeleteOutlined />}>删除</Button>
+            <Popconfirm
+              title="确认删除该文件？"
+              okButtonProps={{ loading: deletingId === record.id }}
+              onConfirm={() => deleteFile(record.id)}
+            >
+              <Button type="link" danger icon={<DeleteOutlined />} disabled={deletingId !== null}>删除</Button>
             </Popconfirm>
           )}
         </Space>
@@ -101,8 +123,13 @@ export default function FilesPage() {
     <Card
       title="文件共享"
       extra={can('create', 'file') ? (
-        <Upload accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp" showUploadList={false} customRequest={uploadFile}>
-          <Button icon={<UploadOutlined />}>上传文件</Button>
+        <Upload
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp"
+          disabled={uploading}
+          showUploadList={false}
+          customRequest={uploadFile}
+        >
+          <Button icon={<UploadOutlined />} loading={uploading}>上传文件</Button>
         </Upload>
       ) : null}
     >

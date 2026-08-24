@@ -85,6 +85,8 @@ export default function RemindersPage() {
   const [disableModalVisible, setDisableModalVisible] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<ReminderItem | null>(null)
   const [followUpModalVisible, setFollowUpModalVisible] = useState(false)
+  const [disableSubmitting, setDisableSubmitting] = useState(false)
+  const [enablingCustomerId, setEnablingCustomerId] = useState<string | null>(null)
   const [form] = Form.useForm()
 
   useEffect(() => {
@@ -134,8 +136,10 @@ export default function RemindersPage() {
   }
 
   const confirmDisableReminder = async () => {
+    if (disableSubmitting) return
     try {
       const values = await form.validateFields()
+      setDisableSubmitting(true)
       const data = await apiRequest<{ success: boolean }>('/api/reminders/disable', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -151,10 +155,14 @@ export default function RemindersPage() {
       void fetchDisabledList()
     } catch (error) {
       message.error(error instanceof Error ? error.message : '操作失败')
+    } finally {
+      setDisableSubmitting(false)
     }
   }
 
   const handleEnableReminder = async (customerId: string) => {
+    if (enablingCustomerId) return
+    setEnablingCustomerId(customerId)
     try {
       const data = await apiRequest<{ success: boolean }>('/api/reminders/enable', {
         method: 'POST',
@@ -167,6 +175,8 @@ export default function RemindersPage() {
       void fetchDisabledList()
     } catch (error) {
       message.error(error instanceof Error ? error.message : '操作失败')
+    } finally {
+      setEnablingCustomerId(null)
     }
   }
 
@@ -346,10 +356,12 @@ export default function RemindersPage() {
             )}
           </div>
           <div style={{ flexShrink: 0 }}>
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               size="small"
-              onClick={() => handleEnableReminder(item.customerId)}
+              loading={enablingCustomerId === item.customerId}
+              disabled={enablingCustomerId !== null}
+              onClick={() => void handleEnableReminder(item.customerId)}
             >
               恢复提醒
             </Button>
@@ -560,7 +572,11 @@ export default function RemindersPage() {
       <Modal
         title="确认不再提醒"
         open={disableModalVisible}
-        onCancel={() => setDisableModalVisible(false)}
+        confirmLoading={disableSubmitting}
+        cancelButtonProps={{ disabled: disableSubmitting }}
+        onCancel={() => {
+          if (!disableSubmitting) setDisableModalVisible(false)
+        }}
         onOk={confirmDisableReminder}
         okText="确认禁用"
         cancelText="取消"
