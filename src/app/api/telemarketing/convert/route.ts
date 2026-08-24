@@ -1,88 +1,70 @@
-import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { defineAbility } from '@/lib/casl'
+import { CustomerLevel, CustomerSource } from '@prisma/client'
+import { z } from 'zod'
 
-// POST /api/telemarketing/convert - 将电销记录转入我的客户
+import { auth } from '@/lib/auth'
+import { defineAbility } from '@/lib/casl'
+import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import {
+  convertTelemarketingToCustomer,
+  TelemarketingConvertError,
+} from '@/lib/telemarketing/convert'
+
+const convertSchema = z.object({
+  telemarketingId: z.string().uuid('电销记录 ID 格式不正确'),
+  level: z.nativeEnum(CustomerLevel),
+  source: z.nativeEnum(CustomerSource),
+  notes: z.string().trim().max(5000, '备注不能超过 5000 个字符').optional(),
+})
+
 export async function POST(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
-    
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return jsonWithRequestId({ error: '未授权' }, requestId, { status: 401 })
+    }
+    const ability = defineAbility(session.user.permissions)
+    if (ability.cannot('update', 'lead') || ability.cannot('create', 'customer')) {
+      return jsonWithRequestId({ error: '无权转化电销记录' }, requestId, { status: 403 })
     }
 
-    // Check permissions
-    const permissions = session.user?.permissions || []
-    const ability = defineAbility(permissions)
-    if (ability.cannot('create', 'customer')) {
-      return NextResponse.json({ error: 'No permission to convert to customer' }, { status: 403 })
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return jsonWithRequestId({ error: '请求内容不是有效 JSON' }, requestId, { status: 400 })
+    }
+    const parsed = convertSchema.safeParse(body)
+    if (!parsed.success) {
+      return jsonWithRequestId(
+        { error: parsed.error.issues[0]?.message || '转化信息不正确' },
+        requestId,
+        { status: 400 }
+      )
     }
 
-    const body = await request.json()
-    const { telemarketingId, level, source, notes } = body
-
-    if (!telemarketingId) {
-      return NextResponse.json({ error: 'Telemarketing ID is required' }, { status: 400 })
-    }
-
-    // Get the telemarketing record
-    const telemarketing = await prisma.telemarketingList.findUnique({
-      where: { id: telemarketingId },
+    const result = await convertTelemarketingToCustomer({
+      ...parsed.data,
+      actorId: session.user.id,
+      requestId,
     })
-
-    if (!telemarketing) {
-      return NextResponse.json({ error: 'Telemarketing record not found' }, { status: 404 })
-    }
-
-    // Check ownership
-    if (telemarketing.salesId !== session.user.id) {
-      return NextResponse.json({ error: 'No permission to convert this record' }, { status: 403 })
-    }
-
-    // Check if already converted
-    if (telemarketing.customerId) {
-      return NextResponse.json({ error: 'Already converted to customer' }, { status: 400 })
-    }
-
-    // Create customer from telemarketing record
-    const customer = await prisma.customer.create({
-      data: {
-        name: telemarketing.name,
-        company: telemarketing.company,
-        phone: telemarketing.phone,
-        level: level || 'POTENTIAL',
-        source: source || 'COLD_CALL',
-        notes: notes || telemarketing.notes,
-        salesId: session.user.id,
-        isPublic: false,
-        status: 'ACTIVE',
-      }
-    })
-
-    // Update telemarketing record
-    await prisma.telemarketingList.update({
-      where: { id: telemarketingId },
-      data: {
-        customerId: customer.id,
-        isEffective: true,
-        status: 'CONVERTED',
-      }
-    })
-
-    return NextResponse.json({
+    return jsonWithRequestId({
       success: true,
       data: {
-        customer,
-        telemarketing: telemarketing,
+        customer: result.customer,
+        telemarketing: result.telemarketing,
       },
-      message: 'Successfully converted to customer'
-    })
-  } catch (error: any) {
-    console.error('Failed to convert telemarketing to customer:', error)
-    return NextResponse.json({ 
-      error: 'Server error',
-      details: error.message 
-    }, { status: 500 })
+      replayed: result.replayed,
+      message: result.replayed ? '该电销记录已转入客户' : '已成功转入我的客户',
+    }, requestId, { status: result.replayed ? 200 : 201 })
+  } catch (error) {
+    if (error instanceof TelemarketingConvertError) {
+      return jsonWithRequestId(
+        { error: error.message, code: error.code },
+        requestId,
+        { status: error.status }
+      )
+    }
+    return serverErrorResponse(error, 'POST /api/telemarketing/convert', requestId)
   }
 }

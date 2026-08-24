@@ -221,3 +221,13 @@ conclusion: fail
 - python scripts\manage.py routes --profile test、python scripts\manage.py button-audit --profile test、python scripts\manage.py runtime-test --profile test 和 python scripts\manage.py build --profile test 均退出码 0；构建日志为 D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-155556.log，构建基线仍为仓库现有 Next.js 14.2.35，本轮没有执行框架升级。
 - storage/test 中本轮及历史 test 合同文件已清理并重新创建空目录。public/uploads/contracts 仍有旧公共上传目录文件，stable/test 数据库当前均无 ContractArchive 引用；由于该目录可能包含用户原始文件，本轮未自动删除，需在发布清理阶段人工确认后处理。
 - 当前仍不能宣称任务 8 整体完成：电销转客户、普通客户转移、删除/停用历史追溯、多角色关联夹具、完整权限矩阵、Playwright 全量按钮验收、长连接、性能、安全和 stable 发布演练仍未完成。prisma/schema.prisma 当前 648 行，属于现有 Prisma 单文件结构，后续需单独评估拆分方式。
+
+## Apply working evidence - 2026-08-24 17:06
+
+- 电销转客户已改为 `Serializable` 事务：锁定电销记录后，在同一事务内创建客户、更新电销状态并写入 `TELEMARKETING_CONVERTED` 审计；同一记录重复提交返回原客户，相同电话已有客户时返回 HTTP 409。
+- 新增普通客户转移接口和目标销售范围接口。仅管理员与销售主管可执行，主管目标范围限定为本人及下属；客户归属更新与 `CUSTOMER_TRANSFERRED` 审计位于同一事务，相同 `requestId` 重放不会重复写入审计，相同请求号更换目标返回 HTTP 409。
+- 电销转化弹窗将“当前记录”和“提交中”状态分离，修复打开弹窗后按钮持续 loading；客户列表新增转移弹窗，一次弹窗操作复用同一个 `x-request-id`，提交期间禁用关闭和重复提交。
+- `python scripts\manage.py data-flow --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-flow-20260824-170350.log`。真实验收覆盖同一电销记录双请求并发转化、重复电话拒绝、主管目标范围、客户 A 到 B 再转回 A、请求重放、请求冲突、普通销售 403、数据库终态和审计数量；测试用户、客户、电销和审计夹具已清理。
+- `python scripts\manage.py data-reachability --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260824-170419.log`；核心业务表检查通过，业务夹具数量为 0，外键孤儿项、异常订单金额和负回款均为 0。
+- `python scripts\manage.py routes --profile test`、`python scripts\manage.py button-audit --profile test` 和 `python scripts\manage.py build --profile test` 均退出码 0；构建日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-170513.log`，生产路由表包含 `/api/customers/[id]/transfer`、`/api/customers/transfer-options` 和 `/api/telemarketing/convert`。
+- 任务 8.3 已完成。任务 8.5 的删除、停用、归档历史追溯和任务 8.6 的其余失败写入链路仍需单独证据，因此任务 8 整体保持未完成。

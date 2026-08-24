@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, Table, Button, Space, Modal, Form, Input, Select, Tag, message, Popconfirm, Statistic, Row, Col } from 'antd'
+import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Popconfirm, Statistic, Row, Col } from 'antd'
 import { PlusOutlined, PhoneOutlined, CheckCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
+import { TelemarketingConvertModal } from './telemarketing-convert-modal'
 
 const { TextArea } = Input
 
@@ -41,9 +42,7 @@ export default function TelemarketingPage() {
   const [modalVisible, setModalVisible] = useState(false)
   const [editingRecord, setEditingRecord] = useState<TelemarketingRecord | null>(null)
   const [form] = Form.useForm()
-  const [convertModalVisible, setConvertModalVisible] = useState(false)
-  const [convertingId, setConvertingId] = useState<string | null>(null)
-  const [convertForm] = Form.useForm()
+  const [convertRecord, setConvertRecord] = useState<TelemarketingRecord | null>(null)
 
   // Load data
   const loadData = async () => {
@@ -118,38 +117,6 @@ export default function TelemarketingPage() {
     } catch (error) {
       console.error('Delete failed:', error)
       message.error('网络错误')
-    }
-  }
-
-  // Handle convert to customer
-  const handleConvert = async (values: any) => {
-    if (!convertingId) return
-    
-    setConvertingId(convertingId)
-    try {
-      const res = await fetch('/api/telemarketing/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          telemarketingId: convertingId,
-          ...values,
-        }),
-      })
-      const json = await res.json()
-      if (json.success) {
-        message.success('已成功转入我的客户')
-        setConvertModalVisible(false)
-        convertForm.resetFields()
-        setConvertingId(null)
-        loadData()
-      } else {
-        message.error(json.error || '转换失败')
-      }
-    } catch (error) {
-      console.error('Convert failed:', error)
-      message.error('网络错误')
-    } finally {
-      setConvertingId(null)
     }
   }
 
@@ -284,15 +251,7 @@ export default function TelemarketingPage() {
               type="primary"
               size="small"
               icon={<CheckCircleOutlined />}
-              onClick={() => {
-                setConvertingId(record.id)
-                convertForm.setFieldsValue({
-                  level: 'POTENTIAL',
-                  source: 'COLD_CALL',
-                  notes: record.notes,
-                })
-                setConvertModalVisible(true)
-              }}
+              onClick={() => setConvertRecord(record)}
             >
               转入客户
             </Button>
@@ -482,75 +441,11 @@ export default function TelemarketingPage() {
         </Form>
       </Modal>
 
-      {/* Convert to Customer Modal */}
-      <Modal
-        title="转入我的客户"
-        open={convertModalVisible}
-        onCancel={() => {
-          setConvertModalVisible(false)
-          convertForm.resetFields()
-          setConvertingId(null)
-        }}
-        footer={null}
-        width={500}
-      >
-        <Form
-          form={convertForm}
-          layout="vertical"
-          onFinish={handleConvert}
-        >
-          <Form.Item
-            name="level"
-            label="客户等级"
-            rules={[{ required: true }]}
-          >
-            <Select>
-              <Select.Option value="POTENTIAL">潜在客户</Select.Option>
-              <Select.Option value="NORMAL">普通客户</Select.Option>
-              <Select.Option value="IMPORTANT">重要客户</Select.Option>
-              <Select.Option value="VIP">VIP客户</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="source"
-            label="客户来源"
-            rules={[{ required: true }]}
-          >
-            <Select>
-              <Select.Option value="COLD_CALL">电销</Select.Option>
-              <Select.Option value="WEBSITE">官网</Select.Option>
-              <Select.Option value="REFERRAL">转介绍</Select.Option>
-              <Select.Option value="ADVERTISEMENT">广告</Select.Option>
-              <Select.Option value="EXHIBITION">展会</Select.Option>
-              <Select.Option value="SOCIAL_MEDIA">社交媒体</Select.Option>
-              <Select.Option value="OTHER">其他</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="notes"
-            label="备注"
-          >
-            <TextArea rows={3} placeholder="可补充客户备注信息" />
-          </Form.Item>
-
-          <Form.Item>
-            <Space>
-              <Button 
-                type="primary" 
-                htmlType="submit"
-                loading={!!convertingId}
-              >
-                确认转入
-              </Button>
-              <Button onClick={() => setConvertModalVisible(false)}>
-                取消
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+      <TelemarketingConvertModal
+        record={convertRecord}
+        onClose={() => setConvertRecord(null)}
+        onSaved={loadData}
+      />
     </div>
   )
 }

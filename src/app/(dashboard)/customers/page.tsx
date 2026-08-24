@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Card, Table, Button, Space, Input, Select, Modal, Form, message, Tag, Upload } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ExportOutlined, UploadOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ExportOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { PermissionGuard } from '@/components/common/PermissionGuard'
 import { FollowUpModal } from '@/components/customers/follow-up-modal'
+import { CustomerTransferModal } from '@/components/customers/customer-transfer-modal'
+import { usePermission } from '@/hooks/usePermission'
 import { apiRequest } from '@/lib/http/client'
 import { Resizable } from 'react-resizable'
 import 'react-resizable/css/styles.css'
@@ -88,6 +90,7 @@ interface Customer {
 }
 
 export default function CustomersPage() {
+  const { roles } = usePermission()
   const [loading, setLoading] = useState(false)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [total, setTotal] = useState(0)
@@ -102,6 +105,7 @@ export default function CustomersPage() {
   const [focusedCustomerId, setFocusedCustomerId] = useState<string | null>(null)
   const [followUpCustomer, setFollowUpCustomer] = useState<Customer | null>(null)
   const [followUpModalVisible, setFollowUpModalVisible] = useState(false)
+  const [transferCustomer, setTransferCustomer] = useState<Customer | null>(null)
   const [form] = Form.useForm()
   const [uploading, setUploading] = useState(false)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
@@ -115,8 +119,9 @@ export default function CustomersPage() {
     lastFollowUp: 160,
     sales: 100,
     createdAt: 160,
-    action: 200,
+    action: 260,
   })
+  const canTransferCustomers = roles.includes('admin') || roles.includes('sales_manager')
 
   // 加载客户列表
   const loadCustomers = async () => {
@@ -500,6 +505,16 @@ export default function CustomersPage() {
               </Button>
             </PermissionGuard>
           )}
+          {!record.isPublic && canTransferCustomers && (
+            <Button
+              type="link"
+              size="small"
+              icon={<SwapOutlined />}
+              onClick={() => setTransferCustomer(record)}
+            >
+              转移
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -734,6 +749,15 @@ export default function CustomersPage() {
         customerName={followUpCustomer?.name}
         onClose={() => setFollowUpModalVisible(false)}
         onSaved={handleFollowUpSaved}
+      />
+
+      <CustomerTransferModal
+        customer={transferCustomer}
+        onClose={() => setTransferCustomer(null)}
+        onSaved={() => {
+          setTransferCustomer(null)
+          return loadCustomers()
+        }}
       />
 
       {/* 客资录入弹窗 */}
