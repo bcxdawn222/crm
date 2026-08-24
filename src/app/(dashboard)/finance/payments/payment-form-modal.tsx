@@ -4,18 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, DatePicker, Form, Input, InputNumber, message, Modal, Select } from 'antd'
 import dayjs from 'dayjs'
 
+import { apiRequest } from '@/lib/http/client'
 import type { PaymentFormValues, PaymentOrderOption } from './payment-types'
 
-interface OrdersResponse {
-  success?: boolean
-  data?: { list: PaymentOrderOption[] }
-  error?: string
-}
-
-interface SubmitResponse {
-  success?: boolean
-  error?: string
-}
+interface OrdersResponse { success: true; data: { list: PaymentOrderOption[] } }
+interface SubmitResponse { success: true }
 
 interface PaymentFormModalProps {
   open: boolean
@@ -37,12 +30,8 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
     submissionIdRef.current = crypto.randomUUID()
     setOrdersLoading(true)
 
-    void fetch('/api/finance/orders?page=1&pageSize=100')
-      .then(async (response) => {
-        const data = (await response.json()) as OrdersResponse
-        if (!data.success || !data.data) {
-          throw new Error(data.error || '加载订单失败')
-        }
+    void apiRequest<OrdersResponse>('/api/finance/orders?page=1&pageSize=100')
+      .then((data) => {
         setOrderOptions(
           data.data.list.filter(
             (order) => order.unpaidAmount > 0 && order.status !== 'CANCELLED'
@@ -61,7 +50,7 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
     setSubmitting(true)
 
     try {
-      const response = await fetch('/api/finance/payments', {
+      await apiRequest<SubmitResponse>('/api/finance/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -71,9 +60,9 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
           ...values,
           paymentDate: values.paymentDate.format('YYYY-MM-DD'),
         }),
+      }, {
+        requestKey: `payment-form-${submissionIdRef.current}`,
       })
-      const data = (await response.json()) as SubmitResponse
-      if (!data.success) throw new Error(data.error || '操作失败')
 
       message.success('创建成功')
       onClose()
@@ -87,7 +76,17 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
   }
 
   return (
-    <Modal title="新增收款记录" open={open} onCancel={onClose} footer={null} width={600}>
+    <Modal
+      title="新增收款记录"
+      open={open}
+      onCancel={() => {
+        if (!submitting) onClose()
+      }}
+      footer={null}
+      width={600}
+      closable={!submitting}
+      maskClosable={!submitting}
+    >
       <Form
         form={form}
         layout="vertical"

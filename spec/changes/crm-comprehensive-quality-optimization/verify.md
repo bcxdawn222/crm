@@ -262,3 +262,13 @@ conclusion: fail
 - `python scripts\manage.py data-flow --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-flow-20260824-173200.log`；新增电销 CRUD、编辑字段落库、转化后禁止删除和重复软删除验收均通过，夹具已清理。
 - `python scripts\manage.py data-reachability --profile test`、`python scripts\manage.py button-audit --profile test` 和 `python scripts\manage.py build --profile test` 均退出码 0；链路报告日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260824-173247.log`，按钮审计日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-button-audit-20260824-173258.log`，构建日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-173315.log`。
 - 任务 9 仍未整体完成：财务、公海、合作客户、合同等页面尚未全部切换到统一请求层，401 草稿恢复、断网恢复和长时间会话测试尚未覆盖。
+
+## Apply working evidence - 2026-08-24 17:43
+
+- 订单列表、订单表单、回款列表、回款表单、公海列表/统计/配额/认领和合作客户列表/提醒/编辑已接入 `src/lib/http/client.ts`；写操作统一带 `requestKey`，提交中禁止关闭弹窗或重复提交。
+- 合作客户“运营负责人”不再使用无效硬编码用户 ID，新增 `/api/customers/operation-manager-options`，只返回 ACTIVE 用户；编辑弹窗读取真实选项并提交现有 `operationManagerId` 字段。
+- `python scripts\manage.py typecheck --profile stable`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260824-174001.log`。
+- `python scripts\manage.py data-flow --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-flow-20260824-174042.log`；订单、回款、合同、公海、合作客户和电销数据写入链路全部通过并清理夹具。
+- `python scripts\manage.py routes --profile test`、`python scripts\manage.py button-audit --profile test` 均退出码 0，日志分别为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-routes-20260824-174115.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-button-audit-20260824-174125.log`。
+- `python scripts\manage.py build --profile test`：退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-174148.log`；构建路由包含 `/api/customers/operation-manager-options`。
+- 任务 9 仍未整体完成：客户合同组件、文件、消息、提醒、任务、日报、统计等页面仍有直接 `fetch`，401 草稿恢复、离线恢复和长时间会话测试尚未覆盖。

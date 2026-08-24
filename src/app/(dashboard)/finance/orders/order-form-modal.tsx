@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Form, Input, message, Modal, Select, Spin } from 'antd'
 
+import { apiRequest } from '@/lib/http/client'
 import type { OrderRecord } from './order-types'
 
 interface CustomerOption {
@@ -11,16 +12,8 @@ interface CustomerOption {
   company?: string | null
 }
 
-interface CustomerResponse {
-  success?: boolean
-  data?: { list: CustomerOption[] }
-  error?: string
-}
-
-interface SubmitResponse {
-  success?: boolean
-  error?: string
-}
+interface CustomerResponse { success: true; data: { list: CustomerOption[] } }
+interface SubmitResponse { success: true }
 
 interface OrderFormValues {
   customerId: string
@@ -78,13 +71,8 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
       })
       if (keyword.trim()) params.set('keyword', keyword.trim())
 
-      const response = await fetch(`/api/customers?${params}`)
-      const result = await response.json() as CustomerResponse
+      const result = await apiRequest<CustomerResponse>(`/api/customers?${params}`)
       if (requestSequence !== requestSequenceRef.current) return
-      if (!response.ok || !result.success || !result.data) {
-        throw new Error(result.error || '客户加载失败')
-      }
-
       setCustomers(mergeCustomerOptions(result.data.list, preservedCustomer))
     } catch (error) {
       if (requestSequence !== requestSequenceRef.current) return
@@ -125,9 +113,10 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
   }
 
   async function handleSubmit(values: OrderFormValues) {
+    if (isSubmitting) return
     setIsSubmitting(true)
     try {
-      const response = await fetch(
+      await apiRequest<SubmitResponse>(
         order ? `/api/finance/orders/${order.id}` : '/api/finance/orders',
         {
           method: order ? 'PUT' : 'POST',
@@ -136,19 +125,16 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
             'x-request-id': submissionIdRef.current,
           },
           body: JSON.stringify(values),
+        },
+        {
+          requestKey: `order-form-${order?.id || 'new'}-${submissionIdRef.current}`,
         }
       )
-      const result = await response.json() as SubmitResponse
-      if (!response.ok || !result.success) {
-        message.error(result.error || '操作失败')
-        return
-      }
-
       message.success(order ? '更新成功' : '创建成功')
       onClose()
       onSaved()
     } catch (error) {
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '保存订单失败')
     } finally {
       setIsSubmitting(false)
     }
@@ -163,10 +149,14 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
     <Modal
       title={order ? '编辑订单' : '新增订单'}
       open={open}
-      onCancel={onClose}
+      onCancel={() => {
+        if (!isSubmitting) onClose()
+      }}
       footer={null}
       width={700}
       destroyOnClose
+      closable={!isSubmitting}
+      maskClosable={!isSubmitting}
     >
       <Form form={form} layout="vertical" onFinish={handleSubmit}>
         <Form.Item name="customerId" label="客户" rules={[{ required: true, message: '请选择客户' }]}>

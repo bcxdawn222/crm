@@ -6,6 +6,7 @@ import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from '@ant-de
 import type { ColumnsType } from 'antd/es/table'
 
 import { PermissionGuard } from '@/components/common/PermissionGuard'
+import { apiRequest } from '@/lib/http/client'
 import { OrderFormModal } from './order-form-modal'
 import type { OrderRecord, OrderStatus } from './order-types'
 
@@ -23,9 +24,8 @@ const STATUS_OPTIONS = Object.entries(STATUS_MAP).map(([value, config]) => ({
 }))
 
 interface OrderListResponse {
-  success?: boolean
-  data?: { list: OrderRecord[]; total: number }
-  error?: string
+  success: true
+  data: { list: OrderRecord[]; total: number }
 }
 
 export default function OrdersPage() {
@@ -53,17 +53,11 @@ export default function OrdersPage() {
       if (targetKeyword.trim()) params.set('keyword', targetKeyword.trim())
       if (targetStatus) params.set('status', targetStatus)
 
-      const response = await fetch(`/api/finance/orders?${params}`)
-      const result = await response.json() as OrderListResponse
-      if (!response.ok || !result.success || !result.data) {
-        message.error(result.error || '加载失败')
-        return
-      }
-
+      const result = await apiRequest<OrderListResponse>(`/api/finance/orders?${params}`)
       setOrders(result.data.list)
       setTotal(result.data.total)
     } catch (error) {
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '加载订单失败')
     } finally {
       setLoading(false)
     }
@@ -96,16 +90,13 @@ export default function OrdersPage() {
       content: '确定要删除该订单吗?',
       onOk: async () => {
         try {
-          const response = await fetch(`/api/finance/orders/${id}`, { method: 'DELETE' })
-          const result = await response.json() as { success?: boolean; error?: string }
-          if (!response.ok || !result.success) {
-            message.error(result.error || '删除失败')
-            return
-          }
+          await apiRequest<{ success: true }>(`/api/finance/orders/${id}`, { method: 'DELETE' }, {
+            requestKey: `order-delete-${id}`,
+          })
           message.success('删除成功')
-          void loadOrders()
+          await loadOrders()
         } catch (error) {
-          message.error('网络错误')
+          message.error(error instanceof Error ? error.message : '删除订单失败')
         }
       },
     })

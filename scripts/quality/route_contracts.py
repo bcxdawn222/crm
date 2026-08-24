@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def run_route_check(logger: logging.Logger) -> int:
     required_routes = (
         ROOT / "src/app/api/customers/[id]/transfer/route.ts",
+        ROOT / "src/app/api/customers/operation-manager-options/route.ts",
         ROOT / "src/app/api/customers/renewal-reminders/route.ts",
         ROOT / "src/app/api/customers/transfer-options/route.ts",
         ROOT / "src/app/api/public-pool/claim/route.ts",

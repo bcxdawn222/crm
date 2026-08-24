@@ -5,6 +5,7 @@ import { Card, Table, Button, Space, Input, Modal, message, Tag, Statistic, Row,
 import { UserAddOutlined, BarChartOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import PublicPoolDashboard from '@/components/dashboard/PublicPoolDashboard'
+import { apiRequest } from '@/lib/http/client'
 
 interface Customer {
   id: string
@@ -39,6 +40,25 @@ interface Statistics {
   trend: Array<{ date: string; enterCount: number; claimCount: number }>
 }
 
+interface PublicPoolListResponse {
+  success: true
+  data: { list: Customer[]; total: number }
+}
+
+interface QuotaStatus {
+  quota: {
+    maxActiveCustomers: number
+    maxDailyClaims: number
+    claimHoldDays: number
+  }
+  usage: {
+    activeCount: number
+    todayClaims: number
+  }
+  canClaim: boolean
+  isAdmin: boolean
+}
+
 export default function PublicPoolPage() {
   const [loading, setLoading] = useState(false)
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -48,45 +68,31 @@ export default function PublicPoolPage() {
   const [keyword, setKeyword] = useState('')
   
   // 新增: 配额状态
-  const [quotaStatus, setQuotaStatus] = useState<{
-    quota: {
-      maxActiveCustomers: number
-      maxDailyClaims: number
-      claimHoldDays: number
-    }
-    usage: {
-      activeCount: number
-      todayClaims: number
-    }
-    canClaim: boolean
-    isAdmin: boolean
-  } | null>(null)
+  const [quotaStatus, setQuotaStatus] = useState<QuotaStatus | null>(null)
+  const [claimingId, setClaimingId] = useState<string | null>(null)
   
   // 新增: 数据看板状态
   const [showDashboard, setShowDashboard] = useState(false)
   const [statistics, setStatistics] = useState<Statistics | null>(null)
 
   // 加载公海池客户列表
-  const loadCustomers = async () => {
+  const loadCustomers = async (
+    targetPage = page,
+    targetKeyword = keyword
+  ) => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
+        page: targetPage.toString(),
         pageSize: pageSize.toString(),
       })
-      if (keyword) params.append('keyword', keyword)
+      if (targetKeyword.trim()) params.append('keyword', targetKeyword.trim())
 
-      const res = await fetch(`/api/public-pool?${params}`)
-      const data = await res.json()
-
-      if (data.success) {
-        setCustomers(data.data.list)
-        setTotal(data.data.total)
-      } else {
-        message.error(data.error || '加载失败')
-      }
+      const data = await apiRequest<PublicPoolListResponse>(`/api/public-pool?${params}`)
+      setCustomers(data.data.list)
+      setTotal(data.data.total)
     } catch (error) {
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '加载公海客户失败')
     } finally {
       setLoading(false)
     }
@@ -100,33 +106,27 @@ export default function PublicPoolPage() {
   // 加载统计数据
   const loadStatistics = async () => {
     try {
-      const res = await fetch('/api/public-pool/statistics')
-      const data = await res.json()
-      if (data.success) {
-        setStatistics(data.data)
-      }
+      const data = await apiRequest<{ success: true; data: Statistics }>('/api/public-pool/statistics')
+      setStatistics(data.data)
     } catch (error) {
-      console.error('Failed to load statistics:', error)
+      message.error(error instanceof Error ? error.message : '加载公海统计失败')
     }
   }
 
   // 加载配额状态
   const loadQuotaStatus = async () => {
     try {
-      const res = await fetch('/api/public-pool/quota')
-      const data = await res.json()
-      if (data.success) {
-        setQuotaStatus(data.data)
-      }
+      const data = await apiRequest<{ success: true; data: QuotaStatus }>('/api/public-pool/quota')
+      setQuotaStatus(data.data)
     } catch (error) {
-      console.error('Failed to load quota status:', error)
+      message.error(error instanceof Error ? error.message : '加载认领配额失败')
     }
   }
 
   // 搜索
   const handleSearch = () => {
     setPage(1)
-    loadCustomers()
+    void loadCustomers(1)
   }
 
   // 认领客户
@@ -135,23 +135,22 @@ export default function PublicPoolPage() {
       title: '确认认领',
       content: `确定要认领客户"${customerName}"吗?认领后该客户将归您所有。`,
       onOk: async () => {
+        if (claimingId) return
+        setClaimingId(customerId)
         try {
-          const res = await fetch('/api/public-pool/claim', {
+          await apiRequest<{ success: true }>('/api/public-pool/claim', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ customerId }),
+          }, {
+            requestKey: `public-pool-claim-${customerId}`,
           })
-
-          const data = await res.json()
-
-          if (data.success) {
-            message.success('认领成功')
-            loadCustomers()
-          } else {
-            message.error(data.error || '认领失败')
-          }
+          message.success('认领成功')
+          await Promise.all([loadCustomers(), loadQuotaStatus()])
         } catch (error) {
-          message.error('网络错误')
+          message.error(error instanceof Error ? error.message : '认领失败')
+        } finally {
+          setClaimingId(null)
         }
       },
     })
@@ -249,6 +248,7 @@ export default function PublicPoolPage() {
             size="small"
             icon={<UserAddOutlined />}
             disabled={!canClaim}
+            loading={claimingId === record.id}
             onClick={() => handleClaim(record.id, record.name)}
           >
             {canClaim ? '认领' : '已达上限'}
@@ -329,7 +329,7 @@ export default function PublicPoolPage() {
           <Button type="primary" onClick={handleSearch}>
             搜索
           </Button>
-          <Button onClick={() => { setKeyword(''); setPage(1); loadCustomers() }}>
+          <Button onClick={() => { setKeyword(''); setPage(1); void loadCustomers(1, '') }}>
             重置
           </Button>
         </Space>

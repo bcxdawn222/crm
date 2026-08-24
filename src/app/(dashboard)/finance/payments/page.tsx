@@ -5,6 +5,7 @@ import { Button, Card, message, Table, Tag } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 
+import { apiRequest } from '@/lib/http/client'
 import { PaymentFormModal } from './payment-form-modal'
 import type { PaymentRecord } from './payment-types'
 
@@ -25,17 +26,14 @@ export default function PaymentsPage() {
         pageSize: pageSize.toString(),
       })
 
-      const res = await fetch(`/api/finance/payments?${params}`)
-      const data = await res.json()
-
-      if (data.success) {
-        setPayments(data.data.list)
-        setTotal(data.data.total)
-      } else {
-        message.error(data.error || '加载失败')
-      }
+      const data = await apiRequest<{
+        success: true
+        data: { list: PaymentRecord[]; total: number }
+      }>(`/api/finance/payments?${params}`)
+      setPayments(data.data.list)
+      setTotal(data.data.total)
     } catch (error) {
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '加载收款记录失败')
     } finally {
       setLoading(false)
     }

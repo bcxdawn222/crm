@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, Table, Button, Space, Modal, Form, DatePicker, InputNumber, Select, Tag, message, Input, Statistic, Row, Col, Alert } from 'antd'
 import { BellOutlined, CalendarOutlined, PhoneOutlined, EditOutlined, FileTextOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -8,6 +8,7 @@ import dayjs, { Dayjs } from 'dayjs'
 import { Resizable } from 'react-resizable'
 import 'react-resizable/css/styles.css'
 import { ContractArchiveModal } from '@/components/contract'
+import { apiRequest } from '@/lib/http/client'
 
 const { TextArea } = Input
 
@@ -78,6 +79,27 @@ interface CooperatingCustomer {
     id: string
     realName: string
   }
+  operationManagerId?: string
+}
+
+interface CooperatingFormValues {
+  contractStartDate?: Dayjs | null
+  contractEndDate: Dayjs | null
+  contractAmount?: number
+  renewalReminderDays?: number
+  operationManagerId?: string
+  lastVisitAt?: Dayjs | null
+  nextVisitAt?: Dayjs | null
+  visitFrequency?: string
+  cooperationNotes?: string
+}
+
+interface OperationManagerOption {
+  id: string
+  realName: string
+  username: string
+  department?: string | null
+  position?: string | null
 }
 
 export default function CooperatingCustomersPage() {
@@ -88,12 +110,16 @@ export default function CooperatingCustomersPage() {
   const [pageSize, setPageSize] = useState(10)
   const [editModalVisible, setEditModalVisible] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<CooperatingCustomer | null>(null)
-  const [form] = Form.useForm()
+  const [form] = Form.useForm<CooperatingFormValues>()
   const [expiringSoon, setExpiringSoon] = useState(false)
   const [reminders, setReminders] = useState<CooperatingCustomer[]>([])
   const [contractModalVisible, setContractModalVisible] = useState(false)
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('')
   const [selectedCustomerName, setSelectedCustomerName] = useState<string>('')
+  const [submitting, setSubmitting] = useState(false)
+  const [managerLoading, setManagerLoading] = useState(false)
+  const [managerOptions, setManagerOptions] = useState<OperationManagerOption[]>([])
+  const requestIdRef = useRef('')
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     name: 100,
     company: 150,
@@ -121,14 +147,14 @@ export default function CooperatingCustomersPage() {
         params.append('expiringSoon', 'true')
       }
 
-      const res = await fetch(`/api/customers/cooperating?${params}`)
-      const json = await res.json()
-      if (json.success) {
-        setData(json.data.list)
-        setTotal(json.data.total)
-      }
+      const result = await apiRequest<{
+        success: true
+        data: { list: CooperatingCustomer[]; total: number }
+      }>(`/api/customers/cooperating?${params}`)
+      setData(result.data.list)
+      setTotal(result.data.total)
     } catch (error) {
-      console.error('Failed to load data:', error)
+      message.error(error instanceof Error ? error.message : '加载合作客户失败')
     } finally {
       setLoading(false)
     }
@@ -137,13 +163,26 @@ export default function CooperatingCustomersPage() {
   // Load renewal reminders
   const loadReminders = async () => {
     try {
-      const res = await fetch('/api/customers/renewal-reminders?days=30')
-      const json = await res.json()
-      if (json.success) {
-        setReminders(json.data)
-      }
+      const result = await apiRequest<{ success: true; data: CooperatingCustomer[] }>(
+        '/api/customers/renewal-reminders?days=30'
+      )
+      setReminders(result.data)
     } catch (error) {
-      console.error('Failed to load reminders:', error)
+      message.error(error instanceof Error ? error.message : '加载续签提醒失败')
+    }
+  }
+
+  const loadOperationManagers = async () => {
+    setManagerLoading(true)
+    try {
+      const result = await apiRequest<{ success: true; data: OperationManagerOption[] }>(
+        '/api/customers/operation-manager-options'
+      )
+      setManagerOptions(result.data)
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '加载运营负责人失败')
+    } finally {
+      setManagerLoading(false)
     }
   }
 
@@ -153,29 +192,40 @@ export default function CooperatingCustomersPage() {
   }, [page, pageSize, expiringSoon])
 
   // Handle edit
-  const handleEdit = async (values: any) => {
-    if (!editingCustomer) return
+  const handleEdit = async (values: CooperatingFormValues) => {
+    if (!editingCustomer || submitting) return
+    if (!values.contractEndDate) {
+      message.error('请选择合同到期日期')
+      return
+    }
 
+    setSubmitting(true)
     try {
-      const res = await fetch(`/api/customers/cooperating?id=${editingCustomer.id}`, {
+      await apiRequest<{ success: true }>(`/api/customers/cooperating?id=${editingCustomer.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-request-id': requestIdRef.current,
+        },
+        body: JSON.stringify({
+          ...values,
+          contractStartDate: values.contractStartDate?.format('YYYY-MM-DD'),
+          contractEndDate: values.contractEndDate.format('YYYY-MM-DD'),
+          lastVisitAt: values.lastVisitAt?.format('YYYY-MM-DD'),
+          nextVisitAt: values.nextVisitAt?.format('YYYY-MM-DD'),
+        }),
+      }, {
+        requestKey: `cooperating-update-${editingCustomer.id}-${requestIdRef.current}`,
       })
-      const json = await res.json()
-      if (json.success) {
-        message.success('更新成功')
-        setEditModalVisible(false)
-        form.resetFields()
-        setEditingCustomer(null)
-        loadData()
-        loadReminders()
-      } else {
-        message.error(json.error || '更新失败')
-      }
+      message.success('更新成功')
+      setEditModalVisible(false)
+      form.resetFields()
+      setEditingCustomer(null)
+      await Promise.all([loadData(), loadReminders()])
     } catch (error) {
-      console.error('Update failed:', error)
-      message.error('网络错误')
+      message.error(error instanceof Error ? error.message : '更新合作客户失败')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -360,18 +410,21 @@ export default function CooperatingCustomersPage() {
             size="small"
             icon={<EditOutlined />}
             onClick={() => {
+              requestIdRef.current = crypto.randomUUID()
               setEditingCustomer(record)
               form.setFieldsValue({
                 contractStartDate: record.contractStartDate ? dayjs(record.contractStartDate) : null,
                 contractEndDate: record.contractEndDate ? dayjs(record.contractEndDate) : null,
                 contractAmount: record.contractAmount,
                 renewalReminderDays: record.renewalReminderDays || 30,
+                operationManagerId: record.operationManagerId || record.operationManager?.id,
                 lastVisitAt: record.lastVisitAt ? dayjs(record.lastVisitAt) : null,
                 nextVisitAt: record.nextVisitAt ? dayjs(record.nextVisitAt) : null,
                 visitFrequency: record.visitFrequency,
                 cooperationNotes: record.cooperationNotes,
               })
               setEditModalVisible(true)
+              void loadOperationManagers()
             }}
           >
             编辑
@@ -523,12 +576,15 @@ export default function CooperatingCustomersPage() {
         title="编辑合作信息"
         open={editModalVisible}
         onCancel={() => {
+          if (submitting) return
           setEditModalVisible(false)
           form.resetFields()
           setEditingCustomer(null)
         }}
         footer={null}
         width={700}
+        closable={!submitting}
+        maskClosable={!submitting}
       >
         <Form
           form={form}
@@ -592,11 +648,19 @@ export default function CooperatingCustomersPage() {
                 name="operationManagerId"
                 label="运营负责人"
               >
-                <Select placeholder="选择运营负责人" allowClear>
-                  <Select.Option value="user-ops-001">张运营</Select.Option>
-                  <Select.Option value="user-ops-002">李运营</Select.Option>
-                  <Select.Option value="user-ops-003">王运营</Select.Option>
-                </Select>
+                <Select
+                  placeholder="选择运营负责人"
+                  allowClear
+                  showSearch
+                  loading={managerLoading}
+                  optionFilterProp="label"
+                  options={managerOptions.map((manager) => ({
+                    value: manager.id,
+                    label: [manager.realName, manager.department, manager.position]
+                      .filter(Boolean)
+                      .join(' · '),
+                  }))}
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -634,10 +698,10 @@ export default function CooperatingCustomersPage() {
 
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit">
+              <Button type="primary" htmlType="submit" loading={submitting}>
                 保存
               </Button>
-              <Button onClick={() => setEditModalVisible(false)}>
+              <Button onClick={() => setEditModalVisible(false)} disabled={submitting}>
                 取消
               </Button>
             </Space>
