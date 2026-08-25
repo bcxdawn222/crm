@@ -36,8 +36,10 @@ def main() -> int:
     database_url = os.environ.get("DATABASE_URL", "")
     marker = uuid4().hex[:12]
     opener = build_opener()
-    login(opener, BASE_URL, USERNAME, PASSWORD)
+    admin = login(opener, BASE_URL, USERNAME, PASSWORD)
+    actor_id = str(admin["id"])
     customer_id: str | None = None
+    auto_customer_id: str | None = None
     request_ids: list[str] = []
 
     try:
@@ -131,7 +133,43 @@ def main() -> int:
             f"WHERE requestId IN ({sql_quote(archive_request_id)},{sql_quote(claim_request_id)})",
         )
         require(audits == "ARCHIVE_TO_PUBLIC_POOL,CLAIM", f"公海审计动作不正确: {audits}")
-        print("客户进入公海、每日客资认领与重复操作保护验收通过")
+
+        auto_customer_id = str(uuid4())
+        database_value(
+            database_url,
+            "INSERT INTO Customer "
+            "(id,name,phone,source,level,status,salesId,isPublic,createdAt,updatedAt,lastFollowUpAt) VALUES "
+            f"({sql_quote(auto_customer_id)},{sql_quote(f'自动回收客户-{marker}')},"
+            f"{sql_quote(f'137{marker[:8]}')},'OTHER','POTENTIAL','ACTIVE',{sql_quote(actor_id)},0,"
+            "DATE_SUB(NOW(3), INTERVAL 120 DAY),NOW(3),DATE_SUB(NOW(3), INTERVAL 100 DAY))",
+        )
+        auto_request_id = f"public-pool-auto-{marker}"
+        request_ids.append(auto_request_id)
+        auto_result = request(
+            opener,
+            BASE_URL,
+            "/api/public-pool/auto-move",
+            method="POST",
+            request_id=auto_request_id,
+        )
+        auto_payload = json_body(auto_result)
+        require(auto_result.status == 200 and auto_payload.get("success") is True, f"自动回收失败: {auto_payload}")
+        auto_details = auto_payload.get("data", {}).get("details", [])
+        moved_ids = {str(item.get("customerId")) for item in auto_details if isinstance(item, dict)}
+        require(auto_customer_id in moved_ids, "自动回收结果未包含目标客户")
+        auto_row = database_value(
+            database_url,
+            "SELECT isPublic,status,publicPoolReason,JSON_UNQUOTE(JSON_EXTRACT(publicPoolHistory,'$[0].reason')) "
+            f"FROM Customer WHERE id={sql_quote(auto_customer_id)}",
+        )
+        require(auto_row == "1\tINACTIVE\tRULE_1\tRULE_1", f"自动回收数据库状态不正确: {auto_row}")
+        auto_audit = database_value(
+            database_url,
+            "SELECT action FROM AuditEvent "
+            f"WHERE requestId={sql_quote(auto_request_id)} AND entityId={sql_quote(auto_customer_id)}",
+        )
+        require(auto_audit == "AUTO_MOVE_TO_PUBLIC_POOL", "自动回收审计缺失")
+        print("客户进入公海、认领、自动回收与重复操作保护验收通过")
         return 0
     finally:
         if request_ids:
@@ -144,6 +182,9 @@ def main() -> int:
             database_value(database_url, f"DELETE FROM Customer WHERE id={sql_quote(customer_id)}")
             remaining = database_value(database_url, f"SELECT COUNT(*) FROM Customer WHERE id={sql_quote(customer_id)}")
             require(remaining == "0", "公海验收客户清理失败")
+        if auto_customer_id:
+            database_value(database_url, f"DELETE FROM AuditEvent WHERE entityId={sql_quote(auto_customer_id)}")
+            database_value(database_url, f"DELETE FROM Customer WHERE id={sql_quote(auto_customer_id)}")
         print("public-pool-flow test 夹具已清理")
 
 

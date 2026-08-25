@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { createPayment, CreatePaymentError } from '@/lib/payments/create'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { getAccessibleUserIds } from '@/lib/data-permission'
+import { parsePagination } from '@/lib/http/pagination'
 
 
 const createPaymentSchema = z.object({
@@ -37,8 +38,11 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const pageSize = parseInt(searchParams.get('pageSize') || '10')
+    const pagination = parsePagination(searchParams)
+    if (!pagination) {
+      return NextResponse.json({ error: 'Pagination parameters are invalid' }, { status: 400 })
+    }
+    const { page, pageSize } = pagination
     const keyword = searchParams.get('keyword') || ''
     const startDate = searchParams.get('startDate') || ''
     const endDate = searchParams.get('endDate') || ''
@@ -69,37 +73,26 @@ export async function GET(request: Request) {
       }
     }
 
-    // Query total count
-    const total = await prisma.payment.count({ where })
-
-    // Query list
-    const payments = await prisma.payment.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { paymentDate: 'desc' },
-      include: {
-        order: {
-          select: {
-            id: true,
-            orderNo: true,
-            contractAmount: true,
-            customer: {
-              select: {
-                name: true,
-                company: true,
-              }
-            }
-          }
+    const [total, payments] = await Promise.all([
+      prisma.payment.count({ where }),
+      prisma.payment.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: [{ paymentDate: 'desc' }, { id: 'asc' }],
+        include: {
+          order: {
+            select: {
+              id: true,
+              orderNo: true,
+              contractAmount: true,
+              customer: { select: { name: true, company: true } },
+            },
+          },
+          operator: { select: { id: true, realName: true } },
         },
-        operator: {
-          select: {
-            id: true,
-            realName: true,
-          }
-        }
-      }
-    })
+      }),
+    ])
 
     // Format Decimal fields
     const formattedPayments = payments.map(payment => ({

@@ -46,9 +46,16 @@ export async function GET(request: Request) {
     const customers = await prisma.customer.findMany({
       where,
       orderBy: { contractEndDate: 'asc' },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        company: true,
+        contractEndDate: true,
+        contractAmount: true,
+        renewalReminderDays: true,
         sales: { select: { id: true, realName: true } },
       },
+      take: 100,
     })
 
     return NextResponse.json({

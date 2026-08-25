@@ -4,9 +4,10 @@ export const dynamic = 'force-dynamic'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
-import { Prisma } from '@prisma/client'
-import { buildDataFilter, canAccessSalesData } from '@/lib/data-permission'
+import { canAccessSalesData, getAccessibleUserIds } from '@/lib/data-permission'
 import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { parsePagination } from '@/lib/http/pagination'
+import { queryDailyLeads } from '@/lib/reports/daily-leads'
 
 // GET /api/daily-leads - 获取每日新增客资统计
 export async function GET(request: Request) {
@@ -29,19 +30,9 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const salesId = searchParams.get('salesId')
-    const page = parseInt(searchParams.get('page') || '1')
-    const pageSize = parseInt(searchParams.get('pageSize') || '10')
-
-    // Build date filter
-    const where: Prisma.CustomerWhereInput = {
-      ...await buildDataFilter(session.user.id, session.user.roles),
-    }
-    
-    if (startDate && endDate) {
-      where.createdAt = {
-        gte: new Date(startDate),
-        lte: new Date(endDate + 'T23:59:59.999Z')
-      }
+    const pagination = parsePagination(searchParams)
+    if (!pagination) {
+      return NextResponse.json({ error: 'Pagination parameters are invalid' }, { status: 400 })
     }
 
     // Filter by sales person
@@ -49,105 +40,25 @@ export async function GET(request: Request) {
       if (!await canAccessSalesData(session.user.id, session.user.roles, salesId)) {
         return NextResponse.json({ error: 'No permission to access this sales scope' }, { status: 403 })
       }
-      where.salesId = salesId
     }
-
-    // Get daily statistics
-    const dailyStats = await getDailyLeadStats(where, page, pageSize)
-
-    // Get total count of unique dates
-    const allCustomers = await prisma.customer.findMany({
-      where,
-      select: {
-        createdAt: true
-      }
+    const result = await queryDailyLeads({
+      accessibleUserIds: await getAccessibleUserIds(session.user.id, session.user.roles),
+      salesId: salesId || undefined,
+      startDate: startDate ? new Date(`${startDate}T00:00:00.000Z`) : undefined,
+      endDate: endDate ? new Date(`${endDate}T23:59:59.999Z`) : undefined,
+      ...pagination,
     })
-    
-    const uniqueDates = new Set(
-      allCustomers.map(c => c.createdAt.toISOString().split('T')[0])
-    )
-    const total = uniqueDates.size
 
     return NextResponse.json({
       success: true,
-      data: dailyStats,
-      total,
-      page,
-      pageSize
+      data: result.list,
+      total: result.total,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
     })
   } catch (error) {
     return serverErrorResponse(error, 'GET /api/daily-leads', requestId)
   }
-}
-
-// Helper function to get daily lead statistics
-async function getDailyLeadStats(where: Prisma.CustomerWhereInput, page: number, pageSize: number) {
-  const skip = (page - 1) * pageSize
-  
-  // Get customers grouped by date
-  const customers = await prisma.customer.findMany({
-    where,
-    select: {
-      id: true,
-      name: true,
-      company: true,
-      phone: true,
-      email: true,
-      level: true,
-      source: true,
-      notes: true,
-      isPublic: true,
-      createdAt: true,
-      sales: {
-        select: {
-          id: true,
-          realName: true,
-          username: true
-        }
-      }
-    },
-    orderBy: {
-      createdAt: 'desc'
-    }
-  })
-
-  // Group by date
-  const groupedByDate: Record<string, typeof customers> = {}
-  customers.forEach(customer => {
-    const dateKey = customer.createdAt.toISOString().split('T')[0]
-    if (!groupedByDate[dateKey]) {
-      groupedByDate[dateKey] = []
-    }
-    groupedByDate[dateKey].push(customer)
-  })
-
-  // Convert to array and paginate
-  const allDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a))
-  const paginatedDates = allDates.slice(skip, skip + pageSize)
-  
-  const result = paginatedDates.map(date => {
-    const dayCustomers = groupedByDate[date]
-    return {
-      date,
-      count: dayCustomers.length,
-      customers: dayCustomers,
-      // Statistics by level
-      byLevel: {
-        POTENTIAL: dayCustomers.filter(c => c.level === 'POTENTIAL').length,
-        NORMAL: dayCustomers.filter(c => c.level === 'NORMAL').length,
-        IMPORTANT: dayCustomers.filter(c => c.level === 'IMPORTANT').length,
-        VIP: dayCustomers.filter(c => c.level === 'VIP').length,
-      },
-      // Statistics by source
-      bySource: dayCustomers.reduce((acc, curr) => {
-        const source = curr.source || 'OTHER'
-        acc[source] = (acc[source] || 0) + 1
-        return acc
-      }, {} as Record<string, number>)
-    }
-  })
-
-  return result
 }
 
 

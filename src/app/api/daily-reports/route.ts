@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getAccessibleUserIds } from '@/lib/data-permission'
+import { parsePagination } from '@/lib/http/pagination'
 import { Prisma } from '@prisma/client'
 import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
 
@@ -21,8 +22,11 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const pageSize = parseInt(searchParams.get('pageSize') || '10')
+    const pagination = parsePagination(searchParams)
+    if (!pagination) {
+      return NextResponse.json({ error: 'Pagination parameters are invalid' }, { status: 400 })
+    }
+    const { page, pageSize } = pagination
     const startDate = searchParams.get('startDate') || ''
     const endDate = searchParams.get('endDate') || ''
 
@@ -44,30 +48,19 @@ export async function GET(request: Request) {
       }
     }
 
-    // Query total count
-    const total = await prisma.dailyReport.count({ where })
-
-    // Query list
-    const reports = await prisma.dailyReport.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { reportDate: 'desc' },
-      include: {
-        user: {
-          select: {
-            id: true,
-            realName: true,
-          }
+    const [total, reports] = await Promise.all([
+      prisma.dailyReport.count({ where }),
+      prisma.dailyReport.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: [{ reportDate: 'desc' }, { id: 'asc' }],
+        include: {
+          user: { select: { id: true, realName: true } },
+          reviewer: { select: { id: true, realName: true } },
         },
-        reviewer: {
-          select: {
-            id: true,
-            realName: true,
-          },
-        },
-      }
-    })
+      }),
+    ])
 
     return NextResponse.json({
       success: true,

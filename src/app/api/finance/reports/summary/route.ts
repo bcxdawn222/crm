@@ -42,21 +42,16 @@ export async function GET(request: Request) {
       }
     }
 
-    // Query all orders
-    const orders = await prisma.order.findMany({
+    const summary = await prisma.order.aggregate({
       where,
-      select: {
-        contractAmount: true,
-        paidAmount: true,
-        unpaidAmount: true,
-      }
+      _count: true,
+      _sum: { contractAmount: true, paidAmount: true, unpaidAmount: true },
     })
 
-    // Calculate statistics
-    const totalOrders = orders.length
-    const totalAmount = orders.reduce((sum, order) => sum + order.contractAmount.toNumber(), 0)
-    const paidAmount = orders.reduce((sum, order) => sum + order.paidAmount.toNumber(), 0)
-    const unpaidAmount = orders.reduce((sum, order) => sum + order.unpaidAmount.toNumber(), 0)
+    const totalOrders = summary._count
+    const totalAmount = Number(summary._sum.contractAmount ?? 0)
+    const paidAmount = Number(summary._sum.paidAmount ?? 0)
+    const unpaidAmount = Number(summary._sum.unpaidAmount ?? 0)
     const completionRate = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0
 
     return NextResponse.json({

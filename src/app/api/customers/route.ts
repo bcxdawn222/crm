@@ -83,39 +83,24 @@ export async function GET(request: Request) {
       where.status = status as CustomerStatus
     }
 
-    // Query total count
-    const total = await prisma.customer.count({ where })
-
-    // Query list
-    const customers = await prisma.customer.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        sales: {
-          select: {
-            id: true,
-            realName: true,
-          }
-        },
-        _count: {
-          select: {
-            followUps: true,
-            orders: true,
-          }
-        },
-        followUps: {
-          select: {
-            createdAt: true,
+    const [total, customers] = await Promise.all([
+      prisma.customer.count({ where }),
+      prisma.customer.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        include: {
+          sales: { select: { id: true, realName: true } },
+          _count: { select: { followUps: true, orders: true } },
+          followUps: {
+            select: { createdAt: true },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
           },
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 1,
-        }
-      }
-    })
+        },
+      }),
+    ])
 
     // Map level to category
     const levelMap: Record<string, string> = {

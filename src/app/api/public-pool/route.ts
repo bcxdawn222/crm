@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
 import { handlePublicPoolClaim } from '@/lib/public-pool/claim-handler'
 import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { parsePagination } from '@/lib/http/pagination'
+import type { Prisma } from '@prisma/client'
 
 // GET /api/public-pool - 获取公海池客户列表
 export async function GET(request: Request) {
@@ -23,12 +25,15 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const pageSize = parseInt(searchParams.get('pageSize') || '10')
+    const pagination = parsePagination(searchParams)
+    if (!pagination) {
+      return NextResponse.json({ error: 'Pagination parameters are invalid' }, { status: 400 })
+    }
+    const { page, pageSize } = pagination
     const keyword = searchParams.get('keyword') || ''
 
     // Build query conditions
-    const where: any = {
+    const where: Prisma.CustomerWhereInput = {
       isPublic: true,
     }
 
@@ -41,30 +46,19 @@ export async function GET(request: Request) {
       ]
     }
 
-    // Query total count
-    const total = await prisma.customer.count({ where })
-
-    // Query list
-    const customers = await prisma.customer.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        sales: {
-          select: {
-            id: true,
-            realName: true,
-          }
+    const [total, customers] = await Promise.all([
+      prisma.customer.count({ where }),
+      prisma.customer.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: [{ publicPoolEnteredAt: 'desc' }, { id: 'asc' }],
+        include: {
+          sales: { select: { id: true, realName: true } },
+          _count: { select: { followUps: true, orders: true } },
         },
-        _count: {
-          select: {
-            followUps: true,
-            orders: true,
-          }
-        }
-      }
-    })
+      }),
+    ])
 
     // Map level to category
     const levelMap: Record<string, string> = {

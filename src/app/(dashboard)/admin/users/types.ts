@@ -49,6 +49,12 @@ export interface UserFormValues {
 export interface UserListResponse {
   success: true
   data: UserItem[]
+  pagination: {
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }
 }
 
 export interface RoleListResponse {

@@ -29,6 +29,9 @@ export default function UsersPage() {
   const { can, user: currentUser } = usePermission()
   const canManageRoles = can('update', 'role')
   const [users, setUsers] = useState<UserItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [roles, setRoles] = useState<RoleOption[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -39,19 +42,20 @@ export default function UsersPage() {
     setLoading(true)
     try {
       const [userResult, roleResult] = await Promise.all([
-        apiRequest<UserListResponse>('/api/users?includeInactive=true'),
+        apiRequest<UserListResponse>(`/api/users?includeInactive=true&page=${page}&pageSize=${pageSize}`),
         canManageRoles
           ? apiRequest<RoleListResponse>('/api/roles')
           : Promise.resolve<RoleListResponse>({ success: true, data: [] }),
       ])
       setUsers(userResult.data)
+      setTotal(userResult.pagination.total)
       setRoles(roleResult.data)
     } catch (error) {
       message.error(error instanceof Error ? error.message : '加载用户失败')
     } finally {
       setLoading(false)
     }
-  }, [canManageRoles])
+  }, [canManageRoles, page, pageSize])
 
   useEffect(() => {
     void loadData()
@@ -162,7 +166,18 @@ export default function UsersPage() {
         loading={loading}
         rowKey="id"
         scroll={{ x: 1180 }}
-        pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (total) => `共 ${total} 条` }}
+        pagination={{
+          current: page,
+          pageSize,
+          total,
+          showSizeChanger: true,
+          pageSizeOptions: [10, 20, 50, 100],
+          showTotal: (value) => `共 ${value} 条`,
+          onChange: (nextPage, nextPageSize) => {
+            setPage(nextPageSize === pageSize ? nextPage : 1)
+            setPageSize(nextPageSize)
+          },
+        }}
       />
       <UserFormModal
         open={modalOpen}

@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma'
 
 const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024
 const MAX_IMPORT_ROWS = 1000
+const IMPORT_BATCH_SIZE = 200
 const SUPPORTED_EXTENSIONS = new Set(['.csv', '.xls', '.xlsx'])
 
 const FIELD_MAPPING = {
@@ -225,14 +226,20 @@ export async function importCustomers(input: {
       })
       if (conflicts.length > 0) throw new CustomerImportConflictError(conflicts.length)
 
-      await tx.customer.createMany({ data: customers })
+      for (let index = 0; index < customers.length; index += IMPORT_BATCH_SIZE) {
+        await tx.customer.createMany({ data: customers.slice(index, index + IMPORT_BATCH_SIZE) })
+      }
       const customerIds = customers.map((customer) => customer.id as string)
       await recordAuditEvent(tx, {
         actorId: input.actorId,
         action: 'IMPORT',
         entityType: 'CustomerImport',
         entityId: input.requestId,
-        afterData: { customerIds, count: customerIds.length },
+        afterData: {
+          customerIds,
+          count: customerIds.length,
+          batchCount: Math.ceil(customerIds.length / IMPORT_BATCH_SIZE),
+        },
         reason: 'CUSTOMERS_IMPORTED',
         requestId: input.requestId,
       })

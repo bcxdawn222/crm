@@ -364,3 +364,17 @@ conclusion: fail
 - 最终构建体积预算报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\前端性能预算.md`：公共共享 JavaScript 88.2 kB；首页 275 kB、统计页 222 kB、公海页 379 kB；全路由均低于 500 kB，`python scripts\manage.py perf --profile test` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-perf-20260825-122815.log`。
 - 验证命令均通过：`python scripts\manage.py typecheck --profile stable`，日志 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260825-121923.log`；`python scripts\manage.py build --profile test`，日志 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260825-122422.log`；`routes`、`button-audit`、`data-reachability`、`runtime-test` 退出码均为 0。最终 test 服务已停止，`instance-status` 显示 PID 不存在、端口未监听、锁为 False。
 - 性能报告和日志未写入用户名、密码、Cookie、令牌、数据库连接串或上传文件内容；本轮浏览器登录凭据仅通过当前进程环境变量传入，未写入仓库。任务 13.1 至 13.7 已完成。
+
+## Apply working evidence - 2026-08-25 API、Prisma 与数据库性能
+
+- 新增 API 与数据库性能入口 `python scripts\manage.py api-perf --profile test`。脚本只允许连接 test profile，自动停止旧 test 服务、启用 Prisma 查询日志、创建 120 条临时客户及关联订单/回款/跟进/消息/文件/审计数据，预热后对 15 个关键接口各采样 3 次，执行关键 SQL 的 `EXPLAIN`，最后清理全部夹具并停止服务。
+- 最终性能预算退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-api-perf-20260825-132232.log`，原始报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\api-database-performance-20260825T052253Z.json`，汇总文档为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\API与数据库性能.md`。15 个接口 p95 为 28.9 至 55.4 ms，最大 Prisma 查询数为 12，单次最大返回 100 行，错误率均为 0。性能脚本要求通过当前进程的 `CRM_PERF_*` 或 `CRM_SMOKE_*` 环境变量提供 test 登录凭据，不在源码中设置默认密码；生成的 Markdown 固定使用 LF，`git diff --check` 不再把 Windows CRLF 识别为尾随空白。
+- 客户、用户、日报、每日客资、公海、订单、回款、任务等列表统一使用分页参数上限；count 与列表查询并行，排序增加稳定 `id`；续签提醒最多 100 条，提醒中心每类最多 25 条、总计最多 100 条。用户管理页面使用真实服务端分页，每日客资销售选项显式最多读取 100 条。
+- 每日客资、销售漏斗、销售趋势、公海统计、销售总览、财务汇总和提醒查询已改为数据库聚合或固定数量并行查询，数据范围条件在 SQL/Prisma 查询中执行；销售主管递归下属范围改为单次 MySQL recursive CTE。曾因 `ONLY_FULL_GROUP_BY` 和 CTE collation 冲突出现 500，分别统一日期分组表达式并显式使用 `utf8mb4_unicode_ci` 后通过真实 `data-flow` 和性能验收。
+- PrismaClient 继续使用开发环境全局单例，只有设置 `CRM_PRISMA_QUERY_LOG=1` 时输出 query。Windows MySQL 服务启动权限不足时，运行管理器会查找 `mysqld` 或从 `mysql` 客户端同目录定位服务端程序；未找到时明确返回错误，不隐藏启动失败。
+- 查询计划使用 `Customer_createdAt_idx`、`Customer_contractEndDate_idx`、`Order_createdAt_idx`、`Payment_paymentDate_idx`、`Message_receiverId_idx` 和 `AuditEvent_action_createdAt_idx`；当前 test 数据及执行计划没有新增索引的证据，因此未增加索引，避免无依据提高写入成本。
+- 客户导入保持单次最多 1000 条，在同一导入事务内按 200 条执行 `createMany` 并记录批次数；公海自动回收单次最多 200 条、每 25 条一个事务，响应返回 `limitReached`。审查时发现自动回收候选查询与写入之间存在竞态，现已按回收规则、原负责人和 `updatedAt` 进行乐观并发校验，避免跟进、转移或历史变化后的客户被错误回收。
+- 公海流程第一次重跑时 test 服务未启动，返回 `WinError 10061`，失败日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-public-pool-flow-20260825-131416.log`；通过 `python scripts\manage.py start --profile test` 启动后重跑退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-public-pool-flow-20260825-131439.log`，客户状态、历史记录、审计事件和夹具清理均通过。
+- 类型检查第一次因开发服务占用 Prisma 查询引擎文件而发生 `EPERM`，失败日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260825-131640.log`；停止 test 服务释放文件后重跑退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260825-131704.log`。最终构建退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260825-131716.log`。
+- 最终 `python scripts\manage.py data-reachability --profile test` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260825-131841.log`；Customer、FollowUp、Lead、Order、Payment、File、Message、ContractArchive 均为 0，外键孤立项、异常订单金额和负回款均为 0。`git diff --check` 退出码 0，test 服务已停止。
+- 受项目“禁止子智能体”规则约束，本轮没有调用独立 verifier；以上证据均来自主流程实际执行的项目脚本、数据库检查和构建日志。任务 14.1 至 14.7 已完成。

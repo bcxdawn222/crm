@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client'
 import { recordAuditEvent } from '@/lib/audit/record'
 import { auth } from '@/lib/auth'
 import { defineAbility } from '@/lib/casl'
+import { parsePagination } from '@/lib/http/pagination'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { prisma } from '@/lib/prisma'
 import {
@@ -32,6 +33,10 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
+    const pagination = parsePagination(searchParams, { defaultPageSize: 20, maxPageSize: 100 })
+    if (!pagination) {
+      return jsonWithRequestId({ error: '分页参数不正确' }, requestId, { status: 400 })
+    }
     const role = searchParams.get('role')
     const includeInactive = searchParams.get('includeInactive') === 'true'
     const where: Prisma.UserWhereInput = includeInactive ? {} : { status: 'ACTIVE' }
@@ -39,12 +44,26 @@ export async function GET(request: Request) {
       where.roles = { some: { role: { name: role } } }
     }
 
-    const users = await prisma.user.findMany({
-      where,
-      select: userAdminSelect,
-      orderBy: { createdAt: 'desc' },
-    })
-    return jsonWithRequestId({ success: true, data: users }, requestId)
+    const [total, users] = await Promise.all([
+      prisma.user.count({ where }),
+      prisma.user.findMany({
+        where,
+        select: userAdminSelect,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip: (pagination.page - 1) * pagination.pageSize,
+        take: pagination.pageSize,
+      }),
+    ])
+    return jsonWithRequestId({
+      success: true,
+      data: users,
+      pagination: {
+        total,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        totalPages: Math.ceil(total / pagination.pageSize),
+      },
+    }, requestId)
   } catch (error) {
     return serverErrorResponse(error, 'GET /api/users', requestId)
   }

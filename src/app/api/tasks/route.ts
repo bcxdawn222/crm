@@ -67,30 +67,19 @@ export async function GET(request: Request) {
       where.priority = priority as TaskPriority
     }
 
-    // Query total count
-    const total = await prisma.task.count({ where })
-
-    // Query list
-    const tasks = await prisma.task.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        assignee: {
-          select: {
-            id: true,
-            realName: true,
-          }
+    const [total, tasks] = await Promise.all([
+      prisma.task.count({ where }),
+      prisma.task.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        include: {
+          assignee: { select: { id: true, realName: true } },
+          creator: { select: { id: true, realName: true } },
         },
-        creator: {
-          select: {
-            id: true,
-            realName: true,
-          }
-        }
-      }
-    })
+      }),
+    ])
 
     return NextResponse.json({
       success: true,

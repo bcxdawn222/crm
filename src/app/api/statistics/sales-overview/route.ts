@@ -34,65 +34,42 @@ export async function GET(request: Request) {
 
     const whereCondition = await buildDataFilter(session.user.id, session.user.roles)
 
-    // ========== 本月业绩 ==========
-    const monthlyRevenueResult = await prisma.order.aggregate({
-      where: {
-        ...whereCondition,
-        createdAt: { gte: monthStart }
-      },
-      _sum: { contractAmount: true },
-      _count: true
-    })
+    const [
+      monthlyRevenueResult,
+      lastMonthRevenueResult,
+      monthlyPaymentsResult,
+      monthlyNewCustomers,
+      yearlyRevenueResult,
+    ] = await Promise.all([
+      prisma.order.aggregate({
+        where: { ...whereCondition, createdAt: { gte: monthStart } },
+        _sum: { contractAmount: true },
+        _count: true,
+      }),
+      prisma.order.aggregate({
+        where: { ...whereCondition, createdAt: { gte: lastMonthStart, lte: lastMonthEnd } },
+        _sum: { contractAmount: true },
+      }),
+      prisma.payment.aggregate({
+        where: { order: { ...whereCondition, createdAt: { gte: monthStart } } },
+        _sum: { amount: true },
+      }),
+      prisma.customer.count({ where: { ...whereCondition, createdAt: { gte: monthStart } } }),
+      prisma.order.aggregate({
+        where: { ...whereCondition, createdAt: { gte: yearStart } },
+        _sum: { contractAmount: true },
+      }),
+    ])
 
     const monthlyRevenue = Number(monthlyRevenueResult._sum.contractAmount || 0)
     const monthlyOrders = monthlyRevenueResult._count
-
-    // 上月业绩(用于环比)
-    const lastMonthRevenueResult = await prisma.order.aggregate({
-      where: {
-        ...whereCondition,
-        createdAt: { 
-          gte: lastMonthStart,
-          lte: lastMonthEnd
-        }
-      },
-      _sum: { contractAmount: true }
-    })
 
     const lastMonthRevenue = Number(lastMonthRevenueResult._sum.contractAmount || 0)
     const revenueGrowth = lastMonthRevenue > 0 
       ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue * 100)
       : 0
 
-    // 本月收款金额
-    const monthlyPaymentsResult = await prisma.payment.aggregate({
-      where: {
-        order: {
-          ...whereCondition,
-          createdAt: { gte: monthStart }
-        }
-      },
-      _sum: { amount: true }
-    })
-
     const monthlyPayments = Number(monthlyPaymentsResult._sum.amount || 0)
-
-    // 本月新增客户数
-    const monthlyNewCustomers = await prisma.customer.count({
-      where: {
-        ...whereCondition,
-        createdAt: { gte: monthStart }
-      }
-    })
-
-    // ========== 年度累计 ==========
-    const yearlyRevenueResult = await prisma.order.aggregate({
-      where: {
-        ...whereCondition,
-        createdAt: { gte: yearStart }
-      },
-      _sum: { contractAmount: true }
-    })
 
     const yearlyRevenue = Number(yearlyRevenueResult._sum.contractAmount || 0)
     

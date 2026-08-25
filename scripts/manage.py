@@ -38,6 +38,7 @@ TEST_FLOW_SCRIPTS = {
     "server-runtime-drill": "server_runtime_drill.py",
     "perf": "../performance/frontend_budget.py",
     "perf-runtime": "../performance/frontend_runtime.py",
+    "api-perf": "../performance/api_database.py",
 }
 
 @dataclass(frozen=True)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -54,11 +55,25 @@ def _log_server_tail(logger: logging.Logger, config: ProfileConfig, line_count: 
         logger.error("[server] %s", line)
 
 
+def _find_mysql_binary() -> Path | None:
+    if MYSQL_BINARY:
+        return Path(MYSQL_BINARY)
+    direct = shutil.which("mysqld")
+    if direct:
+        return Path(direct)
+    client = shutil.which("mysql") or shutil.which("mariadb")
+    if client:
+        candidate = Path(client).with_name("mysqld.exe" if os.name == "nt" else "mysqld")
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def start_database_direct(logger: logging.Logger, host: str, port: int) -> int:
-    if not MYSQL_BINARY:
-        logger.error("未配置 CRM_MYSQL_BIN，不能使用本地 MySQL 进程启动模式")
+    binary = _find_mysql_binary()
+    if binary is None:
+        logger.error("未找到 mysqld，可通过 CRM_MYSQL_BIN 指定本地 MySQL 服务端")
         return 2
-    binary = Path(MYSQL_BINARY)
     if not binary.is_file():
         logger.error("MySQL 可执行文件不存在: %s", binary)
         return 2
@@ -148,8 +163,8 @@ def start_database(logger: logging.Logger, config: ProfileConfig) -> int:
     if output:
         logger.info("[mysql-service] %s", output)
     if result.returncode != 0:
-        logger.error("MySQL 服务启动失败，服务名=%s，退出码=%s", MYSQL_SERVICE_NAME, result.returncode)
-        return result.returncode
+        logger.warning("MySQL 服务启动失败，尝试本地 mysqld，服务名=%s，退出码=%s", MYSQL_SERVICE_NAME, result.returncode)
+        return start_database_direct(logger, config.database_host, config.database_port)
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         if is_port_open(config.database_host, config.database_port):

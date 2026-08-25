@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client'
+
 import { prisma } from './prisma'
 
 export interface TeamTreeNode {
@@ -28,26 +30,23 @@ export async function getAccessibleUserIds(
  * @returns 包含用户自己和所有下属的ID数组
  */
 export async function getUserAndSubordinateIds(userId: string): Promise<string[]> {
-  const ids = new Set<string>([userId])
-  
-  // 递归获取所有下属
-  async function getSubordinates(parentId: string) {
-    const subordinates = await prisma.user.findMany({
-      where: { managerId: parentId },
-      select: { id: true }
-    })
-    
-    for (const sub of subordinates) {
-      if (!ids.has(sub.id)) {
-        ids.add(sub.id)
-        // 递归获取下属的下属
-        await getSubordinates(sub.id)
-      }
-    }
-  }
-  
-  await getSubordinates(userId)
-  return Array.from(ids)
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    WITH RECURSIVE user_tree (id, visited) AS (
+      SELECT id, CAST(id AS CHAR(4000) CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci
+      FROM User
+      WHERE id = ${userId}
+      UNION ALL
+      SELECT child.id, CONCAT(parent.visited, ',', child.id) COLLATE utf8mb4_unicode_ci
+      FROM User child
+      INNER JOIN user_tree parent ON child.managerId = parent.id
+      WHERE FIND_IN_SET(
+        child.id COLLATE utf8mb4_unicode_ci,
+        parent.visited COLLATE utf8mb4_unicode_ci
+      ) = 0
+    )
+    SELECT DISTINCT id FROM user_tree
+  `)
+  return rows.map((row) => row.id)
 }
 
 /**

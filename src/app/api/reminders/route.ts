@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
 import { buildDataFilter, getAccessibleUserIds } from '@/lib/data-permission'
 import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { loadReminderRows } from '@/lib/reminders/queries'
 
 // GET /api/reminders - Get reminder list
 export async function GET(request: Request) {
@@ -32,114 +32,8 @@ export async function GET(request: Request) {
     const accessibleUserIds = await getAccessibleUserIds(userId, roles)
 
     const now = new Date()
-    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
-
-    // 1. Get customers with overdue follow-up (more than 3 days)
-    const overdueFollowUp = await prisma.customer.findMany({
-      where: {
-        ...dataFilter,
-        isPublic: false,
-        status: 'ACTIVE',
-        reminderDisabled: false,
-        OR: [
-          { lastFollowUpAt: { lt: threeDaysAgo } },
-          { lastFollowUpAt: null },
-        ],
-      },
-      include: {
-        sales: {
-          select: {
-            id: true,
-            realName: true,
-          }
-        },
-      },
-      orderBy: {
-        lastFollowUpAt: { sort: 'asc', nulls: 'first' },
-      },
-      take: 50,
-    })
-
-    // 2. Get customers with expiring contracts (within 30 days)
-    const expiringContracts = await prisma.customer.findMany({
-      where: {
-        ...dataFilter,
-        isPublic: false,
-        reminderDisabled: false,
-        contractEndDate: {
-          gte: now,
-          lte: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-        },
-      },
-      include: {
-        sales: {
-          select: {
-            id: true,
-            realName: true,
-          }
-        },
-      },
-      orderBy: {
-        contractEndDate: 'asc',
-      },
-      take: 50,
-    })
-
-    // 3. Get customers with upcoming visits (within 7 days)
-    const upcomingVisits = await prisma.customer.findMany({
-      where: {
-        ...dataFilter,
-        isPublic: false,
-        reminderDisabled: false,
-        nextVisitAt: {
-          gte: now,
-          lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
-        },
-      },
-      include: {
-        sales: {
-          select: {
-            id: true,
-            realName: true,
-          }
-        },
-      },
-      orderBy: {
-        nextVisitAt: 'asc',
-      },
-      take: 50,
-    })
-
-    // 4. Get planned follow-up tasks (within 7 days)
-    const plannedFollowUps = await prisma.followUp.findMany({
-      where: {
-        ...(accessibleUserIds === null ? {} : { salesId: { in: accessibleUserIds } }),
-        status: 'PLANNED',
-        nextFollowUpAt: {
-          gte: now,
-          lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
-        },
-      },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            company: true,
-          }
-        },
-        sales: {
-          select: {
-            id: true,
-            realName: true,
-          }
-        },
-      },
-      orderBy: {
-        nextFollowUpAt: 'asc',
-      },
-      take: 50,
-    })
+    const [overdueFollowUp, expiringContracts, upcomingVisits, plannedFollowUps] =
+      await loadReminderRows({ customerWhere: dataFilter, accessibleUserIds, now })
 
     // Format response data
     const formatOverdueFollowUp = overdueFollowUp.map(c => ({
