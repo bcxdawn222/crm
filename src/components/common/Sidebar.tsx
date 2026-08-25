@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Layout, Menu } from 'antd'
+import { Drawer, Layout, Menu } from 'antd'
 import type { MenuProps } from 'antd'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -148,6 +148,8 @@ const menuItems = [
 
 interface SidebarProps {
   collapsed: boolean
+  mobileOpen: boolean
+  onMobileClose: () => void
 }
 
 interface MenuItem {
@@ -159,7 +161,25 @@ interface MenuItem {
   children?: MenuItem[]
 }
 
-export default function Sidebar({ collapsed }: SidebarProps) {
+function selectedMenuKey(pathname: string, items: MenuItem[]): string {
+  const childKeys = items.flatMap((item) => item.children || [])
+  const routeKeys = [...items, ...childKeys]
+    .map((item) => item.key)
+    .filter((key) => key.startsWith('/'))
+    .sort((left, right) => right.length - left.length)
+  return routeKeys.find((key) => pathname === key || pathname.startsWith(`${key}/`)) || pathname
+}
+
+function openMenuKeys(pathname: string): string[] {
+  if (pathname.startsWith('/admin')) return ['/admin']
+  if (pathname.startsWith('/finance')) return ['/finance']
+  if (pathname.startsWith('/customers') || ['/public-pool', '/daily-leads', '/telemarketing'].some((path) => pathname.startsWith(path))) {
+    return ['/customer-management']
+  }
+  return []
+}
+
+export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname()
   const { permissions } = usePermission()
 
@@ -186,28 +206,45 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   }
 
   const visibleMenuItems = filterMenuByPermission(menuItems)
+  const selectedKey = selectedMenuKey(pathname, visibleMenuItems)
+  const defaultOpenKeys = openMenuKeys(pathname)
+
+  const renderMenu = (mobile: boolean) => (
+    <Menu
+      className="crm-sidebar-menu"
+      mode="inline"
+      theme="dark"
+      selectedKeys={[selectedKey]}
+      defaultOpenKeys={defaultOpenKeys}
+      items={visibleMenuItems as MenuProps['items']}
+      onClick={mobile ? onMobileClose : undefined}
+    />
+  )
 
   return (
-    <Sider 
-      trigger={null} 
-      collapsible 
-      collapsed={collapsed}
-      theme="dark"
-      style={{
-        overflow: 'auto',
-        height: '100vh',
-        position: 'fixed',
-        left: 0,
-        top: 0,
-        bottom: 0,
-      }}
-    >
-      <Menu
-        mode="inline"
+    <>
+      <Sider
+        className="crm-desktop-sidebar"
+        trigger={null}
+        collapsible
+        collapsed={collapsed}
         theme="dark"
-        selectedKeys={[pathname]}
-        items={visibleMenuItems as MenuProps['items']}
-      />
-    </Sider>
+        width={200}
+        collapsedWidth={80}
+      >
+        {renderMenu(false)}
+      </Sider>
+      <Drawer
+        rootClassName="crm-mobile-sidebar"
+        placement="left"
+        width="min(82vw, 280px)"
+        open={mobileOpen}
+        closable={false}
+        onClose={onMobileClose}
+        styles={{ body: { padding: 0, background: '#0f172a' } }}
+      >
+        <nav aria-label="主导航">{renderMenu(true)}</nav>
+      </Drawer>
+    </>
   )
 }

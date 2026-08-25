@@ -37,15 +37,7 @@ export default function RevenueTrendChart() {
   }
 
   const option = {
-    title: {
-      text: '收入趋势分析',
-      left: 'center',
-      textStyle: { 
-        fontSize: 18, 
-        fontWeight: 'bold',
-        color: '#333'
-      }
-    },
+    animation: false,
     tooltip: {
       trigger: 'axis',
       backgroundColor: 'rgba(255,255,255,0.95)',
@@ -88,7 +80,7 @@ export default function RevenueTrendChart() {
       left: '3%',
       right: '4%',
       bottom: '15%',
-      top: '15%',
+      top: '8%',
       containLabel: true
     },
     xAxis: {

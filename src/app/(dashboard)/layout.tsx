@@ -14,20 +14,19 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const collapsed = useUIStore((state) => state.sidebarCollapsed)
+  const mobileOpen = useUIStore((state) => state.mobileSidebarOpen)
+  const closeMobileSidebar = useUIStore((state) => state.closeMobileSidebar)
 
   return (
-    <Layout className="crm-app-shell" style={{ minHeight: '100vh' }}>
-      <Sidebar collapsed={collapsed} />
-      <Layout className="crm-main-layout" style={{ marginLeft: collapsed ? 80 : 200 }}>
-        <AppHeader userName="用户" />
-        <Content
-          className="crm-page-content"
-          style={{
-            margin: '84px 16px 16px',
-            padding: 24,
-            minHeight: 280,
-          }}
-        >
+    <Layout className="crm-app-shell">
+      <Sidebar
+        collapsed={collapsed}
+        mobileOpen={mobileOpen}
+        onMobileClose={closeMobileSidebar}
+      />
+      <Layout className={`crm-main-layout${collapsed ? ' crm-main-layout--collapsed' : ''}`}>
+        <AppHeader />
+        <Content className="crm-page-content">
           <NetworkRecoveryBoundary>{children}</NetworkRecoveryBoundary>
         </Content>
       </Layout>

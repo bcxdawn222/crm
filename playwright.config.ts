@@ -57,9 +57,20 @@ export default defineConfig({
     {
       name: 'chromium',
       testMatch: /.*\.spec\.ts/,
+      testIgnore: /.*\.mobile\.spec\.ts/,
       dependencies: ['auth-setup'],
       use: {
         ...devices['Desktop Chrome'],
+        storageState: adminState,
+      },
+    },
+    {
+      name: 'mobile-chromium',
+      testMatch: /.*\.mobile\.spec\.ts/,
+      dependencies: ['auth-setup'],
+      use: {
+        ...devices['Pixel 5'],
+        viewport: { width: 390, height: 844 },
         storageState: adminState,
       },
     },

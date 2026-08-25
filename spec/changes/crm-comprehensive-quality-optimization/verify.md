@@ -389,3 +389,11 @@ conclusion: fail
 - `python scripts\manage.py typecheck --profile stable` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260825-144502.log`。本阶段只覆盖 Chromium Desktop；移动端视觉回归保留给后续 UI 与最终发布验收任务。
 - 发布前最终门禁均退出码 0：构建日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260825-145006.log`，路由、按钮、数据可达性和单实例状态日志分别为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-routes-20260825-145111.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-button-audit-20260825-145111.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260825-145111.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-instance-status-20260825-145111.log`。`git diff --check` 无输出。
 - test 数据库保留的 2 条 `ROLE_UPDATED` 审计创建于 2026 年 8 月 24 日，不属于本轮 E2E；为保留历史记录未删除。Customer、FollowUp、Lead、Order、Payment、File、Message、ContractArchive 和 SystemSetting 均为 0，外键孤立项、异常订单金额和负回款均为 0。
+
+## Apply working evidence - 2026-08-25 响应式外壳与首页漏斗布局
+
+- Dashboard 外壳已改为桌面固定侧栏和 1024px 以下抽屉导航；侧栏折叠宽度为 200/80px，顶栏显示真实姓名，390px 隐藏姓名文字并保留账户入口。移动端抽屉关闭、路由跳转和页面横向溢出已纳入 Playwright。
+- 首页移除内容区内部重复 24px padding。销售漏斗删除图表内重复标题，全零数据使用只影响 SVG 宽度的 100/82/64/46/28 阶梯值，标签和 tooltip 继续读取接口真实 `count`，不写回数据库。收入趋势同步删除重复内部标题，KPI 数值保持单行。
+- 新增 `dashboard.visual.spec.ts`，以只读接口全零响应稳定复现原截图；断言标题仅出现一次、五个 `0个` 标签均可见、五层 SVG 宽度依次收窄且最窄层大于 70px。响应式用例覆盖 1440、1280、1024、768 和 390px，在 1024px 检出 KPI 四列挤出内容区后改为 1200px 以下两列、手机一列。
+- `python scripts\manage.py e2e --profile test` 最终 22 项全部通过，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-e2e-20260825-155930.log`；测试服务已停止，PID 和端口已清理。视觉截图经人工检查后从 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\output\playwright\visual` 清理，后续成功用例不再生成常驻截图。
+- `python scripts\manage.py typecheck --profile stable` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260825-160210.log`；`python scripts\manage.py build --profile test` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260825-160216.log`。

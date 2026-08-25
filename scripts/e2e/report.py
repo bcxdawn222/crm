@@ -84,7 +84,7 @@ def render(report: PlaywrightReport) -> str:
 - 生成时间：{generated_at}
 - 运行环境：`CRM_PROFILE=test`
 - 数据库保护：仅允许数据库名以 `_test` 结尾
-- 浏览器：Chromium Desktop
+- 浏览器：Chromium Desktop、Chromium Mobile（390px）
 - 结果：{passed} 项通过，{failed} 项未通过，共 {len(cases)} 项
 - 原始 JSON：`output/playwright/report.json`
 - 失败产物：`output/playwright/results/`，仅失败时保留 screenshot、video 和 trace
@@ -97,6 +97,7 @@ def render(report: PlaywrightReport) -> str:
 - 权限证据：管理员、销售主管、销售和受限用户，覆盖按钮隐藏、API 403、页面 403 和数据范围。
 - 恢复证据：空状态、加载状态、真实慢响应、断网恢复、会话撤销后重新登录、浏览器刷新和真实服务端 500。
 - 重复操作：客户新增和系统设置保存验证重复点击只产生一次写请求。
+- 视觉边界：销售漏斗全零数据、移动端抽屉导航、标题唯一性和页面横向溢出。
 
 ## 用例明细
 
@@ -106,9 +107,10 @@ def render(report: PlaywrightReport) -> str:
 
 ## 未自动化范围
 
-- 未使用 `skip`、mock API 或硬编码成功响应；本轮报告中的业务请求均连接真实 test 服务。
+- 未使用 `skip`；业务写操作、权限和数据断言均连接真实 test 服务及 test 数据库。
+- 销售漏斗视觉边界用例仅替换 `/api/statistics/funnel` 的只读响应为五层全零数据，用于稳定复现截图中的布局问题，不作为业务接口正确性的证据。
 - 未对 stable 或线上数据库执行写操作，线上只允许发布后进行只读核对。
-- 本阶段仅使用 Chromium Desktop；多浏览器和移动端视觉回归属于 UI/最终发布验收范围。
+- 本阶段覆盖 Chromium Desktop 和 390px Chromium Mobile；Firefox、WebKit 及更多尺寸仍属于最终发布验收范围。
 - E2E 不替代持续压力测试、依赖安全审计和真实 Nginx/PM2/systemd 主机演练，这些由后续任务单独验证。
 """
 

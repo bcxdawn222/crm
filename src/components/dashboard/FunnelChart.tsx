@@ -1,6 +1,6 @@
 'use client'
 
-import { Card, Spin } from 'antd'
+import { Card } from 'antd'
 import CRMChart from '@/components/charts/CRMChart'
 import { useState, useEffect } from 'react'
 import { apiRequest } from '@/lib/http/client'
@@ -11,6 +11,23 @@ interface FunnelStage {
   count: number
   conversionRate: number
   avgDaysInStage: number
+}
+
+interface FunnelTooltipParams {
+  color: string
+  dataIndex: number
+}
+
+interface FunnelLabelParams {
+  dataIndex: number
+  name: string
+}
+
+const STAGE_COLORS = ['#2563eb', '#0f766e', '#d97706', '#dc2626', '#475569']
+
+function emptyStageWidth(index: number, stageCount: number): number {
+  if (stageCount <= 1) return 100
+  return Math.round(100 - (index * 72) / (stageCount - 1))
 }
 
 export default function FunnelChart() {
@@ -35,35 +52,29 @@ export default function FunnelChart() {
     }
   }
 
+  const allStagesEmpty = data.length > 0 && data.every((stage) => stage.count === 0)
+  const maxStageCount = Math.max(...data.map((stage) => stage.count), 1)
   const option = {
-    title: {
-      text: '销售漏斗',
-      left: 'center',
-      textStyle: { 
-        fontSize: 18, 
-        fontWeight: 'bold',
-        color: '#333'
-      }
-    },
+    animation: false,
     tooltip: {
       trigger: 'item',
       backgroundColor: 'rgba(255,255,255,0.95)',
-      borderColor: '#eee',
+      borderColor: '#e2e8f0',
       borderWidth: 1,
-      textStyle: { color: '#333' },
-      formatter: (params: any) => {
+      textStyle: { color: '#0f172a' },
+      formatter: (params: FunnelTooltipParams) => {
         const stage = data[params.dataIndex]
         if (!stage) return ''
-        
+
         return `
-          <div style="padding: 12px; min-width: 180px;">
-            <div style="font-size: 16px; font-weight: bold; margin-bottom: 8px; color: ${params.color};">
+          <div style="padding: 8px; min-width: 168px;">
+            <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: ${params.color};">
               ${stage.name}
             </div>
-            <div style="font-size: 14px; line-height: 1.8;">
-              <div>📊 客户数: <strong>${stage.count}</strong>个</div>
-              <div>📈 转化率: <strong style="color: #52c41a;">${stage.conversionRate}%</strong></div>
-              <div>⏱️ 平均停留: <strong>${stage.avgDaysInStage}</strong>天</div>
+            <div style="font-size: 13px; line-height: 1.8; color: #475569;">
+              <div>客户数：<strong style="color: #0f172a;">${stage.count}个</strong></div>
+              <div>转化率：<strong style="color: #0f172a;">${stage.conversionRate}%</strong></div>
+              <div>平均停留：<strong style="color: #0f172a;">${stage.avgDaysInStage}天</strong></div>
             </div>
           </div>
         `
@@ -71,47 +82,49 @@ export default function FunnelChart() {
     },
     series: [{
       type: 'funnel',
-      left: '10%',
-      top: 60,
-      bottom: 60,
-      width: '80%',
+      left: '8%',
+      top: 12,
+      bottom: 12,
+      width: '84%',
       min: 0,
-      max: Math.max(...data.map(s => s.count), 1),
-      minSize: '0%',
+      max: allStagesEmpty ? 100 : maxStageCount,
+      minSize: allStagesEmpty ? '28%' : '12%',
       maxSize: '100%',
-      sort: 'descending',
-      gap: 4,
+      sort: 'none',
+      gap: 3,
       label: {
         show: true,
         position: 'inside',
-        formatter: '{b}\n{c}个',
-        fontSize: 14,
+        formatter: (params: FunnelLabelParams) => {
+          const stage = data[params.dataIndex]
+          return `${params.name}\n${stage?.count ?? 0}个`
+        },
+        fontSize: 13,
+        lineHeight: 18,
         color: '#fff',
-        fontWeight: 'bold'
+        fontWeight: 600
       },
+      labelLayout: { hideOverlap: true },
       itemStyle: {
         borderColor: '#fff',
-        borderWidth: 2,
-        shadowBlur: 15,
-        shadowColor: 'rgba(0, 0, 0, 0.2)',
-        shadowOffsetY: 5
+        borderWidth: 1,
+        borderRadius: 2,
       },
       emphasis: {
-        label: { 
-          fontSize: 16,
-          fontWeight: 'bold'
+        label: {
+          fontSize: 14,
+          fontWeight: 600
         },
         itemStyle: {
-          shadowBlur: 25,
-          shadowColor: 'rgba(0, 0, 0, 0.3)',
-          shadowOffsetY: 8
+          shadowBlur: 12,
+          shadowColor: 'rgba(15, 23, 42, 0.18)',
         }
       },
       data: data.map((stage, index) => ({
-        value: stage.count,
+        value: allStagesEmpty ? emptyStageWidth(index, data.length) : stage.count,
         name: stage.name,
         itemStyle: {
-          color: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de'][index % 5],
+          color: STAGE_COLORS[index % STAGE_COLORS.length],
         }
       }))
     }]
@@ -120,18 +133,25 @@ export default function FunnelChart() {
   return (
     <Card
       loading={loading}
-      title={<span style={{ fontSize: 16, fontWeight: 'bold' }}>销售漏斗</span>}
+      data-testid="sales-funnel-card"
+      title={<span style={{ fontSize: 16, fontWeight: 600 }}>销售漏斗</span>}
+      extra={allStagesEmpty ? (
+        <span style={{ color: '#64748b', fontSize: 13 }}>当前暂无客户</span>
+      ) : null}
       style={{
         minHeight: 472,
-        borderRadius: 12,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+        height: '100%',
+        border: '1px solid #e2e8f0',
+        borderRadius: 8,
+        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)'
       }}
-      styles={{ body: { minHeight: 400 } }}
+      styles={{ body: { minHeight: 400, padding: '16px 20px 20px' } }}
     >
       {!loading && data.length > 0 && (
         <CRMChart
-          option={option} 
-          style={{ height: 400 }}
+          className="sales-funnel-chart"
+          option={option}
+          style={{ height: 364 }}
           opts={{ renderer: 'svg' }}
         />
       )}

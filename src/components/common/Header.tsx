@@ -2,19 +2,17 @@
 
 import React from 'react'
 import { Layout, Button, Avatar, Dropdown } from 'antd'
-import { MenuFoldOutlined, MenuUnfoldOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons'
-import { signOut } from 'next-auth/react'
+import { MenuFoldOutlined, MenuOutlined, MenuUnfoldOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons'
+import { signOut, useSession } from 'next-auth/react'
 import { useUIStore } from '@/stores/uiStore'
 import { clearAllDrafts } from '@/lib/forms/draft-storage'
 
 const { Header } = Layout
 
-interface HeaderProps {
-  userName: string
-}
-
-export default function AppHeader({ userName }: HeaderProps) {
-  const { sidebarCollapsed, toggleSidebar } = useUIStore()
+export default function AppHeader() {
+  const { data: session } = useSession()
+  const { sidebarCollapsed, toggleSidebar, openMobileSidebar } = useUIStore()
+  const displayName = session?.user.realName || session?.user.username || '用户'
 
   const userMenuItems = [
     {
@@ -35,38 +33,30 @@ export default function AppHeader({ userName }: HeaderProps) {
 
   return (
     <Header
-      style={{
-        padding: 0,
-        background: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        boxShadow: '0 1px 4px rgba(0,21,41,.08)',
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        left: sidebarCollapsed ? 80 : 200,
-        zIndex: 100,
-        height: 64,
-      }}
+      className={`crm-app-header${sidebarCollapsed ? ' crm-app-header--collapsed' : ''}`}
     >
       <Button
+        className="crm-header-menu-button crm-header-menu-button--desktop"
         type="text"
         icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
         onClick={toggleSidebar}
-        style={{ fontSize: '16px', width: 64, height: 64 }}
+        aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+        title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
       />
-      
-      <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          cursor: 'pointer',
-          padding: '0 16px',
-        }}>
-          <Avatar icon={<UserOutlined />} style={{ marginRight: 8 }} />
-          <span>{userName}</span>
-        </div>
+      <Button
+        className="crm-header-menu-button crm-header-menu-button--mobile"
+        type="text"
+        icon={<MenuOutlined />}
+        onClick={openMobileSidebar}
+        aria-label="打开导航菜单"
+        title="打开导航菜单"
+      />
+
+      <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
+        <Button type="text" className="crm-account-trigger" aria-label={`${displayName}，打开账号菜单`}>
+          <Avatar icon={<UserOutlined />} />
+          <span className="crm-account-name">{displayName}</span>
+        </Button>
       </Dropdown>
     </Header>
   )

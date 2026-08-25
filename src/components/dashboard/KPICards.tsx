@@ -96,7 +96,7 @@ export default function KPICards() {
   return (
     <Row gutter={16} style={{ marginBottom: 24 }}>
       {kpiCards.map((card, index) => (
-        <Col key={index} xs={24} sm={12} md={12} lg={6}>
+        <Col key={index} xs={24} sm={12} xl={6}>
           <Card 
             className="kpi-card"
             style={{
@@ -119,11 +119,12 @@ export default function KPICards() {
                 }}>
                   {card.title}
                 </div>
-                <div style={{ 
-                  fontSize: 32, 
-                  fontWeight: 'bold', 
+                <div className="kpi-card-value" style={{
+                  fontSize: 28,
+                  fontWeight: 'bold',
                   color: '#0f172a',
-                  marginBottom: 8
+                  marginBottom: 8,
+                  whiteSpace: 'nowrap',
                 }}>
                   {card.prefix}
                   {' '}

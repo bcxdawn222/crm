@@ -16,7 +16,7 @@ const FunnelChart = dynamic(() => import('@/components/dashboard/FunnelChart'), 
 
 export default function DashboardPage() {
   return (
-    <div style={{ padding: 24 }}>
+    <div className="dashboard-page">
       {/* 第一层: KPI核心指标卡片 */}
       <KPICards />
       
