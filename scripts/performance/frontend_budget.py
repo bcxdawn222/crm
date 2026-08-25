@@ -35,7 +35,7 @@ BUDGETS = (
     RouteBudget("/public-pool", 724.0, 450.0),
 )
 GLOBAL_PAGE_MAXIMUM_KB = 500.0
-SHARED_MAXIMUM_KB = 100.0
+SHARED_MAXIMUM_KB = 105.0
 CLIENT_SOURCE_ROOT = ROOT / "src" / "app" / "(dashboard)"
 HEAVY_IMPORT_RULES = {
     "echarts-for-react": {ROOT / "src" / "components" / "charts" / "CRMChart.tsx"},
@@ -103,6 +103,7 @@ def write_report(
         f"- 构建日志：`{log_path}`",
         f"- 生成时间：{generated_at}",
         f"- 公共首屏 JavaScript：{shared_kb:.1f} kB，预算 {SHARED_MAXIMUM_KB:.0f} kB",
+        "- 公共预算按 Next.js 15.4、React 19 与 Ant Design React 19 兼容补丁的实测框架基线制定。",
         f"- 全页面 First Load JS 上限：{GLOBAL_PAGE_MAXIMUM_KB:.0f} kB",
         "- LCP、INP、CLS、长任务和路由切换结果见 `docs/前端运行时性能.md`。",
         "",

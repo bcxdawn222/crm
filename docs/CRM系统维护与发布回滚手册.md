@@ -136,7 +136,7 @@ python scripts\manage.py e2e --profile test
 
 当前门禁包括：
 
-- 公共首屏 JavaScript 不超过 100 kB；
+- 公共首屏 JavaScript 不超过 105 kB；该预算包含 React 19 的 Ant Design 兼容补丁；
 - 单页面 First Load JS 不超过 500 kB；
 - API p95 不超过 2000 ms；
 - 单请求 Prisma 查询数不超过 20；
