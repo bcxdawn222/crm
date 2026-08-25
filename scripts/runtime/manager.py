@@ -8,8 +8,9 @@ import subprocess
 import time
 from pathlib import Path
 
-from .process_identity import is_process_running, process_belongs_to_crm
-from .profile_config import ProfileConfig, validate_profile_isolated
+from .instance_state import InstanceRecord, write_instance_record
+from .process_identity import is_process_running
+from .profile_config import ProfileConfig
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -163,121 +164,22 @@ def _release_lock(config: ProfileConfig) -> None:
     config.lock_file.unlink(missing_ok=True)
 
 
-def _lock_pid(lock_file: Path) -> int | None:
-    if not lock_file.exists():
-        return None
-    for line in lock_file.read_text(encoding="utf-8", errors="replace").splitlines():
-        key, separator, value = line.partition("=")
-        if separator and key == "pid" and value.isdigit():
-            return int(value)
-    return None
-
-
-def _acquire_lock(config: ProfileConfig, pid: int) -> None:
+def _acquire_lock(config: ProfileConfig, pid: int | None = None) -> None:
+    """保留旧测试入口，同时使用实例记录格式进行原子加锁。"""
+    record = InstanceRecord(pid or os.getpid(), config.name, config.app_port, ROOT)
     try:
-        handle = config.lock_file.open("x", encoding="utf-8")
+        write_instance_record(config.lock_file, record, exclusive=True)
     except FileExistsError as error:
-        existing_pid = _lock_pid(config.lock_file)
-        if existing_pid is not None and is_process_running(existing_pid):
-            raise RuntimeError(f"{config.name} profile 已有实例锁，PID={existing_pid}") from error
-        config.lock_file.unlink(missing_ok=True)
-        handle = config.lock_file.open("x", encoding="utf-8")
-    with handle:
-        handle.write(f"pid={pid}\nprofile={config.name}\nport={config.app_port}\nroot={ROOT}\n")
+        raise RuntimeError(f"{config.name} profile 已有启动锁") from error
 
 
 def start_server(logger: logging.Logger, config: ProfileConfig) -> int:
-    validate_profile_isolated(config)
-    try:
-        _acquire_lock(config, os.getpid())
-    except RuntimeError as error:
-        logger.error("%s", error)
-        return 1
+    from .instance_manager import start_server as managed_start_server
 
-    database_result = start_database(logger, config)
-    if database_result != 0:
-        _release_lock(config)
-        return database_result
-    if config.pid_file.exists():
-        pid_text = config.pid_file.read_text(encoding="ascii", errors="ignore").strip()
-        if pid_text.isdigit() and is_process_running(int(pid_text)):
-            logger.error("%s profile PID 文件指向正在运行的进程，拒绝启动，PID=%s", config.name, pid_text)
-            _release_lock(config)
-            return 1
-        config.pid_file.unlink(missing_ok=True)
-    if is_port_open(config.app_host, config.app_port):
-        logger.error("端口 %s 已被占用，无法确认该进程属于当前项目", config.app_port)
-        _release_lock(config)
-        return 1
-
-    server_log_path = config.log_dir / "server.log"
-    server_log = server_log_path.open("a", encoding="utf-8")
-    creation_flags = 0
-    if os.name == "nt":
-        creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
-    npm_command = "npm.cmd" if os.name == "nt" else "npm"
-    profile_nextauth_url = os.environ.get(f"CRM_{config.name.upper()}_NEXTAUTH_URL", "")
-    if not profile_nextauth_url and config.name == "stable":
-        profile_nextauth_url = os.environ.get("NEXTAUTH_URL", "")
-    profile_nextauth_url = profile_nextauth_url or f"http://{config.app_host}:{config.app_port}"
-    try:
-        process = subprocess.Popen(
-            [npm_command, "run", "dev", "--", "--hostname", config.app_host, "--port", str(config.app_port)],
-            cwd=ROOT,
-            env={
-                **os.environ,
-                "CRM_PROFILE": config.name,
-                "CRM_UPLOAD_DIR": str(config.upload_dir),
-                "DATABASE_URL": config.database_url,
-                "NEXTAUTH_URL": profile_nextauth_url,
-            },
-            stdout=server_log,
-            stderr=subprocess.STDOUT,
-            creationflags=creation_flags,
-            start_new_session=os.name != "nt",
-        )
-    except OSError:
-        server_log.close()
-        _release_lock(config)
-        raise
-    server_log.close()
-    config.lock_file.write_text(f"pid={process.pid}\nprofile={config.name}\nport={config.app_port}\nroot={ROOT}\n", encoding="utf-8")
-    config.pid_file.write_text(str(process.pid), encoding="ascii")
-    deadline = time.monotonic() + 30
-    while time.monotonic() < deadline:
-        if is_port_open(config.app_host, config.app_port):
-            logger.info("服务已启动，profile=%s，PID=%s，日志=%s", config.name, process.pid, server_log_path)
-            return 0
-        if process.poll() is not None:
-            logger.error("服务进程提前退出，退出码=%s", process.returncode)
-            _log_server_tail(logger, config)
-            config.pid_file.unlink(missing_ok=True)
-            _release_lock(config)
-            return process.returncode or 1
-        time.sleep(0.5)
-    logger.error("服务在 30 秒内未监听端口 %s", config.app_port)
-    _log_server_tail(logger, config)
-    terminate_process_tree(process.pid)
-    config.pid_file.unlink(missing_ok=True)
-    _release_lock(config)
-    return 1
+    return managed_start_server(logger, config)
 
 
 def stop_server(logger: logging.Logger, config: ProfileConfig) -> int:
-    if not config.pid_file.exists():
-        logger.error("未找到 %s profile PID 文件: %s", config.name, config.pid_file)
-        return 1
-    pid_text = config.pid_file.read_text(encoding="ascii").strip()
-    if not pid_text.isdigit():
-        logger.error("PID 文件内容无效: %s", config.pid_file)
-        return 1
-    pid = int(pid_text)
-    if is_process_running(pid):
-        if not process_belongs_to_crm(pid):
-            logger.error("PID=%s 不属于当前 CRM 项目，拒绝终止", pid)
-            return 1
-        terminate_process_tree(pid)
-        logger.info("%s profile 服务已停止，PID=%s", config.name, pid)
-    config.pid_file.unlink(missing_ok=True)
-    _release_lock(config)
-    return 0
+    from .instance_manager import stop_server as managed_stop_server
+
+    return managed_stop_server(logger, config)

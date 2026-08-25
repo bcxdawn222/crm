@@ -325,3 +325,15 @@ conclusion: fail
 - `python scripts\manage.py data-flow --profile test`、`content-flow`、`data-reachability`、`routes`、`button-audit` 均退出码 0；真实数据链路通过，test 业务夹具为 0，外键孤儿、异常订单金额和负回款均为 0。
 - `python scripts\manage.py typecheck --profile stable` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260824-234421.log`；`python scripts\manage.py build --profile test` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260824-234434.log`。
 - test 服务已停止，PID 不存在、端口未监听、锁为 False。受项目“禁止子智能体”规则约束，本轮未调用独立 verifier，证据来自主流程实际执行。
+
+## Apply working evidence - 2026-08-25 单实例与进程生命周期
+
+- `python scripts\manage.py runtime-test --profile test` 退出码 0；旧的 profile 隔离检查和新的 `instance_flow_test.py` 均通过，后者共执行 10 项测试，覆盖排他锁、记录损坏、PID/锁不一致、外部 PID、陈旧记录、端口冲突、不可写运行目录、外部 PID 残留清理和启动失败清理。
+- `python scripts\manage.py instance-status --profile test` 在启动前显示 `stopped`，PID 不存在、端口未监听、锁为 False。
+- `python scripts\manage.py start --profile test` 退出码 0，真实 test 服务启动并监听 `3001`；状态检查显示 `running`，锁和 PID 记录包含 profile、PID、端口和项目根目录，监听 PID 属于 CRM 进程树。
+- 第二次执行 `python scripts\manage.py start --profile test` 退出码 1，日志明确显示 `test profile 已有实例`；启动前后 CRM 进程数量均为 3，没有创建第二棵进程树。
+- `python scripts\manage.py stop --profile test` 退出码 0；随后 `python scripts\manage.py instance-status --profile test` 显示 `stopped`，端口未监听、端口进程为空、锁为 False、PID 不存在。
+- `git diff --check` 退出码 0；本轮动态测试只使用 `test` profile，没有写入 stable 业务数据。测试日志位于 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\`。
+- 新增 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\scripts\deploy\ecosystem.config.mjs` 和 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\scripts\deploy\crm@.service`。模板静态检查确认 stable/test 分别使用 `3000/3001`、每个 profile `1` 个实例、`fork`、自动重启和 `/api/health` 检查；尚未在真实 PM2/systemd 主机上执行部署演练，因此该部分结论限于模板一致性检查。
+- 追加安全校验后，损坏记录或外部 PID 即使端口空闲，`stop` 也会返回非零并保留记录，不再自动接管无法确认归属的实例；进程枚举失败会转为不可确认状态，不会直接执行终止。
+- 修正启动管理进程的短生命周期识别：原子创建且字段匹配当前调用的锁记录可直接进入 `starting`，服务进程生成后仍必须通过 CRM 命令行、进程树和端口归属校验。修正后再次真实启动 test 成功，第二次启动退出码 1、进程数无增加，停止和最终状态检查均退出码 0。

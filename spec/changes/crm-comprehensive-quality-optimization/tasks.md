@@ -92,14 +92,14 @@
   - [x] 10.5 验证角色更新、用户停用和会话刷新后的权限生效时间，避免旧 JWT 长时间保留已撤销权限。
   - [x] 10.6 清理本阶段测试账户和临时文件，通过权限矩阵后提交 `fix: align CRM permissions across UI API and data scope`。
 
-- [ ] 11. 单实例与进程生命周期
+- [x] 11. 单实例与进程生命周期
   - [x] 11.1 用原子文件锁增强 PID 文件，记录 profile、PID、工作目录和端口；启动锁在创建服务进程前取得，避免启动竞态。
-  - [ ] 11.2 启动前校验进程身份、工作目录和端口归属，识别 PID 复用、其他项目占用和陈旧锁。
-  - [ ] 11.3 stable/test 各允许一个实例且端口不冲突；同 profile 第二次启动返回明确状态，不生成第二进程。
+  - [x] 11.2 启动前校验进程身份、工作目录和端口归属，识别 PID 复用、其他项目占用和陈旧锁；状态命令可输出 `foreign_pid`、`port_conflict`、`stale` 和 `corrupt`。
+  - [x] 11.3 stable/test 各允许一个实例且端口不冲突；同 profile 第二次启动返回明确状态，不生成第二进程；已通过真实 test 服务双启动验证。
   - [x] 11.4 停止时只终止经身份校验的当前项目进程树，拒绝依据陈旧 PID 误杀其他进程；已在真实 stable dev 进程上验证。
-  - [ ] 11.5 为异常退出、系统重启、锁损坏、端口占用和日志不可写增加自动化测试。
-  - [ ] 11.6 校验服务器 PM2/systemd 目标实例数、自动重启和健康检查策略与本地锁规则一致。
-  - [ ] 11.7 清理本阶段进程与锁文件，通过双启动测试后提交 `fix: enforce single CRM instance per release profile`。
+  - [x] 11.5 为异常退出、系统重启、锁损坏、端口占用和日志不可写增加自动化测试；`instance_flow_test.py` 覆盖锁互斥、记录损坏、PID/锁不一致、外部 PID、陈旧记录、端口冲突和启动失败清理。
+  - [x] 11.6 校验服务器 PM2/systemd 目标实例数、自动重启和健康检查策略与本地锁规则一致；新增 `ecosystem.config.mjs` 和 `crm@.service` 模板，均按 profile 单实例运行并检查 `/api/health`。
+  - [x] 11.7 清理本阶段进程与锁文件，通过双启动测试后提交 `fix: enforce single CRM instance per release profile`；本轮真实 test 服务已停止，状态为 `stopped`。
 
 - [ ] 12. Stable/Test 发布通道与服务端治理
   - [ ] 12.1 建立 stable/test 环境模板，仅提交变量名和说明，不提交真实密码、Cookie、数据库连接和 OSS 密钥。

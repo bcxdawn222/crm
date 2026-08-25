@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from uuid import uuid4
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -85,6 +86,17 @@ def get_profile_config(name: str) -> ProfileConfig:
         app_port = int(port_value)
     except ValueError as error:
         raise ValueError(f"CRM_{profile_name.upper()}_PORT 必须是数字") from error
+    if not 1 <= app_port <= 65535:
+        raise ValueError(f"CRM_{profile_name.upper()}_PORT 必须在 1 到 65535 之间")
+    other_name = "test" if profile_name == "stable" else "stable"
+    other_default = 3001 if other_name == "test" else 3000
+    other_port_value = os.environ.get(f"CRM_{other_name.upper()}_PORT", str(other_default))
+    try:
+        other_port = int(other_port_value)
+    except ValueError as error:
+        raise ValueError(f"CRM_{other_name.upper()}_PORT 必须是数字") from error
+    if app_port == other_port:
+        raise ValueError("stable 与 test profile 不能使用相同应用端口")
 
     profile_root = ROOT / ".runtime" / profile_name
     log_dir = ROOT / "logs" / profile_name
@@ -104,11 +116,22 @@ def get_profile_config(name: str) -> ProfileConfig:
 
 
 def validate_profile_isolated(config: ProfileConfig) -> None:
-    config.log_dir.mkdir(parents=True, exist_ok=True)
-    config.upload_dir.mkdir(parents=True, exist_ok=True)
-    config.pid_file.parent.mkdir(parents=True, exist_ok=True)
-    config.build_dir.mkdir(parents=True, exist_ok=True)
+    directories = (config.log_dir, config.upload_dir, config.pid_file.parent, config.build_dir)
+    for directory in directories:
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            raise ValueError(f"运行目录不可用: {directory}: {error}") from error
     if config.name == "test":
         stable_url = _stable_database_url()
         if stable_url and stable_url == config.database_url:
             raise ValueError("test profile 与 stable profile 使用了相同数据库连接")
+    for directory in directories:
+        probe = directory / f".crm-write-probe-{uuid4().hex}"
+        try:
+            with probe.open("x", encoding="ascii") as handle:
+                handle.write("ok")
+        except OSError as error:
+            raise ValueError(f"运行目录不可写: {directory}: {error}") from error
+        finally:
+            probe.unlink(missing_ok=True)

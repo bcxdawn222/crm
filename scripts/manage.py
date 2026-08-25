@@ -19,6 +19,7 @@ from runtime.manager import (
     stop_server,
     stop_database_direct,
 )
+from runtime.instance_state import inspect_instance
 from runtime.profile_config import ProfileConfig, get_profile_config
 from quality.route_contracts import run_route_check
 
@@ -130,6 +131,7 @@ def main() -> int:
             "data-reachability",
             "permission-matrix",
             *TEST_FLOW_SCRIPTS,
+            "instance-test",
             "runtime-test",
             "e2e",
             "perf",
@@ -152,7 +154,11 @@ def main() -> int:
         return 2
     os.environ["CRM_PROFILE"] = profile.name
     os.environ["DATABASE_URL"] = profile.database_url
-    logger = configure_logger(args.action, profile)
+    try:
+        logger = configure_logger(args.action, profile)
+    except OSError as error:
+        print(f"日志初始化失败: {error}", file=sys.stderr)
+        return 2
     logger.info(
         "当前 profile=%s，数据库=%s:%s，应用端口=%s",
         profile.name,
@@ -166,16 +172,16 @@ def main() -> int:
     if args.action == "stop":
         return stop_server(logger, profile)
     if args.action in {"status", "instance-status"}:
-        pid_state = "不存在"
-        if profile.pid_file.exists():
-            pid_state = profile.pid_file.read_text(encoding="ascii", errors="replace").strip()
-        port_state = "已监听" if is_port_open(profile.app_host, profile.app_port) else "未监听"
+        inspection = inspect_instance(profile)
         logger.info(
-            "profile=%s PID=%s 端口=%s 锁=%s",
+            "profile=%s 状态=%s PID=%s 端口=%s 端口进程=%s 锁=%s 详情=%s",
             profile.name,
-            pid_state,
-            port_state,
+            inspection.kind.value,
+            inspection.pid if inspection.pid is not None else "不存在",
+            "已监听" if is_port_open(profile.app_host, profile.app_port) else "未监听",
+            list(inspection.port_pids),
             profile.lock_file.exists(),
+            inspection.detail,
         )
         return 0
     if args.action == "dbstart":
@@ -258,8 +264,16 @@ def main() -> int:
         ]
         return run_sequence(((args.action, command),), logger)
     if args.action == "runtime-test":
-        command = [sys.executable, str(ROOT / "scripts" / "quality" / "runtime_checks.py")]
-        return run_sequence((("runtime-test", command),), logger)
+        return run_sequence(
+            (
+                ("runtime-test", (sys.executable, str(ROOT / "scripts" / "quality" / "runtime_checks.py"))),
+                ("instance-test", (sys.executable, str(ROOT / "scripts" / "quality" / "instance_flow_test.py"))),
+            ),
+            logger,
+        )
+    if args.action == "instance-test":
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "instance_flow_test.py")]
+        return run_sequence((("instance-test", command),), logger)
     if args.action in {"e2e", "perf", "release", "promote", "rollback"}:
         logger.error("动作已登记但尚未实现: %s", args.action)
         return 3

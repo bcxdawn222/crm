@@ -1,0 +1,21 @@
+[Unit]
+Description=CRM Next.js service (%i)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=crm
+Group=crm
+WorkingDirectory=/opt/crm-system
+EnvironmentFile=/etc/crm-system/%i.env
+ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port ${CRM_PORT}
+ExecStartPost=/usr/bin/curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1:${CRM_PORT}/api/health
+Restart=always
+RestartSec=5
+KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

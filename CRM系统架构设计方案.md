@@ -279,18 +279,21 @@ server {
 ### 5.4 PM2配置
 
 ```javascript
-// ecosystem.config.js
-module.exports = {
+// ecosystem.config.mjs
+export default {
   apps: [
     {
       name: 'crm-nextjs',
       script: 'node_modules/next/dist/bin/next',
       args: 'start',
-      instances: 2,
-      exec_mode: 'cluster',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
       env: {
         NODE_ENV: 'production',
         PORT: 3000,
+        CRM_PROFILE: 'stable',
       }
     }
   ]
