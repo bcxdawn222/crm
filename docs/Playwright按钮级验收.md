@@ -2,13 +2,14 @@
 
 ## 本轮结果
 
-- 生成时间：2026-08-25 16:01:33 +0800
+- 生成时间：2026-08-25 16:30:06 +0800
 - 运行环境：`CRM_PROFILE=test`
 - 数据库保护：仅允许数据库名以 `_test` 结尾
 - 浏览器：Chromium Desktop、Chromium Mobile（390px）
 - 结果：22 项通过，0 项未通过，共 22 项
 - 原始 JSON：`output/playwright/report.json`
 - 失败产物：`output/playwright/results/`，仅失败时保留 screenshot、video 和 trace
+- 执行日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-e2e-20260825-162755.log`
 
 ## 覆盖范围
 
@@ -54,3 +55,12 @@
 - 未对 stable 或线上数据库执行写操作，线上只允许发布后进行只读核对。
 - 本阶段覆盖 Chromium Desktop 和 390px Chromium Mobile；Firefox、WebKit 及更多尺寸仍属于最终发布验收范围。
 - E2E 不替代持续压力测试、依赖安全审计和真实 Nginx/PM2/systemd 主机演练，这些由后续任务单独验证。
+
+## 测试数据与清理结果
+
+- 本轮自动生成管理员、销售主管、销售和受限用户 4 类隔离账号，并生成 25 条销售客户及主管、管理员、公海客户等流程数据。
+- 所有测试数据只写入 `crm_system_test`，没有向 stable 或线上数据库写入测试数据。
+- 客户、订单、回款、跟进、文件、消息、合同、设置、公海、用户和角色流程均通过真实 API 与数据库断言，流程结束后自动清理夹具。
+- 最终数据库检查结果：`Customer`、`FollowUp`、`Lead`、`Order`、`Payment`、`File`、`Message`、`ContractArchive`、`SystemSetting` 均为 0；外键孤立项、异常订单金额和负回款均为 0。
+- 最终检查日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260825-163839.log`。
+- 测试服务已停止，PID 不存在，端口 `3001` 未监听，实例锁已清理。状态日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-instance-status-20260825-163839.log`。

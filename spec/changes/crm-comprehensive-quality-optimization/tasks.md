@@ -136,7 +136,7 @@
   - [x] 15.4 覆盖管理员、经理、销售和受限用户，验证隐藏按钮、403、数据范围和会话过期后的恢复。
   - [x] 15.5 覆盖空状态、加载、慢响应、断网、500、重复点击和浏览器刷新，失败保留 screenshot、video 和 trace。
   - [x] 15.6 将未通过或无法自动化的按钮列入报告，不允许通过跳过、mock 或硬编码响应冒充成功。
-  - [x] 15.7 清理测试文件和夹具，通过按钮 E2E 后提交 `test: cover CRM actions with browser and database assertions`。
+  - [x] 15.7 清理测试文件和夹具，通过按钮 E2E 后提交 `test: cover CRM actions with browser and database assertions`；2026-08-25 复跑 22/22 通过，数据库业务表归零，test 服务、端口、实例锁和 Playwright 状态文件均已清理。
 
 - [ ] 16. 长时间稳定性与性能压力测试
   - [ ] 16.1 用 k6 建立登录后只读列表、搜索、统计和健康检查的基础负载场景，不直接压测 stable 写接口。

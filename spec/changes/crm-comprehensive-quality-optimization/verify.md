@@ -397,3 +397,12 @@ conclusion: fail
 - 新增 `dashboard.visual.spec.ts`，以只读接口全零响应稳定复现原截图；断言标题仅出现一次、五个 `0个` 标签均可见、五层 SVG 宽度依次收窄且最窄层大于 70px。响应式用例覆盖 1440、1280、1024、768 和 390px，在 1024px 检出 KPI 四列挤出内容区后改为 1200px 以下两列、手机一列。
 - `python scripts\manage.py e2e --profile test` 最终 22 项全部通过，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-e2e-20260825-155930.log`；测试服务已停止，PID 和端口已清理。视觉截图经人工检查后从 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\output\playwright\visual` 清理，后续成功用例不再生成常驻截图。
 - `python scripts\manage.py typecheck --profile stable` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260825-160210.log`；`python scripts\manage.py build --profile test` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260825-160216.log`。
+
+## Apply working evidence - 2026-08-25 隔离测试数据与自动化复验
+
+- 测试夹具仅写入 `crm_system_test`：自动准备管理员、销售主管、销售、受限用户 4 类账号，25 条销售客户及主管、管理员、公海客户等业务数据；未向 stable 或线上数据库写入测试数据。
+- `python scripts\manage.py e2e --profile test` 共 22 项全部通过，覆盖客户新增、编辑、归档、删除、转移、公海认领、文件、权限、设置、会话恢复及 1440、1280、1024、768、390px 响应式布局；日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-e2e-20260825-162755.log`。
+- `data-flow`、`content-flow`、`user-flow`、`role-flow`、`settings-flow`、`public-pool-flow`、`scope-flow`、`permission-flow` 均退出码 0，各流程日志位于 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\`，并明确记录夹具已清理。
+- `network-session-flow` 首次因服务仍使用默认 8 小时会话而在等待 60 秒后得到 HTTP 200；这是测试环境未注入短会话参数，不是通过结果。test 服务以 `CRM_SESSION_MAX_AGE_SECONDS=60` 重启后再次真实等待 60 秒，接口返回 JSON 401，错误为“登录状态已过期”，响应体与 `x-request-id` 一致，退出码 0；最终日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-network-session-flow-20260825-163631.log`。
+- 最终 `python scripts\manage.py data-reachability --profile test` 退出码 0：`Customer`、`FollowUp`、`Lead`、`Order`、`Payment`、`File`、`Message`、`ContractArchive`、`SystemSetting` 均为 0，外键孤立项、异常订单金额和负回款均为 0；日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260825-163839.log`。
+- 最终 `python scripts\manage.py instance-status --profile test` 显示 `stopped`，PID 不存在、端口 `3001` 未监听、锁为 False；日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-instance-status-20260825-163839.log`。Playwright `.last-run.json` 状态文件已删除，`storage/test` 无测试上传残留。
