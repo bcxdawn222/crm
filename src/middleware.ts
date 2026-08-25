@@ -6,6 +6,21 @@ import { hasPageAccess } from '@/lib/access/page-access'
 // 公开路由(不需要认证)
 const publicRoutes = ['/login', '/api/auth', '/api/health']
 
+function externalOrigin(request: NextRequest, protocol: string): string {
+  const configuredUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL
+  if (configuredUrl) {
+    try {
+      return new URL(configuredUrl).origin
+    } catch {
+      // 配置错误时继续使用代理请求头，避免中间件直接中断。
+    }
+  }
+  const host = request.headers.get('x-forwarded-host')?.split(',')[0].trim()
+    || request.headers.get('host')
+    || request.nextUrl.host
+  return `${protocol}://${host}`
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   
@@ -33,12 +48,8 @@ export async function middleware(request: NextRequest) {
       response.headers.set('x-request-id', requestId)
       return response
     }
-    const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0].trim()
-      || request.headers.get('host')
-      || request.nextUrl.host
-    const externalOrigin = `${forwardedProtocol}://${forwardedHost}`
     const callbackUrl = `${request.nextUrl.pathname}${request.nextUrl.search}`
-    const loginUrl = new URL('/login', externalOrigin)
+    const loginUrl = new URL('/login', externalOrigin(request, forwardedProtocol))
     loginUrl.searchParams.set('callbackUrl', callbackUrl)
     return NextResponse.redirect(loginUrl)
   }
@@ -47,7 +58,10 @@ export async function middleware(request: NextRequest) {
     ? token.permissions.filter((permission): permission is string => typeof permission === 'string')
     : []
   if (!hasPageAccess(pathname, userPermissions)) {
-    return NextResponse.redirect(new URL('/403', request.url))
+    const forbiddenUrl = request.nextUrl.clone()
+    forbiddenUrl.pathname = '/403'
+    forbiddenUrl.search = ''
+    return NextResponse.redirect(forbiddenUrl)
   }
   
   return NextResponse.next()

@@ -129,6 +129,12 @@ interface CustomerImportResponse {
   data: { count: number }
 }
 
+interface CustomerFilters {
+  keyword: string
+  category?: string
+  status?: string
+}
+
 export default function CustomersPage() {
   const { roles } = usePermission()
   const [loading, setLoading] = useState(false)
@@ -150,6 +156,7 @@ export default function CustomersPage() {
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const formRequestIdRef = useRef('')
+  const listRequestSequenceRef = useRef(0)
   const customerDraft = useFormDraft<CustomerFormValues, CustomerDraft>({
     key: `customers:${editingCustomer?.id || 'create'}`,
     enabled: modalVisible,
@@ -184,24 +191,30 @@ export default function CustomersPage() {
   const canTransferCustomers = roles.includes('admin') || roles.includes('sales_manager')
 
   // 加载客户列表
-  const loadCustomers = async () => {
+  const loadCustomers = async (
+    targetPage = page,
+    filters: CustomerFilters = { keyword, category, status },
+  ) => {
+    const requestSequence = ++listRequestSequenceRef.current
     setLoading(true)
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
+        page: targetPage.toString(),
         pageSize: pageSize.toString(),
       })
-      if (keyword) params.append('keyword', keyword)
-      if (category) params.append('category', category)
-      if (status) params.append('status', status)
+      if (filters.keyword) params.append('keyword', filters.keyword)
+      if (filters.category) params.append('category', filters.category)
+      if (filters.status) params.append('status', filters.status)
 
       const data = await apiRequest<CustomerListResponse>(`/api/customers?${params}`)
+      if (requestSequence !== listRequestSequenceRef.current) return
       setCustomers(data.data.list)
       setTotal(data.data.total)
     } catch (error) {
+      if (requestSequence !== listRequestSequenceRef.current) return
       message.error(error instanceof Error ? error.message : '加载客户失败')
     } finally {
-      setLoading(false)
+      if (requestSequence === listRequestSequenceRef.current) setLoading(false)
     }
   }
 
@@ -215,15 +228,23 @@ export default function CustomersPage() {
 
   // 搜索
   const handleSearch = () => {
+    if (page === 1) {
+      void loadCustomers(1)
+      return
+    }
     setPage(1)
-    loadCustomers()
   }
 
   // 重置搜索
   const handleReset = () => {
+    const resetFilters: CustomerFilters = { keyword: '' }
     setKeyword('')
     setCategory(undefined)
     setStatus(undefined)
+    if (page === 1) {
+      void loadCustomers(1, resetFilters)
+      return
+    }
     setPage(1)
   }
 

@@ -15,23 +15,23 @@ export async function GET(request: Request) {
     const session = await auth()
     
     if (!session) {
-      return NextResponse.json({ error: '未登录或登录已过期' }, { status: 401 })
+      return jsonWithRequestId({ error: '未登录或登录已过期' }, requestId, { status: 401 })
     }
 
     // Check permissions
     const permissions = (session.user?.permissions as string[]) || []
     if (!Array.isArray(permissions) || permissions.length === 0) {
-      return NextResponse.json({ error: '当前账号未配置客户查看权限' }, { status: 403 })
+      return jsonWithRequestId({ error: '当前账号未配置客户查看权限' }, requestId, { status: 403 })
     }
     const ability = defineAbility(permissions)
     if (ability.cannot('read', 'customer')) {
-      return NextResponse.json({ error: '无权查看客户信息' }, { status: 403 })
+      return jsonWithRequestId({ error: '无权查看客户信息' }, requestId, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
     const pagination = parsePagination(searchParams)
     if (!pagination) {
-      return NextResponse.json({ error: 'Pagination parameters are invalid' }, { status: 400 })
+      return jsonWithRequestId({ error: '分页参数不正确' }, requestId, { status: 400 })
     }
     const { page, pageSize } = pagination
     const keyword = searchParams.get('keyword') || ''

@@ -39,6 +39,7 @@ TEST_FLOW_SCRIPTS = {
     "perf": "../performance/frontend_budget.py",
     "perf-runtime": "../performance/frontend_runtime.py",
     "api-perf": "../performance/api_database.py",
+    "e2e": "../e2e/run.py",
 }
 
 @dataclass(frozen=True)
@@ -130,7 +131,6 @@ def main() -> int:
             "instance-test",
             "release-test",
             "runtime-test",
-            "e2e",
             "release",
             "promote",
             "rollback",
@@ -278,10 +278,6 @@ def main() -> int:
         return run_sequence((("release-test", command),), logger)
     if args.action in {"release", "promote", "rollback"}:
         return run_release_action(args.action, profile, args.artifact, logger, run_sequence, ROOT)
-    if args.action == "e2e":
-        logger.error("动作已登记但尚未实现: %s", args.action)
-        return 3
-
     route_result = run_route_check(logger)
     if route_result != 0:
         return route_result

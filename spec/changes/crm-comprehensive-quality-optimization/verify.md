@@ -378,3 +378,14 @@ conclusion: fail
 - 类型检查第一次因开发服务占用 Prisma 查询引擎文件而发生 `EPERM`，失败日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260825-131640.log`；停止 test 服务释放文件后重跑退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260825-131704.log`。最终构建退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260825-131716.log`。
 - 最终 `python scripts\manage.py data-reachability --profile test` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260825-131841.log`；Customer、FollowUp、Lead、Order、Payment、File、Message、ContractArchive 均为 0，外键孤立项、异常订单金额和负回款均为 0。`git diff --check` 退出码 0，test 服务已停止。
 - 受项目“禁止子智能体”规则约束，本轮没有调用独立 verifier；以上证据均来自主流程实际执行的项目脚本、数据库检查和构建日志。任务 14.1 至 14.7 已完成。
+
+## Apply working evidence - 2026-08-25 Playwright 按钮级 E2E
+
+- 新增 `playwright.config.ts`、`tests/e2e/` 和 `scripts/e2e/`，统一入口为 `python scripts\manage.py e2e --profile test`。运行器强制 `CRM_PROFILE=test` 且数据库名以 `_test` 结尾，随机生成运行 ID、账号和临时密码，结束后停止 test 服务并清理认证状态、数据库夹具和测试文件。
+- 认证准备覆盖管理员、销售主管、销售和受限用户。删除侧边栏品牌区域后，首次重跑因认证夹具仍等待旧的 `CRM系统` 文案失败；已改为验证真实“仪表盘”菜单，并重新执行全部用例。
+- 最终 E2E 共 19 项全部通过，覆盖导航、搜索、重置、分页、客户新增/编辑/软删除/归档/转移/公海认领、文件上传/下载/删除、系统设置保存，以及按钮隐藏、API 403、页面 403、数据范围、会话撤销和重新登录。
+- 写操作同时断言页面反馈、HTTP、数据库终态与审计事件；真实服务端 500、重复点击、空状态、慢响应、断网恢复和浏览器刷新均已覆盖。未使用 `skip`、mock API 或硬编码成功响应，失败配置保留 screenshot、video、trace、HTML 和 JSON。
+- 最终日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-e2e-20260825-144615.log`，自动验收报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\Playwright按钮级验收.md`。最终 test 服务已停止，测试夹具已清理。
+- `python scripts\manage.py typecheck --profile stable` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260825-144502.log`。本阶段只覆盖 Chromium Desktop；移动端视觉回归保留给后续 UI 与最终发布验收任务。
+- 发布前最终门禁均退出码 0：构建日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260825-145006.log`，路由、按钮、数据可达性和单实例状态日志分别为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-routes-20260825-145111.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-button-audit-20260825-145111.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260825-145111.log`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-instance-status-20260825-145111.log`。`git diff --check` 无输出。
+- test 数据库保留的 2 条 `ROLE_UPDATED` 审计创建于 2026 年 8 月 24 日，不属于本轮 E2E；为保留历史记录未删除。Customer、FollowUp、Lead、Order、Payment、File、Message、ContractArchive 和 SystemSetting 均为 0，外键孤立项、异常订单金额和负回款均为 0。
