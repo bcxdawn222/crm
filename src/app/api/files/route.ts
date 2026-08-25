@@ -6,6 +6,7 @@ import { auth } from '@/lib/auth'
 import { defineAbility } from '@/lib/casl'
 import { removeSharedFile, storeSharedFile } from '@/lib/files/storage'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { writeServerError } from '@/lib/logger'
 import { parsePagination } from '@/lib/http/pagination'
 import { prisma } from '@/lib/prisma'
 import { getAccessibleUserIds } from '@/lib/data-permission'
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
       try {
         await removeSharedFile(storedKey)
       } catch (cleanupError) {
-        console.error('清理上传失败文件时出错', cleanupError)
+        await writeServerError('POST /api/files cleanup', cleanupError, requestId)
       }
     }
     return serverErrorResponse(error, 'POST /api/files', requestId)

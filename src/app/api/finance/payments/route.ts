@@ -21,6 +21,7 @@ const createPaymentSchema = z.object({
 
 // GET /api/finance/payments - Get payment list
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     
@@ -121,8 +122,7 @@ export async function GET(request: Request) {
       }
     })
   } catch (error) {
-    console.error('Failed to get payment list:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/finance/payments', requestId)
   }
 }
 

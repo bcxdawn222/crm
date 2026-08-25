@@ -5,9 +5,11 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
 import { buildDataFilter, getAccessibleUserIds } from '@/lib/data-permission'
+import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
 
 // GET /api/statistics/trend - 获取业绩趋势分析
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     
@@ -172,7 +174,6 @@ export async function GET(request: Request) {
       }
     })
   } catch (error) {
-    console.error('Failed to get trend analysis:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/statistics/trend', requestId)
   }
 }

@@ -85,8 +85,7 @@ export async function GET(
       data: customer
     })
   } catch (error) {
-    console.error('获取客户详情失败:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/customers/[id]', requestId)
   }
 }
 

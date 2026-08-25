@@ -5,9 +5,11 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
 import { buildDataFilter } from '@/lib/data-permission'
+import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
 
 // GET /api/reminders/disabled - Get list of customers with disabled reminders
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     
@@ -66,7 +68,6 @@ export async function GET(request: Request) {
       data: formattedList,
     })
   } catch (error) {
-    console.error('Failed to get disabled reminders:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/reminders/disabled', requestId)
   }
 }

@@ -3,9 +3,11 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
 
 // GET /api/public-pool/quota - 获取用户公海池认领配额状态
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     
@@ -91,7 +93,6 @@ export async function GET(request: Request) {
       }
     })
   } catch (error) {
-    console.error('Failed to get quota:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/public-pool/quota', requestId)
   }
 }

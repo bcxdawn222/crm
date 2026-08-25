@@ -3,9 +3,11 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
 import { buildDataFilter } from '@/lib/data-permission'
+import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
 
 // POST /api/reminders/disable - Disable reminders for a customer
 export async function POST(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     
@@ -60,7 +62,6 @@ export async function POST(request: Request) {
       }
     })
   } catch (error) {
-    console.error('Failed to disable reminders:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'POST /api/reminders/disable', requestId)
   }
 }

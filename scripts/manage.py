@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Sequence
 
 sys.dont_write_bytecode = True
-
 from runtime.manager import (
     is_port_open,
     start_database,
@@ -20,10 +19,9 @@ from runtime.manager import (
     stop_database_direct,
 )
 from runtime.instance_state import inspect_instance
+from runtime.release_actions import run_release_action
 from runtime.profile_config import ProfileConfig, get_profile_config
 from quality.route_contracts import run_route_check
-
-
 ROOT = Path(__file__).resolve().parents[1]
 LOG_DIR = ROOT / "logs"
 TEST_FLOW_SCRIPTS = {
@@ -36,6 +34,8 @@ TEST_FLOW_SCRIPTS = {
     "scope-flow": "scope_flow_test.py",
     "network-session-flow": "network_session_flow_test.py",
     "permission-flow": "permission_flow_test.py",
+    "server-governance": "server_governance.py",
+    "server-runtime-drill": "server_runtime_drill.py",
 }
 
 
@@ -43,8 +43,6 @@ TEST_FLOW_SCRIPTS = {
 class CommandResult:
     name: str
     return_code: int
-
-
 def configure_logger(action: str, profile: ProfileConfig) -> logging.Logger:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -64,8 +62,6 @@ def configure_logger(action: str, profile: ProfileConfig) -> logging.Logger:
     logger.addHandler(stream_handler)
     logger.info("日志文件: %s", log_path)
     return logger
-
-
 def run_command(name: str, command: Sequence[str], logger: logging.Logger) -> CommandResult:
     executable_command = list(command)
     if os.name == "nt" and executable_command[0] in {"npm", "npx"}:
@@ -89,8 +85,6 @@ def run_command(name: str, command: Sequence[str], logger: logging.Logger) -> Co
     return_code = process.wait()
     logger.info("%s 退出码: %s", name, return_code)
     return CommandResult(name=name, return_code=return_code)
-
-
 def run_sequence(commands: Sequence[tuple[str, Sequence[str]]], logger: logging.Logger) -> int:
     for name, command in commands:
         result = run_command(name, command, logger)
@@ -132,6 +126,7 @@ def main() -> int:
             "permission-matrix",
             *TEST_FLOW_SCRIPTS,
             "instance-test",
+            "release-test",
             "runtime-test",
             "e2e",
             "perf",
@@ -145,6 +140,10 @@ def main() -> int:
         "--skip-db",
         action="store_true",
         help="audit-data 仅检查迁移目录和备份，不连接数据库",
+    )
+    parser.add_argument(
+        "--artifact",
+        help="promote/rollback 使用的发布压缩包路径",
     )
     args = parser.parse_args()
     try:
@@ -274,7 +273,12 @@ def main() -> int:
     if args.action == "instance-test":
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "instance_flow_test.py")]
         return run_sequence((("instance-test", command),), logger)
-    if args.action in {"e2e", "perf", "release", "promote", "rollback"}:
+    if args.action == "release-test":
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "release_flow_test.py")]
+        return run_sequence((("release-test", command),), logger)
+    if args.action in {"release", "promote", "rollback"}:
+        return run_release_action(args.action, profile, args.artifact, logger, run_sequence, ROOT)
+    if args.action in {"e2e", "perf"}:
         logger.error("动作已登记但尚未实现: %s", args.action)
         return 3
 

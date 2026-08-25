@@ -6,9 +6,11 @@ import { parsePagination } from '@/lib/http/pagination'
 import { canCreateTask, findTaskAssigneeWithinScope } from '@/lib/tasks/assignee-scope'
 import { Prisma, TaskPriority, TaskStatus } from '@prisma/client'
 import { getAccessibleUserIds } from '@/lib/data-permission'
+import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
 
 // GET /api/tasks - Get task list
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     
@@ -104,13 +106,13 @@ export async function GET(request: Request) {
       }
     })
   } catch (error) {
-    console.error('Failed to get task list:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/tasks', requestId)
   }
 }
 
 // POST /api/tasks - Create task
 export async function POST(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     
@@ -180,7 +182,6 @@ export async function POST(request: Request) {
       message: 'Task created successfully'
     })
   } catch (error) {
-    console.error('Failed to create task:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'POST /api/tasks', requestId)
   }
 }

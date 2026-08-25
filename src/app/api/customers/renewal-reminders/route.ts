@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { defineAbility } from '@/lib/casl'
 import { buildDataFilter } from '@/lib/data-permission'
+import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { prisma } from '@/lib/prisma'
 
 
@@ -16,6 +17,7 @@ const querySchema = z.object({
 
 
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     if (!session) {
@@ -55,7 +57,6 @@ export async function GET(request: Request) {
       message: `Found ${customers.length} customers with expiring contracts`,
     })
   } catch (error) {
-    console.error('Failed to get renewal reminders:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/customers/renewal-reminders', requestId)
   }
 }

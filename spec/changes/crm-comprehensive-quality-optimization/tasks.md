@@ -101,15 +101,15 @@
   - [x] 11.6 校验服务器 PM2/systemd 目标实例数、自动重启和健康检查策略与本地锁规则一致；新增 `ecosystem.config.mjs` 和 `crm@.service` 模板，均按 profile 单实例运行并检查 `/api/health`。
   - [x] 11.7 清理本阶段进程与锁文件，通过双启动测试后提交 `fix: enforce single CRM instance per release profile`；本轮真实 test 服务已停止，状态为 `stopped`。
 
-- [ ] 12. Stable/Test 发布通道与服务端治理
-  - [ ] 12.1 建立 stable/test 环境模板，仅提交变量名和说明，不提交真实密码、Cookie、数据库连接和 OSS 密钥。
-  - [ ] 12.2 分离构建产物、上传目录、日志、PID/锁、端口、域名或路径，并在 Nginx/进程服务配置中显式标识 profile。
-  - [x] 12.3 实现 `/api/health` 和受保护的深度检查，覆盖版本、profile、运行时长、数据库和存储状态且不泄露敏感信息；迁移状态检查待数据库恢复后补充。
-  - [ ] 12.4 统一服务端 `requestId`、结构化错误、审计和日志，逐步替换 Route Handler 中不一致的中英文错误与裸异常。
-  - [ ] 12.5 `release` 生成带版本、提交、构建时间和迁移清单的产物；`promote` 只接受已通过门禁的 test 产物。
-  - [ ] 12.6 `rollback` 恢复上一 stable 构建和兼容配置，数据库只执行事先验证的恢复方案，不自动删除业务数据。
-  - [ ] 12.7 演练服务重启、健康检查失败、数据库不可达、存储不可达和回滚，确认日志与告警可定位。
-  - [ ] 12.8 清理本阶段临时发布物，通过发布演练后提交 `feat: separate stable test releases and govern server runtime`。
+- [x] 12. Stable/Test 发布通道与服务端治理
+  - [x] 12.1 建立 stable/test 脱敏环境模板，只保留变量名、用途和占位符，真实密码、Cookie、数据库连接及 OSS 密钥不进入仓库。
+  - [x] 12.2 分离构建产物、上传目录、日志、PID/锁、端口和访问域名；Nginx、PM2、systemd 模板均显式标记 profile。
+  - [x] 12.3 `/api/health` 覆盖版本、提交、profile、运行时长和数据库；受保护的深度检查增加存储与 Prisma 迁移名称比对，异常返回 503 且不泄露连接信息。
+  - [x] 12.4 所有捕获未知异常的 Route Handler 统一进入 `serverErrorResponse`，返回通用错误和 `requestId`，完整异常写入文件日志；业务异常保留明确类型、状态码与 code。
+  - [x] 12.5 `release` 先执行类型与生产构建门禁，再生成带版本、提交、构建时间、迁移清单、文件清单和 SHA256 的 test/stable 产物；缺失或损坏校验文件会被拒绝。
+  - [x] 12.6 `promote` 只接受 test 产物并记录 current/previous stable 状态；`rollback` 只允许切回上一 stable 产物，数据库不自动回滚或删除业务数据。
+  - [x] 12.7 在临时 test 端口完成健康、深度健康、服务重启、数据库不可达和存储不可达真实 HTTP 演练；发布测试覆盖两次 promote 后回滚到 previous。PM2/systemd/Nginx 在本机只做模板静态校验。
+  - [x] 12.8 临时服务与端口已清理，`.build` 发布物保持 Git 忽略，通过发布、路由、服务治理、数据审计、类型和生产构建检查后提交 `feat: separate stable test releases and govern server runtime`。
 
 - [ ] 13. 前端性能优化
   - [ ] 13.1 重新测量各页面 First Load JS、路由切换、LCP、INP、CLS 和长任务，按真实环境建立预算。

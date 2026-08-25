@@ -42,22 +42,23 @@ def configure_logger() -> logging.Logger:
 
 
 def read_database_target() -> DatabaseTarget:
-    env_path = ROOT / ".env.local"
-    for line in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if not line.startswith("DATABASE_URL="):
-            continue
-        value = line.split("=", 1)[1].strip().strip('"').strip("'")
-        parsed = urlsplit(value)
-        if parsed.scheme not in {"mysql", "mariadb"} or not parsed.path:
-            raise RuntimeError("DATABASE_URL 不是有效的 MariaDB/MySQL 地址")
-        return DatabaseTarget(
-            parsed.hostname or "127.0.0.1",
-            parsed.port or 3306,
-            unquote(parsed.username or ""),
-            unquote(parsed.password or ""),
-            parsed.path.lstrip("/"),
-        )
-    raise RuntimeError(f"未在 {env_path} 中找到 DATABASE_URL")
+    value = os.environ.get("DATABASE_URL", "").strip().strip('"').strip("'")
+    if not value:
+        env_path = ROOT / ".env.local"
+        for line in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.startswith("DATABASE_URL="):
+                value = line.split("=", 1)[1].strip().strip('"').strip("'")
+                break
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"mysql", "mariadb"} or not parsed.path:
+        raise RuntimeError("DATABASE_URL 不是有效的 MariaDB/MySQL 地址")
+    return DatabaseTarget(
+        parsed.hostname or "127.0.0.1",
+        parsed.port or 3306,
+        unquote(parsed.username or ""),
+        unquote(parsed.password or ""),
+        parsed.path.lstrip("/"),
+    )
 
 
 def run_sql(target: DatabaseTarget, sql: str) -> str:

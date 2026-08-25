@@ -96,8 +96,7 @@ export async function GET(
       }
     })
   } catch (error) {
-    console.error('获取订单详情失败:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/finance/orders/[id]', requestId)
   }
 }
 

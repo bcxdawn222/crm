@@ -6,9 +6,11 @@ import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
 import { Prisma } from '@prisma/client'
 import { buildDataFilter, canAccessSalesData } from '@/lib/data-permission'
+import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
 
 // GET /api/daily-leads - 获取每日新增客资统计
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     
@@ -74,8 +76,7 @@ export async function GET(request: Request) {
       pageSize
     })
   } catch (error) {
-    console.error('Failed to get daily leads:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/daily-leads', requestId)
   }
 }
 

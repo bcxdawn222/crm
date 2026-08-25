@@ -3,9 +3,11 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getAccessibleUserIds } from '@/lib/data-permission'
 import { Prisma } from '@prisma/client'
+import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
 
 // GET /api/daily-reports - Get daily report list
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     
@@ -83,13 +85,13 @@ export async function GET(request: Request) {
       }
     })
   } catch (error) {
-    console.error('Failed to get daily report list:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/daily-reports', requestId)
   }
 }
 
 // POST /api/daily-reports - Create daily report
 export async function POST(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     
@@ -131,7 +133,6 @@ export async function POST(request: Request) {
       message: 'Daily report created successfully'
     })
   } catch (error) {
-    console.error('Failed to create daily report:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'POST /api/daily-reports', requestId)
   }
 }

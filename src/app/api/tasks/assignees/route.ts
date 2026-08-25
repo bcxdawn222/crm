@@ -5,10 +5,12 @@ export const dynamic = 'force-dynamic'
 
 import { auth } from '@/lib/auth'
 import { parsePagination } from '@/lib/http/pagination'
+import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { prisma } from '@/lib/prisma'
 import { buildTaskAssigneeWhere, canCreateTask } from '@/lib/tasks/assignee-scope'
 
 export async function GET(request: Request) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     if (!session) {
@@ -76,7 +78,6 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.error('Failed to get task assignees:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return serverErrorResponse(error, 'GET /api/tasks/assignees', requestId)
   }
 }
