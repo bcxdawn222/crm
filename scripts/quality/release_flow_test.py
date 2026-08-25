@@ -38,6 +38,12 @@ def check_deploy_templates() -> None:
     require("<stable 数据库连接>" in environment and "<test 数据库连接>" in environment, "环境模板未区分 stable/test")
 
 
+def check_release_payload_contract() -> None:
+    included = {path.relative_to(ROOT).as_posix() for path in release.required_paths()}
+    require("prisma/schema.prisma" in included, "发布包缺少 Prisma schema，无法在服务器生成 Client")
+    require("next.config.js" in included, "发布包缺少 Next.js 运行配置")
+
+
 def write_artifact(root: Path, release_id: str, commit: str) -> tuple[Path, release.ReleaseManifest]:
     archive = root / ".build" / "test" / "release" / f"{release_id}.zip"
     archive.parent.mkdir(parents=True, exist_ok=True)
@@ -60,6 +66,7 @@ def write_artifact(root: Path, release_id: str, commit: str) -> tuple[Path, rele
 
 def main() -> int:
     check_deploy_templates()
+    check_release_payload_contract()
     with tempfile.TemporaryDirectory(prefix="crm-release-flow-") as directory:
         root = Path(directory)
         previous_root = release.ROOT

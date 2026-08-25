@@ -85,9 +85,11 @@ def release_paths(profile: str, release_id: str) -> tuple[Path, Path]:
 def required_paths() -> tuple[Path, ...]:
     return (
         ROOT / ".next",
+        ROOT / "next.config.js",
         ROOT / "package.json",
         ROOT / "package-lock.json",
         ROOT / "public",
+        ROOT / "prisma" / "schema.prisma",
         ROOT / "prisma" / "migrations",
         ROOT / "scripts" / "manage.py",
         ROOT / "scripts" / "runtime",
