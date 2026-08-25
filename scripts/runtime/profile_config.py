@@ -18,6 +18,8 @@ class ProfileConfig:
     database_url: str
     database_host: str
     database_port: int
+    auth_url: str
+    auth_secret: str
     upload_dir: Path
     log_dir: Path
     pid_file: Path
@@ -70,6 +72,41 @@ def _required_database_url(profile_name: str) -> str:
     return value
 
 
+def _required_auth_secret(profile_name: str) -> str:
+    stable_secret = (
+        os.environ.get("CRM_STABLE_NEXTAUTH_SECRET", "").strip()
+        or _read_file_env_value("CRM_STABLE_NEXTAUTH_SECRET")
+        or _read_file_env_value("NEXTAUTH_SECRET")
+    )
+    if profile_name == "stable":
+        value = stable_secret
+    else:
+        value = _read_env_value("CRM_TEST_NEXTAUTH_SECRET")
+        if not value:
+            raise ValueError("test profile 必须配置 CRM_TEST_NEXTAUTH_SECRET，不能复用稳定版认证密钥")
+        if stable_secret and value == stable_secret:
+            raise ValueError("CRM_TEST_NEXTAUTH_SECRET 不能与稳定版认证密钥相同")
+    if len(value) < 32:
+        raise ValueError(f"{profile_name} profile 的认证密钥长度不能少于 32 个字符")
+    return value
+
+
+def _required_auth_url(profile_name: str, host: str, port: int) -> str:
+    if profile_name == "stable":
+        value = (
+            os.environ.get("CRM_STABLE_NEXTAUTH_URL", "").strip()
+            or _read_file_env_value("CRM_STABLE_NEXTAUTH_URL")
+            or _read_file_env_value("NEXTAUTH_URL")
+        )
+    else:
+        value = _read_env_value("CRM_TEST_NEXTAUTH_URL")
+    value = value or f"http://{host}:{port}"
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError(f"{profile_name} profile 的认证地址必须是有效且不含凭据的 HTTP(S) URL")
+    return value.rstrip("/")
+
+
 def get_profile_config(name: str) -> ProfileConfig:
     profile_name = name.strip().lower()
     if profile_name not in {"stable", "test"}:
@@ -98,15 +135,18 @@ def get_profile_config(name: str) -> ProfileConfig:
     if app_port == other_port:
         raise ValueError("stable 与 test profile 不能使用相同应用端口")
 
+    app_host = os.environ.get(f"CRM_{profile_name.upper()}_HOST", "127.0.0.1")
     profile_root = ROOT / ".runtime" / profile_name
     log_dir = ROOT / "logs" / profile_name
     return ProfileConfig(
         name=profile_name,
-        app_host=os.environ.get(f"CRM_{profile_name.upper()}_HOST", "127.0.0.1"),
+        app_host=app_host,
         app_port=app_port,
         database_url=database_url,
         database_host=parsed.hostname,
         database_port=parsed.port or 3306,
+        auth_url=_required_auth_url(profile_name, app_host, app_port),
+        auth_secret=_required_auth_secret(profile_name),
         upload_dir=Path(os.environ.get(f"CRM_{profile_name.upper()}_UPLOAD_DIR", str(ROOT / "storage" / profile_name))),
         log_dir=log_dir,
         pid_file=profile_root / "server.pid",

@@ -6,7 +6,7 @@ echo ========================================
 echo.
 
 REM Set environment variable
-set DATABASE_URL=mysql://root:REDACTED_c68d10500c05@localhost:3306/crm_system
+set DATABASE_URL=%CRM_TEST_DATABASE_URL%
 
 echo [1/3] Checking MySQL connection...
 node -e "const {PrismaClient} = require('@prisma/client'); const p = new PrismaClient(); p.$connect().then(() => { console.log('✓ MySQL connected'); process.exit(0); }).catch(e => { console.error('✗ MySQL connection failed:', e.message); process.exit(1); });"

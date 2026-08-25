@@ -1,4 +1,4 @@
 @echo off
-set DATABASE_URL=mysql://root:REDACTED_c68d10500c05@localhost:3306/crm_system
+set DATABASE_URL=%CRM_TEST_DATABASE_URL%
 node -r ts-node/register comprehensive-test.ts
 pause

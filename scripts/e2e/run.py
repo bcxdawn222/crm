@@ -22,11 +22,11 @@ def run(command: list[str], environment: dict[str, str]) -> int:
     return subprocess.run(executable, cwd=ROOT, env=environment, check=False).returncode
 
 
-def manage(action: str, environment: dict[str, str]) -> int:
-    return run(
-        [sys.executable, str(ROOT / "scripts" / "manage.py"), action, "--profile", "test"],
-        environment,
-    )
+def manage(action: str, environment: dict[str, str], *, mode: str | None = None) -> int:
+    command = [sys.executable, str(ROOT / "scripts" / "manage.py"), action, "--profile", "test"]
+    if mode:
+        command.extend(("--mode", mode))
+    return run(command, environment)
 
 
 def main() -> int:
@@ -52,7 +52,9 @@ def main() -> int:
 
     manage("stop", environment)
     try:
-        if manage("start", environment) != 0:
+        if manage("build", environment) != 0:
+            return 1
+        if manage("start", environment, mode="production") != 0:
             return 1
         test_code = run(
             ["npx", "playwright", "test", "--config", "playwright.config.ts"],

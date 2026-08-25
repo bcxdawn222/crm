@@ -145,10 +145,6 @@ def start_server(
         if os.name == "nt":
             creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
         npm_command = "npm.cmd" if os.name == "nt" else "npm"
-        nextauth_url = os.environ.get(f"CRM_{config.name.upper()}_NEXTAUTH_URL", "")
-        if not nextauth_url and config.name == "stable":
-            nextauth_url = os.environ.get("NEXTAUTH_URL", "")
-        nextauth_url = nextauth_url or f"http://{config.app_host}:{config.app_port}"
         process: subprocess.Popen[bytes] | None = None
         npm_script = "start" if mode == "production" else "dev"
         with server_log_path.open("a", encoding="utf-8") as server_log:
@@ -160,9 +156,11 @@ def start_server(
                     "CRM_PROFILE": config.name,
                     "CRM_UPLOAD_DIR": str(config.upload_dir),
                     "DATABASE_URL": config.database_url,
-                    "AUTH_URL": nextauth_url,
+                    "AUTH_SECRET": config.auth_secret,
+                    "AUTH_URL": config.auth_url,
                     "AUTH_TRUST_HOST": os.environ.get("AUTH_TRUST_HOST", "true"),
-                    "NEXTAUTH_URL": nextauth_url,
+                    "NEXTAUTH_SECRET": config.auth_secret,
+                    "NEXTAUTH_URL": config.auth_url,
                 },
                 stdout=server_log,
                 stderr=subprocess.STDOUT,

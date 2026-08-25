@@ -26,7 +26,7 @@ cp .env.example .env.local
 
 编辑 `.env.local`:
 ```env
-DATABASE_URL="mysql://root:你的密码@localhost:3306/crm_system"
+DATABASE_URL="mysql://root:<数据库密码>@localhost:3306/crm_system"
 NEXTAUTH_SECRET="任意随机字符串用于加密session"
 NEXTAUTH_URL="http://localhost:3000"
 ENCRYPTION_KEY="32字节的加密密钥,用于敏感数据加密"

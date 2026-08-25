@@ -71,7 +71,7 @@
 或者手动执行:
 
 ```powershell
-$env:DATABASE_URL = "mysql://root:REDACTED_c68d10500c05@localhost:3306/crm_system"
+$env:DATABASE_URL = "mysql://root:<数据库密码>@localhost:3306/crm_system"
 node generate-all-test-data.js
 ```
 

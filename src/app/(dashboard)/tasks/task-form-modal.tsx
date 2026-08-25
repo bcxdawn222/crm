@@ -59,7 +59,7 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
   const [isLoadingAssignees, setIsLoadingAssignees] = useState(false)
   const [assigneeLoadError, setAssigneeLoadError] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestSequenceRef = useRef(0)
   const submissionIdRef = useRef('')
   const isSales = session?.user.roles.includes('sales') ?? false

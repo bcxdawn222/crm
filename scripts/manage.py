@@ -3,14 +3,12 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import subprocess
 import sys
-from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Sequence
 
 sys.dont_write_bytecode = True
+from cli.command_runner import configure_logger, run_sequence as execute_sequence
 from runtime.manager import (
     is_port_open,
     start_database,
@@ -23,7 +21,6 @@ from runtime.release_actions import run_release_action
 from runtime.profile_config import ProfileConfig, get_profile_config
 from quality.route_contracts import run_route_check
 ROOT = Path(__file__).resolve().parents[1]
-LOG_DIR = ROOT / "logs"
 TEST_FLOW_SCRIPTS = {
     "data-flow": "data_flow_test.py",
     "content-flow": "content_flow_test.py",
@@ -40,61 +37,12 @@ TEST_FLOW_SCRIPTS = {
     "perf-runtime": "../performance/frontend_runtime.py",
     "api-perf": "../performance/api_database.py",
     "stability": "../performance/stability.py",
+    "security-flow": "security_flow_test.py",
     "e2e": "../e2e/run.py",
 }
 
-@dataclass(frozen=True)
-class CommandResult:
-    name: str
-    return_code: int
-def configure_logger(action: str, profile: ProfileConfig) -> logging.Logger:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    profile.log_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_path = profile.log_dir / f"manage-{action}-{timestamp}.log"
-    logger = logging.getLogger("crm-manage")
-    logger.handlers.clear()
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-
-    file_handler = logging.FileHandler(log_path, encoding="utf-8")
-    file_handler.setFormatter(formatter)
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    logger.addHandler(stream_handler)
-    logger.info("日志文件: %s", log_path)
-    return logger
-def run_command(name: str, command: Sequence[str], logger: logging.Logger) -> CommandResult:
-    executable_command = list(command)
-    if os.name == "nt" and executable_command[0] in {"npm", "npx"}:
-        executable_command[0] = f"{executable_command[0]}.cmd"
-    logger.info("执行 %s: %s", name, " ".join(executable_command))
-    child_env = os.environ.copy()
-    child_env.setdefault("PYTHONIOENCODING", "utf-8")
-    process = subprocess.Popen(
-        executable_command,
-        cwd=ROOT,
-        env=child_env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    assert process.stdout is not None
-    for line in process.stdout:
-        logger.info("[%s] %s", name, line.rstrip())
-    return_code = process.wait()
-    logger.info("%s 退出码: %s", name, return_code)
-    return CommandResult(name=name, return_code=return_code)
 def run_sequence(commands: Sequence[tuple[str, Sequence[str]]], logger: logging.Logger) -> int:
-    for name, command in commands:
-        result = run_command(name, command, logger)
-        if result.return_code != 0:
-            return result.return_code
-    return 0
+    return execute_sequence(commands, logger, ROOT)
 
 
 def main() -> int:
@@ -121,6 +69,7 @@ def main() -> int:
             "dbstop",
             "audit",
             "audit-data",
+            "security",
             "start",
             "stop",
             "status",
@@ -154,6 +103,10 @@ def main() -> int:
         return 2
     os.environ["CRM_PROFILE"] = profile.name
     os.environ["DATABASE_URL"] = profile.database_url
+    os.environ["AUTH_SECRET"] = profile.auth_secret
+    os.environ["NEXTAUTH_SECRET"] = profile.auth_secret
+    os.environ["AUTH_URL"] = profile.auth_url
+    os.environ["NEXTAUTH_URL"] = profile.auth_url
     try:
         logger = configure_logger(args.action, profile)
     except OSError as error:
@@ -245,6 +198,12 @@ def main() -> int:
         return run_sequence(
             (("audit-data", command),), logger
         )
+    if args.action == "security":
+        if profile.name != "test":
+            logger.error("security 只允许 --profile test")
+            return 2
+        command = [sys.executable, str(ROOT / "scripts" / "quality" / "security_audit.py")]
+        return run_sequence((("security", command),), logger)
     if args.action == "button-audit":
         command = [sys.executable, str(ROOT / "scripts" / "quality" / "button_audit.py")]
         return run_sequence((("button-audit", command),), logger)

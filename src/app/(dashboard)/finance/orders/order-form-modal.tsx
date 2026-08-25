@@ -61,7 +61,7 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false)
   const [customerLoadError, setCustomerLoadError] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestSequenceRef = useRef(0)
   const submissionIdRef = useRef('')
   const draft = useFormDraft<OrderFormValues, OrderDraft>({

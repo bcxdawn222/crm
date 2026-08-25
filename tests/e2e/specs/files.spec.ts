@@ -7,7 +7,10 @@ import { prisma } from '../support/database'
 import { antText, expectSuccessMessage, tableRow } from '../support/ui'
 
 
-const fileBytes = Buffer.from(`CRM E2E file ${runId}\n`, 'utf8')
+const fileBytes = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+)
 
 test.describe('文件共享按钮', () => {
   test.use({ storageState: authStatePath('admin') })

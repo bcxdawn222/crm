@@ -39,7 +39,7 @@
    
    创建 `.env` 文件:
    ```env
-   DATABASE_URL="mysql://root:REDACTED_c68d10500c05@localhost:3306/crm_system"
+   DATABASE_URL="mysql://root:<数据库密码>@localhost:3306/crm_system"
    NEXTAUTH_SECRET="your-secret-key-here"
    NEXTAUTH_URL="http://localhost:3008"
    ```
@@ -422,7 +422,7 @@ cp .env.example .env.local
 
 编辑 `.env.local` 文件,配置数据库连接:
 ```env
-DATABASE_URL="mysql://root:password@localhost:3306/crm_system"
+DATABASE_URL="mysql://root:<数据库密码>@localhost:3306/crm_system"
 NEXTAUTH_SECRET="your-super-secret-key-here"
 NEXTAUTH_URL="http://localhost:3000"
 ENCRYPTION_KEY="your-32-byte-encryption-key-here!!"

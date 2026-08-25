@@ -5,7 +5,7 @@ import { writeServerError } from '@/lib/logger'
 
 export function getRequestId(request: Request): string {
   const incoming = request.headers.get('x-request-id')?.trim()
-  return incoming && incoming.length <= 100 ? incoming : randomUUID()
+  return incoming && /^[A-Za-z0-9._:-]{1,100}$/.test(incoming) ? incoming : randomUUID()
 }
 
 export function jsonWithRequestId<T>(

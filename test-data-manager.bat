@@ -25,7 +25,7 @@ goto menu
 :clear
 echo.
 echo [正在清空数据库...]
-set DATABASE_URL=mysql://root:REDACTED_c68d10500c05@localhost:3306/crm_system
+set DATABASE_URL=%CRM_TEST_DATABASE_URL%
 npx ts-node clear-database.ts
 echo.
 echo 按任意键返回主菜单...
@@ -36,7 +36,7 @@ goto menu
 :generate
 echo.
 echo [正在生成测试数据...]
-set DATABASE_URL=mysql://root:REDACTED_c68d10500c05@localhost:3306/crm_system
+set DATABASE_URL=%CRM_TEST_DATABASE_URL%
 npx ts-node generate-test-data.ts
 echo.
 echo 按任意键返回主菜单...
@@ -47,7 +47,7 @@ goto menu
 :regenerate
 echo.
 echo [正在清空数据库...]
-set DATABASE_URL=mysql://root:REDACTED_c68d10500c05@localhost:3306/crm_system
+set DATABASE_URL=%CRM_TEST_DATABASE_URL%
 npx ts-node clear-database.ts
 echo.
 echo [正在生成测试数据...]
@@ -61,7 +61,7 @@ goto menu
 :stats
 echo.
 echo [正在查询数据统计...]
-set DATABASE_URL=mysql://root:REDACTED_c68d10500c05@localhost:3306/crm_system
+set DATABASE_URL=%CRM_TEST_DATABASE_URL%
 npx ts-node check-users.ts
 echo.
 echo 按任意键返回主菜单...

@@ -81,8 +81,9 @@ def request(
     body: bytes | None = None,
     content_type: str | None = None,
     request_id: str | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> HttpResult:
-    headers: dict[str, str] = {}
+    request_headers = dict(headers or {})
     if payload is not None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         content_type = "application/json"
@@ -90,11 +91,11 @@ def request(
         body = urllib.parse.urlencode(form).encode("utf-8")
         content_type = "application/x-www-form-urlencoded"
     if content_type:
-        headers["Content-Type"] = content_type
+        request_headers["Content-Type"] = content_type
     if request_id:
-        headers["x-request-id"] = request_id
+        request_headers["x-request-id"] = request_id
     req = urllib.request.Request(
-        f"{base_url.rstrip('/')}{path}", data=body, method=method, headers=headers
+        f"{base_url.rstrip('/')}{path}", data=body, method=method, headers=request_headers
     )
     try:
         with opener.open(req, timeout=30) as response:

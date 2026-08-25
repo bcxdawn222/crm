@@ -41,7 +41,8 @@ def check_deploy_templates() -> None:
 def check_release_payload_contract() -> None:
     included = {path.relative_to(ROOT).as_posix() for path in release.required_paths()}
     require("prisma/schema.prisma" in included, "发布包缺少 Prisma schema，无法在服务器生成 Client")
-    require("next.config.js" in included, "发布包缺少 Next.js 运行配置")
+    require("next.config.mjs" in included, "发布包缺少 Next.js ESM 运行配置")
+    require("scripts/cli" in included, "发布包缺少 manage.py 的 CLI 依赖")
 
 
 def write_artifact(root: Path, release_id: str, commit: str) -> tuple[Path, release.ReleaseManifest]:

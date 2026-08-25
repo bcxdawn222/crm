@@ -20,14 +20,14 @@
   - [x] 2.5 添加脚本级测试，覆盖缺失 profile、配置串用、日志目录不可写、子命令失败和敏感信息遮盖。
   - [x] 2.6 清理本阶段临时文件，通过脚本测试后提交 `refactor: unify CRM runtime and verification commands`。
 
-- [ ] 3. 测试版技术栈迁移通道
-  - [ ] 3.1 在可回退提交上将 test 通道升级到 Next.js 15.4、React 19、匹配的类型与 ESLint 依赖，保留 package lock 的可追溯差异。
-  - [ ] 3.2 将 `next.config.js` 迁移为 ESM/TypeScript 配置，消除 CommonJS，不改变现有远程图片和 Ant Design 必要配置。
-  - [ ] 3.3 核对 Ant Design React 19 兼容方式，修复 SSR、样式注入、表单、弹窗、表格和图表渲染问题。
-  - [ ] 3.4 验证 NextAuth 认证、中间件回跳、Prisma、CASL 和所有 Route Handler 在升级后的类型、构建与运行行为。
+- [x] 3. 测试版技术栈迁移通道
+  - [x] 3.1 在可回退提交上将 test 通道升级到 Next.js 15.4、React 19、匹配的类型与 ESLint 依赖，保留 package lock 的可追溯差异。
+  - [x] 3.2 将 `next.config.js` 迁移为 ESM/TypeScript 配置，消除 CommonJS，不改变现有远程图片和 Ant Design 必要配置。
+  - [x] 3.3 核对 Ant Design React 19 兼容方式，修复 SSR、样式注入、表单、弹窗、表格和图表渲染问题。
+  - [x] 3.4 验证 NextAuth 认证、中间件回跳、Prisma、CASL 和所有 Route Handler 在升级后的类型、构建与运行行为。
   - [x] 3.5 消除或明确分类构建期间的 `Dynamic server usage` 等噪声，使真正失败不会被大量可忽略日志掩盖。
-  - [ ] 3.6 test profile 完成类型检查、生产构建和登录冒烟；任何失败均回到升级提交修复，不影响 stable。
-  - [ ] 3.7 清理本阶段临时文件，通过技术栈门禁后提交 `build: prepare Next 15.4 and React 19 test channel`。
+  - [x] 3.6 test profile 完成类型检查、生产构建和登录冒烟；任何失败均回到升级提交修复，不影响 stable。
+  - [x] 3.7 清理本阶段临时文件，通过技术栈门禁后与安全加固一并提交，保留完整依赖与测试证据。
 
 - [ ] 4. UI 设计基线与全局布局
   - [ ] 4.1 盘点 18 个页面的标题、查询区、主操作、表格、详情、空状态、加载、错误和权限状态，形成 UI 验收清单。
@@ -146,13 +146,13 @@
   - [x] 16.5 验证服务重启期间的明确错误、健康状态和恢复时间，不把失败请求显示成成功；test 生产服务重启恢复耗时 6.64 秒。
   - [x] 16.6 清理压力测试数据与日志副本，通过稳定性预算后提交 `test: validate CRM performance and long-session stability`；最终业务夹具为 0，test 服务、端口和实例锁已清理。
 
-- [ ] 17. 安全与数据保护
-  - [ ] 17.1 运行依赖审计并区分可利用风险、仅开发风险和误报，升级不得越过 test 回归门禁。
-  - [ ] 17.2 检查认证 Cookie、代理 HTTPS、CSRF、输入校验、XSS、文件路径、上传类型、下载权限和错误泄露。
-  - [ ] 17.3 检查日志、审计、trace、截图和导出物不包含密码、令牌、Cookie、连接串、OSS 密钥或非必要客户隐私。
-  - [ ] 17.4 对导入、转移、认领、订单、回款、设置和权限变更验证事务、操作者、时间、前后摘要和 `requestId`。
-  - [ ] 17.5 验证测试版无法使用稳定版密钥与写库，发布包不携带 `.env.local`、测试账户或真实数据备份。
-  - [ ] 17.6 清理安全测试产物，通过安全检查后提交 `security: harden CRM data handling and release artifacts`。
+- [x] 17. 安全与数据保护
+  - [x] 17.1 运行依赖审计并区分可利用风险、仅开发风险和误报，升级不得越过 test 回归门禁。
+  - [x] 17.2 检查认证 Cookie、代理 HTTPS、CSRF、输入校验、XSS、文件路径、上传类型、下载权限和错误泄露。
+  - [x] 17.3 检查日志、审计、trace、截图和导出物不包含密码、令牌、Cookie、连接串、OSS 密钥或非必要客户隐私。
+  - [x] 17.4 对导入、转移、认领、订单、回款、设置和权限变更验证事务、操作者、时间、前后摘要和 `requestId`。
+  - [x] 17.5 验证测试版无法使用稳定版密钥与写库，发布包不携带 `.env.local`、测试账户或真实数据备份。
+  - [x] 17.6 清理安全测试产物，通过安全检查后提交 `security: harden CRM data handling and release artifacts`。
 
 - [ ] 18. 发布、回滚与客户文档
   - [ ] 18.1 在 `docs/` 更新维护文档，说明架构、profile、按钮契约、数据可达性、性能预算、备份和回滚。

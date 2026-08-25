@@ -55,7 +55,7 @@ isPublic  Boolean  @default(false)  // 是否在公海池中
 
 运行方式:
 ```bash
-$env:DATABASE_URL="mysql://root:REDACTED_c68d10500c05@localhost:3306/crm_system"
+$env:DATABASE_URL="mysql://root:<数据库密码>@localhost:3306/crm_system"
 node -r ts-node/register scripts/auto-public-pool.ts
 ```
 
@@ -120,7 +120,7 @@ curl -X POST http://localhost:3008/api/public-pool/auto-move \
 运行测试脚本验证功能:
 
 ```bash
-$env:DATABASE_URL="mysql://root:REDACTED_c68d10500c05@localhost:3306/crm_system"
+$env:DATABASE_URL="mysql://root:<数据库密码>@localhost:3306/crm_system"
 node -r ts-node/register test-public-pool.ts
 ```
 

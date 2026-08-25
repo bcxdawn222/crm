@@ -76,7 +76,7 @@ def main() -> int:
     request_ids: list[str] = []
 
     try:
-        content = f"CRM test file {marker}".encode("utf-8")
+        content = f"%PDF-1.4\nCRM test file {marker}\n%%EOF".encode("utf-8")
         upload_body, content_type = multipart_file(f"data-flow-{marker}.pdf", "application/pdf", content)
         upload_request_id = f"content-flow-file-upload-{marker}"
         upload = request(
