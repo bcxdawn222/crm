@@ -4,11 +4,16 @@ import { useEffect, useState } from 'react'
 import { Button, Card, Input, message, Modal, Select, Space, Table, Tag } from 'antd'
 import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
+import dynamic from 'next/dynamic'
 
 import { PermissionGuard } from '@/components/common/PermissionGuard'
 import { apiRequest } from '@/lib/http/client'
-import { OrderFormModal } from './order-form-modal'
 import type { OrderRecord, OrderStatus } from './order-types'
+
+const OrderFormModal = dynamic(
+  () => import('./order-form-modal').then((module) => module.OrderFormModal),
+  { ssr: false },
+)
 
 const STATUS_MAP: Record<OrderStatus, { text: string; color: string }> = {
   PENDING: { text: '待处理', color: 'orange' },

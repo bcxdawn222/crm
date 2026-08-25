@@ -16,9 +16,9 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body>
-        <SessionProvider>
-          <AntdRegistry>{children}</AntdRegistry>
-        </SessionProvider>
+        <AntdRegistry>
+          <SessionProvider>{children}</SessionProvider>
+        </AntdRegistry>
       </body>
     </html>
   )

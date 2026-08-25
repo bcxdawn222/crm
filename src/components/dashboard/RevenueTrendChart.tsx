@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, Radio, Spin } from 'antd'
-import ReactECharts from 'echarts-for-react'
+import CRMChart from '@/components/charts/CRMChart'
 import { useState, useEffect } from 'react'
 import { apiRequest } from '@/lib/http/client'
 
@@ -225,20 +225,22 @@ export default function RevenueTrendChart() {
           </Radio.Group>
         </div>
       }
-      style={{ 
+      style={{
+        minHeight: 472,
         borderRadius: 12,
         boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
       }}
+      styles={{ body: { minHeight: 400 } }}
     >
       {!loading && data.length > 0 && (
-        <ReactECharts 
+        <CRMChart
           option={option} 
           style={{ height: 400 }}
           opts={{ renderer: 'svg' }}
         />
       )}
       {!loading && data.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
+        <div style={{ display: 'grid', minHeight: 400, placeItems: 'center', color: '#999' }}>
           暂无数据
         </div>
       )}

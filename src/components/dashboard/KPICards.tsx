@@ -45,9 +45,9 @@ export default function KPICards() {
   if (loading) {
     return (
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        {[1, 2, 3, 4].map(i => (
+        {[0, 1, 2, 3].map(i => (
           <Col key={i} span={6}>
-            <Card loading />
+            <Card loading style={{ minHeight: 203 }} />
           </Col>
         ))}
       </Row>
@@ -100,6 +100,7 @@ export default function KPICards() {
           <Card 
             className="kpi-card"
             style={{
+              minHeight: 203,
               border: '1px solid #e2e8f0',
               borderTop: `3px solid ${card.accent}`,
               borderRadius: 8,

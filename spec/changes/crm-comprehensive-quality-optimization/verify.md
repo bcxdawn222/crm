@@ -352,3 +352,15 @@ conclusion: fail
 - `python scripts\manage.py typecheck --profile stable` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260825-113258.log`；`python scripts\manage.py build --profile test` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260825-113309.log`。
 - 提交 `20733b3f72ee8b2c2bb9e66419e488062ad62d54` 后，在干净工作区执行 `python scripts\manage.py release --profile test` 退出码 0，真实产物为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\.build\test\release\1.0.0-20733b3f.zip`，SHA256 为 `c78e3a2583a480482487bb8c37e84f638ede379ab15bc2ebced2110f60585255`，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-release-20260825-114031.log`。ZIP 清单复核不含 `.env`、`logs/`、`storage/`、`.runtime/` 和 `.next/cache/`。
 - `python scripts\manage.py promote --profile stable --artifact ".build\test\release\1.0.0-20733b3f.zip"` 退出码 0，本地发布通道 current 已登记为 `1.0.0-20733b3f`，previous 为 null，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-promote-20260825-114149.log`。该动作只登记本地 stable 发布状态，没有替换线上进程，也没有执行 stable 数据库迁移。
+
+## Apply working evidence - 2026-08-25 前端性能优化
+
+- ECharts 已集中到 `src/components/charts/CRMChart.tsx`，只注册当前页面实际使用的 Bar、Funnel、Line、Pie 和 SVG renderer；首页、统计、公海看板及其余图表页面使用 `next/dynamic` 按页面加载。客户跟进、客户转移、合作客户合同、订单、回款、任务、电销转化和提醒跟进弹窗也改为按需加载。
+- `@tiptap/react`、`@tiptap/starter-kit`、`react-pdf` 在源码没有实际引用，已从运行依赖移除；XLSX 仍只在服务端客户导入模块使用。依赖树统一为 `@ant-design/cssinjs@1.24.0`，并将 `@ant-design/nextjs-registry` 固定为 `1.2.0`，避免 registry 与 Ant Design 使用不同 css-in-js cache。
+- 根布局只保留一处 `AntdRegistry` 和一处会话 provider。生产 HTML 检查确认包含 `id="antd-cssinjs"` 样式标签；此前发现的 SSR 样式缺失导致的首屏位移已修复。首页图表和提醒区域增加稳定的首帧高度，避免加载态与真实内容切换时改变布局。
+- 文件共享和消息中心改为真实服务端分页，均使用稳定 `rowKey`；客户、合作客户、公海、订单、回款、任务、电销、日报和每日客资等已有列表继续使用服务端分页或固定上限，未把全量数据缓存到客户端。统一请求层对 GET 默认使用 `cache: no-store`，写入后按现有页面精确刷新相关数据。
+- 新增性能入口：`python scripts\manage.py perf --profile test` 检查全路由 First Load JS、公共共享包和重型依赖边界；`python scripts\manage.py perf-runtime --profile test` 在 test 生产服务中使用真实 Chrome 登录态，测量桌面和低性能网络/CPU环境的 LCP、INP、CLS、长任务和路由切换。生产启动入口新增 `--mode production`，并同步传递 `AUTH_URL`、`AUTH_TRUST_HOST`，修复本地生产模式 Auth.js `UntrustedHost` 初始化失败。
+- 最终真实运行时报告：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\frontend-runtime-20260825T042541Z.json`。桌面环境首页 LCP 188 ms、CLS 0.001、INP 40 ms；低性能环境首页 LCP 856 ms、CLS 0.001、INP 120 ms；低性能路由切换 606 ms；所有采集页面长任务最大值 183 ms，运行时预算退出码 0。完整文档为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\前端运行时性能.md`。
+- 最终构建体积预算报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\前端性能预算.md`：公共共享 JavaScript 88.2 kB；首页 275 kB、统计页 222 kB、公海页 379 kB；全路由均低于 500 kB，`python scripts\manage.py perf --profile test` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-perf-20260825-122815.log`。
+- 验证命令均通过：`python scripts\manage.py typecheck --profile stable`，日志 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-typecheck-20260825-121923.log`；`python scripts\manage.py build --profile test`，日志 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260825-122422.log`；`routes`、`button-audit`、`data-reachability`、`runtime-test` 退出码均为 0。最终 test 服务已停止，`instance-status` 显示 PID 不存在、端口未监听、锁为 False。
+- 性能报告和日志未写入用户名、密码、Cookie、令牌、数据库连接串或上传文件内容；本轮浏览器登录凭据仅通过当前进程环境变量传入，未写入仓库。任务 13.1 至 13.7 已完成。

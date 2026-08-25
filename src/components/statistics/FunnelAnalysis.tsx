@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, Table, Statistic, Row, Col } from 'antd'
-import ReactECharts from 'echarts-for-react'
+import CRMChart from '@/components/charts/CRMChart'
 
 interface FunnelStage {
   stage: string
@@ -141,7 +141,7 @@ export default function FunnelAnalysis({ data }: { data: FunnelData }) {
       <Row gutter={16}>
         <Col span={12}>
           <Card>
-            <ReactECharts 
+            <CRMChart
               option={funnelOption} 
               style={{ height: 400 }}
               opts={{ renderer: 'svg' }}

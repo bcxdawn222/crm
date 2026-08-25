@@ -23,7 +23,7 @@ interface FileItem {
 
 interface FileResponse {
   success: boolean
-  data: { list: FileItem[]; total: number }
+  data: { list: FileItem[]; total: number; page: number; pageSize: number }
   error?: string
 }
 
@@ -33,18 +33,23 @@ export default function FilesPage() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [total, setTotal] = useState(0)
 
   const loadFiles = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await apiRequest<FileResponse>('/api/files?page=1&pageSize=50')
+      const params = new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString() })
+      const result = await apiRequest<FileResponse>(`/api/files?${params}`)
       setFiles(result.data.list)
+      setTotal(result.data.total)
     } catch (error) {
       message.error(error instanceof Error ? error.message : '加载文件失败')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, pageSize])
 
   useEffect(() => {
     void loadFiles()
@@ -66,7 +71,8 @@ export default function FilesPage() {
       const result = await apiRequest<{ success: boolean; data: FileItem }>('/api/files', { method: 'POST', body: formData }, { requestKey: `file-upload:${file.name}:${file.size}` })
       onSuccess?.(result)
       message.success('文件上传成功')
-      await loadFiles()
+      if (page === 1) await loadFiles()
+      else setPage(1)
     } catch (error) {
       const failure = error instanceof Error ? error : new Error('上传失败')
       onError?.(failure)
@@ -82,7 +88,8 @@ export default function FilesPage() {
     try {
       await apiRequest<{ success: boolean }>(`/api/files/${id}`, { method: 'DELETE' }, { requestKey: `file-delete:${id}` })
       message.success('文件已删除')
-      await loadFiles()
+      if (files.length === 1 && page > 1) setPage((current) => current - 1)
+      else await loadFiles()
     } catch (error) {
       message.error(error instanceof Error ? error.message : '删除文件失败')
       throw error
@@ -133,7 +140,28 @@ export default function FilesPage() {
         </Upload>
       ) : null}
     >
-      <Table columns={columns} dataSource={files} loading={loading} rowKey="id" scroll={{ x: 980 }} pagination={{ pageSize: 20 }} />
+      <Table
+        columns={columns}
+        dataSource={files}
+        loading={loading}
+        rowKey="id"
+        scroll={{ x: 980 }}
+        pagination={{
+          current: page,
+          pageSize,
+          total,
+          showSizeChanger: true,
+          showTotal: (count) => `共 ${count} 条`,
+          onChange: (nextPage, nextPageSize) => {
+            if (nextPageSize !== pageSize) {
+              setPageSize(nextPageSize)
+              setPage(1)
+              return
+            }
+            setPage(nextPage)
+          },
+        }}
+      />
     </Card>
   )
 }

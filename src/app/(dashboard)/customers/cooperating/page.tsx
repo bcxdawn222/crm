@@ -5,9 +5,9 @@ import { Card, Table, Button, Space, Modal, Form, DatePicker, InputNumber, Selec
 import { BellOutlined, CalendarOutlined, PhoneOutlined, EditOutlined, FileTextOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs, { Dayjs } from 'dayjs'
+import dynamic from 'next/dynamic'
 import { Resizable } from 'react-resizable'
 import 'react-resizable/css/styles.css'
-import { ContractArchiveModal } from '@/components/contract'
 import { useFormDraft } from '@/hooks/useFormDraft'
 import {
   isCooperatingCustomerDraft,
@@ -15,6 +15,10 @@ import {
 } from '@/lib/forms/crm-drafts'
 import { apiRequest } from '@/lib/http/client'
 import { usePermission } from '@/hooks/usePermission'
+
+const ContractArchiveModal = dynamic(() => import('@/components/contract/ContractArchiveModal'), {
+  ssr: false,
+})
 
 const { TextArea } = Input
 

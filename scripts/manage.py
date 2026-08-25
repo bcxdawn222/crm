@@ -36,8 +36,9 @@ TEST_FLOW_SCRIPTS = {
     "permission-flow": "permission_flow_test.py",
     "server-governance": "server_governance.py",
     "server-runtime-drill": "server_runtime_drill.py",
+    "perf": "../performance/frontend_budget.py",
+    "perf-runtime": "../performance/frontend_runtime.py",
 }
-
 
 @dataclass(frozen=True)
 class CommandResult:
@@ -129,22 +130,20 @@ def main() -> int:
             "release-test",
             "runtime-test",
             "e2e",
-            "perf",
             "release",
             "promote",
             "rollback",
         ),
     )
     parser.add_argument("--profile", choices=("stable", "test"), default="stable")
+    parser.add_argument("--mode", choices=("development", "production"),
+                        default="development", help="start 使用的服务模式")
     parser.add_argument(
         "--skip-db",
         action="store_true",
         help="audit-data 仅检查迁移目录和备份，不连接数据库",
     )
-    parser.add_argument(
-        "--artifact",
-        help="promote/rollback 使用的发布压缩包路径",
-    )
+    parser.add_argument("--artifact", help="promote/rollback 使用的发布压缩包路径")
     args = parser.parse_args()
     try:
         profile = get_profile_config(args.profile)
@@ -167,7 +166,7 @@ def main() -> int:
     )
 
     if args.action == "start":
-        return start_server(logger, profile)
+        return start_server(logger, profile, mode=args.mode)
     if args.action == "stop":
         return stop_server(logger, profile)
     if args.action in {"status", "instance-status"}:
@@ -259,7 +258,7 @@ def main() -> int:
             return 2
         command = [
             sys.executable,
-            str(ROOT / "scripts" / "quality" / TEST_FLOW_SCRIPTS[args.action]),
+            str((ROOT / "scripts" / "quality" / TEST_FLOW_SCRIPTS[args.action]).resolve()),
         ]
         return run_sequence(((args.action, command),), logger)
     if args.action == "runtime-test":
@@ -278,7 +277,7 @@ def main() -> int:
         return run_sequence((("release-test", command),), logger)
     if args.action in {"release", "promote", "rollback"}:
         return run_release_action(args.action, profile, args.artifact, logger, run_sequence, ROOT)
-    if args.action in {"e2e", "perf"}:
+    if args.action == "e2e":
         logger.error("动作已登记但尚未实现: %s", args.action)
         return 3
 

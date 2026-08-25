@@ -12,9 +12,14 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined
 } from '@ant-design/icons'
+import dynamic from 'next/dynamic'
 import { apiRequest } from '@/lib/http/client'
-import { FollowUpModal } from '@/components/customers/follow-up-modal'
 import { usePermission } from '@/hooks/usePermission'
+
+const FollowUpModal = dynamic(
+  () => import('@/components/customers/follow-up-modal').then((module) => module.FollowUpModal),
+  { ssr: false },
+)
 
 interface ReminderItem {
   type: string

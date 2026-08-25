@@ -102,7 +102,8 @@ export default function SmartReminders() {
           <Button type="link" size="small">查看全部 →</Button>
         </Link>
       }
-      style={{ 
+      style={{
+        minHeight: 263,
         borderRadius: 12,
         boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
       }}

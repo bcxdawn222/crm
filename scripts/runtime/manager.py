@@ -173,10 +173,15 @@ def _acquire_lock(config: ProfileConfig, pid: int | None = None) -> None:
         raise RuntimeError(f"{config.name} profile 已有启动锁") from error
 
 
-def start_server(logger: logging.Logger, config: ProfileConfig) -> int:
+def start_server(
+    logger: logging.Logger,
+    config: ProfileConfig,
+    *,
+    mode: str = "development",
+) -> int:
     from .instance_manager import start_server as managed_start_server
 
-    return managed_start_server(logger, config)
+    return managed_start_server(logger, config, mode=mode)
 
 
 def stop_server(logger: logging.Logger, config: ProfileConfig) -> int:

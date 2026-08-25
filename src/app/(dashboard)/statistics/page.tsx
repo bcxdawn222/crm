@@ -2,10 +2,18 @@
 
 import { useState, useEffect } from 'react'
 import { Card, Tabs, message, Spin } from 'antd'
+import dynamic from 'next/dynamic'
 import SalesOverview from '@/components/statistics/SalesOverview'
-import FunnelAnalysis from '@/components/statistics/FunnelAnalysis'
-import TrendChart from '@/components/statistics/TrendChart'
 import { apiRequest } from '@/lib/http/client'
+
+const FunnelAnalysis = dynamic(() => import('@/components/statistics/FunnelAnalysis'), {
+  ssr: false,
+  loading: () => <div aria-hidden style={{ minHeight: 520 }} />,
+})
+const TrendChart = dynamic(() => import('@/components/statistics/TrendChart'), {
+  ssr: false,
+  loading: () => <div aria-hidden style={{ minHeight: 472 }} />,
+})
 
 interface SalesOverviewData {
   monthlyRevenue: number

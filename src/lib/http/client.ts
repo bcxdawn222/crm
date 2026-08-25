@@ -104,7 +104,13 @@ async function executeRequest<T>(
     const abortExternal = () => controller.abort()
     externalSignal?.addEventListener('abort', abortExternal, { once: true })
     try {
-      const response = await fetch(input, { ...init, method, headers, signal: controller.signal })
+      const response = await fetch(input, {
+        ...init,
+        method,
+        headers,
+        signal: controller.signal,
+        cache: init.cache ?? (method === 'GET' ? 'no-store' : undefined),
+      })
       const payload = await readResponseBody(response)
       if (!response.ok) {
         const currentRequestId = requestIdFrom(response, payload)

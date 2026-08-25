@@ -5,11 +5,16 @@ import { Card, Table, Button, Space, Modal, Form, Input, Tag, message, Popconfir
 import { PlusOutlined, PhoneOutlined, CheckCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
+import dynamic from 'next/dynamic'
 import { useFormDraft } from '@/hooks/useFormDraft'
 import { isTelemarketingDraft, type TelemarketingDraft } from '@/lib/forms/crm-drafts'
 import { apiRequest } from '@/lib/http/client'
-import { TelemarketingConvertModal } from './telemarketing-convert-modal'
 import { usePermission } from '@/hooks/usePermission'
+
+const TelemarketingConvertModal = dynamic(
+  () => import('./telemarketing-convert-modal').then((module) => module.TelemarketingConvertModal),
+  { ssr: false },
+)
 
 const { TextArea } = Input
 

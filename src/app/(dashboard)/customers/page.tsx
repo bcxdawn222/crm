@@ -4,15 +4,23 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, Table, Button, Space, Input, Select, Modal, Form, message, Tag, Upload } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ExportOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
+import dynamic from 'next/dynamic'
 import { PermissionGuard } from '@/components/common/PermissionGuard'
-import { FollowUpModal } from '@/components/customers/follow-up-modal'
-import { CustomerTransferModal } from '@/components/customers/customer-transfer-modal'
 import { useFormDraft } from '@/hooks/useFormDraft'
 import { usePermission } from '@/hooks/usePermission'
 import { isCustomerDraft, type CustomerDraft } from '@/lib/forms/crm-drafts'
 import { apiRequest } from '@/lib/http/client'
 import { Resizable } from 'react-resizable'
 import 'react-resizable/css/styles.css'
+
+const FollowUpModal = dynamic(
+  () => import('@/components/customers/follow-up-modal').then((module) => module.FollowUpModal),
+  { ssr: false },
+)
+const CustomerTransferModal = dynamic(
+  () => import('@/components/customers/customer-transfer-modal').then((module) => module.CustomerTransferModal),
+  { ssr: false },
+)
 
 // 可拖动的表头组件
 const ResizableTitle = (props: any) => {

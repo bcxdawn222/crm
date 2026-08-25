@@ -17,6 +17,7 @@
 }
 
 body {
+  min-height: 100vh;
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-start-rgb));
   font-family: Arial, 'Microsoft YaHei', sans-serif;
@@ -34,10 +35,15 @@ a {
 }
 
 .crm-app-shell {
+  display: flex;
+  min-height: 100vh;
   background: #f1f5f9;
 }
 
 .crm-main-layout {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   min-width: 0;
   background: #f1f5f9;
   transition: margin-left 0.2s ease;

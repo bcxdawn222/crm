@@ -2,7 +2,7 @@
 
 import { Card, Radio } from 'antd'
 import type { RadioChangeEvent } from 'antd'
-import ReactECharts from 'echarts-for-react'
+import CRMChart from '@/components/charts/CRMChart'
 import { useEffect, useState } from 'react'
 import { apiRequest } from '@/lib/http/client'
 
@@ -145,7 +145,7 @@ export default function TrendChart() {
       loading={loading}
     >
       {trendData && (
-        <ReactECharts 
+        <CRMChart
           option={chartOption} 
           style={{ height: 400 }}
           opts={{ renderer: 'svg' }}

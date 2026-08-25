@@ -4,10 +4,15 @@ import { useEffect, useState } from 'react'
 import { Button, Card, message, Select, Space, Table, Tag } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
+import dynamic from 'next/dynamic'
 
 import { usePermission } from '@/hooks/usePermission'
 import { apiRequest } from '@/lib/http/client'
-import { TaskFormModal } from './task-form-modal'
+
+const TaskFormModal = dynamic(
+  () => import('./task-form-modal').then((module) => module.TaskFormModal),
+  { ssr: false },
+)
 
 type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'

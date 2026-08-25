@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Avatar, Button, Card, List, message, Space, Tag } from 'antd'
+import { Avatar, Button, Card, List, message, Pagination, Space, Tag } from 'antd'
 import { BellOutlined, DeleteOutlined, MailOutlined } from '@ant-design/icons'
 
 import { usePermission } from '@/hooks/usePermission'
@@ -20,7 +20,7 @@ interface MessageItem {
 
 interface MessageResponse {
   success: boolean
-  data: { list: MessageItem[]; total: number; unread: number }
+  data: { list: MessageItem[]; total: number; unread: number; page: number; pageSize: number }
   error?: string
 }
 
@@ -31,6 +31,9 @@ export default function MessagesPage() {
   const [unread, setUnread] = useState(0)
   const [markingAll, setMarkingAll] = useState(false)
   const [pendingMessageIds, setPendingMessageIds] = useState<ReadonlySet<string>>(() => new Set())
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [total, setTotal] = useState(0)
 
   const setMessagePending = (id: string, pending: boolean) => {
     setPendingMessageIds((current) => {
@@ -44,15 +47,17 @@ export default function MessagesPage() {
   const loadMessages = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await apiRequest<MessageResponse>('/api/messages?page=1&pageSize=50')
+      const params = new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString() })
+      const result = await apiRequest<MessageResponse>(`/api/messages?${params}`)
       setItems(result.data.list)
       setUnread(result.data.unread)
+      setTotal(result.data.total)
     } catch (error) {
       message.error(error instanceof Error ? error.message : '加载消息失败')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, pageSize])
 
   useEffect(() => {
     void loadMessages()
@@ -92,7 +97,11 @@ export default function MessagesPage() {
     setMessagePending(id, true)
     try {
       await apiRequest<{ success: boolean }>(`/api/messages/${id}`, { method: 'DELETE' }, { requestKey: `message-delete:${id}` })
+      const deleted = items.find((entry) => entry.id === id)
       setItems((current) => current.filter((entry) => entry.id !== id))
+      setTotal((current) => Math.max(0, current - 1))
+      if (deleted && !deleted.isRead) setUnread((current) => Math.max(0, current - 1))
+      if (items.length === 1 && page > 1) setPage((current) => current - 1)
       message.success('消息已删除')
     } catch (error) {
       message.error(error instanceof Error ? error.message : '删除消息失败')
@@ -143,6 +152,24 @@ export default function MessagesPage() {
           </List.Item>
         )}
       />
+      {total > 0 && (
+        <Pagination
+          current={page}
+          pageSize={pageSize}
+          total={total}
+          showSizeChanger
+          showTotal={(count) => `共 ${count} 条`}
+          onChange={(nextPage, nextPageSize) => {
+            if (nextPageSize !== pageSize) {
+              setPageSize(nextPageSize)
+              setPage(1)
+              return
+            }
+            setPage(nextPage)
+          }}
+          style={{ marginTop: 16, textAlign: 'right' }}
+        />
+      )}
     </Card>
   )
 }

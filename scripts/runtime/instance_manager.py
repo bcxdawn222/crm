@@ -86,7 +86,18 @@ def _prepare_start(logger: logging.Logger, config: ProfileConfig, *, current_pid
     return False
 
 
-def start_server(logger: logging.Logger, config: ProfileConfig) -> int:
+def start_server(
+    logger: logging.Logger,
+    config: ProfileConfig,
+    *,
+    mode: str = "development",
+) -> int:
+    if mode not in {"development", "production"}:
+        logger.error("不支持的服务模式: %s", mode)
+        return 2
+    if mode == "production" and not (ROOT / ".next" / "BUILD_ID").is_file():
+        logger.error("生产构建不存在，请先执行 build")
+        return 2
     try:
         validate_profile_isolated(config)
     except ValueError as error:
@@ -139,15 +150,18 @@ def start_server(logger: logging.Logger, config: ProfileConfig) -> int:
             nextauth_url = os.environ.get("NEXTAUTH_URL", "")
         nextauth_url = nextauth_url or f"http://{config.app_host}:{config.app_port}"
         process: subprocess.Popen[bytes] | None = None
+        npm_script = "start" if mode == "production" else "dev"
         with server_log_path.open("a", encoding="utf-8") as server_log:
             process = subprocess.Popen(
-                [npm_command, "run", "dev", "--", "--hostname", config.app_host, "--port", str(config.app_port)],
+                [npm_command, "run", npm_script, "--", "--hostname", config.app_host, "--port", str(config.app_port)],
                 cwd=ROOT,
                 env={
                     **os.environ,
                     "CRM_PROFILE": config.name,
                     "CRM_UPLOAD_DIR": str(config.upload_dir),
                     "DATABASE_URL": config.database_url,
+                    "AUTH_URL": nextauth_url,
+                    "AUTH_TRUST_HOST": os.environ.get("AUTH_TRUST_HOST", "true"),
                     "NEXTAUTH_URL": nextauth_url,
                 },
                 stdout=server_log,
@@ -172,7 +186,13 @@ def start_server(logger: logging.Logger, config: ProfileConfig) -> int:
             if owners and process_tree_ids(process.pid).isdisjoint(owners):
                 logger.error("端口 %s 由其他进程监听: %s", config.app_port, sorted(owners))
                 break
-            logger.info("服务已启动，profile=%s，PID=%s，日志=%s", config.name, process.pid, server_log_path)
+            logger.info(
+                "服务已启动，profile=%s，mode=%s，PID=%s，日志=%s",
+                config.name,
+                mode,
+                process.pid,
+                server_log_path,
+            )
             return 0
         if process.poll() is not None:
             logger.error("服务进程提前退出，退出码=%s", process.returncode)

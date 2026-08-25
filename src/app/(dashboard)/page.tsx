@@ -1,10 +1,18 @@
 'use client'
 
 import { Row, Col } from 'antd'
+import dynamic from 'next/dynamic'
 import KPICards from '@/components/dashboard/KPICards'
-import RevenueTrendChart from '@/components/dashboard/RevenueTrendChart'
-import FunnelChart from '@/components/dashboard/FunnelChart'
 import SmartReminders from '@/components/dashboard/SmartReminders'
+
+const RevenueTrendChart = dynamic(() => import('@/components/dashboard/RevenueTrendChart'), {
+  ssr: false,
+  loading: () => <div aria-hidden style={{ minHeight: 472 }} />,
+})
+const FunnelChart = dynamic(() => import('@/components/dashboard/FunnelChart'), {
+  ssr: false,
+  loading: () => <div aria-hidden style={{ minHeight: 472 }} />,
+})
 
 export default function DashboardPage() {
   return (

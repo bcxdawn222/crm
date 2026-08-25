@@ -4,9 +4,14 @@ import { useState, useEffect } from 'react'
 import { Card, Table, Button, Space, Input, Modal, message, Tag, Statistic, Row, Col, Progress } from 'antd'
 import { UserAddOutlined, BarChartOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import PublicPoolDashboard from '@/components/dashboard/PublicPoolDashboard'
+import dynamic from 'next/dynamic'
 import { apiRequest } from '@/lib/http/client'
 import { usePermission } from '@/hooks/usePermission'
+
+const PublicPoolDashboard = dynamic(() => import('@/components/dashboard/PublicPoolDashboard'), {
+  ssr: false,
+  loading: () => <div aria-hidden style={{ minHeight: 520 }} />,
+})
 
 interface Customer {
   id: string

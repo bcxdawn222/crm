@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, Statistic, Row, Col } from 'antd'
-import ReactECharts from 'echarts-for-react'
+import CRMChart from '@/components/charts/CRMChart'
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 
 interface Statistics {
@@ -187,7 +187,7 @@ export default function PublicPoolDashboard({ stats }: { stats: Statistics }) {
       <Row gutter={16}>
         <Col span={12}>
           <Card title="来源分布">
-            <ReactECharts 
+            <CRMChart
               option={pieOption} 
               style={{ height: 350 }}
               opts={{ renderer: 'svg' }}
@@ -196,7 +196,7 @@ export default function PublicPoolDashboard({ stats }: { stats: Statistics }) {
         </Col>
         <Col span={12}>
           <Card title="流转趋势">
-            <ReactECharts 
+            <CRMChart
               option={lineOption} 
               style={{ height: 350 }}
               opts={{ renderer: 'svg' }}
