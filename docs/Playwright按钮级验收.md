@@ -2,11 +2,11 @@
 
 ## 本轮结果
 
-- 生成时间：2026-08-25 18:32:25 +0800
+- 生成时间：2026-08-25 19:22:47 +0800
 - 运行环境：`CRM_PROFILE=test`
 - 数据库保护：仅允许数据库名以 `_test` 结尾
 - 浏览器：Chromium Desktop、Chromium Mobile（390px）
-- 结果：22 项通过，0 项未通过，共 22 项
+- 结果：26 项通过，0 项未通过，共 26 项
 - 原始 JSON：`output/playwright/report.json`
 - 失败产物：`output/playwright/results/`，仅失败时保留 screenshot、video 和 trace
 
@@ -36,16 +36,20 @@
 | 10 | specs\dashboard.visual.spec.ts | 仪表盘在关键宽度切换侧栏且没有横向溢出 | 通过 |
 | 11 | specs\files.spec.ts / 文件共享按钮 | 上传、下载和删除文件均写入真实存储、数据库和审计 | 通过 |
 | 12 | specs\files.spec.ts / 销售文件权限 | 销售可上传并下载自己的文件但看不到删除按钮 | 通过 |
-| 13 | specs\permissions.spec.ts / 销售页面权限与导航 | 销售可导航到文件页且客户动作按权限隐藏 | 通过 |
-| 14 | specs\permissions.spec.ts / 销售页面权限与导航 | 销售无法读取管理员客户 | 通过 |
-| 15 | specs\permissions.spec.ts / 主管数据范围 | 主管可读取本人和下属客户 | 通过 |
-| 16 | specs\permissions.spec.ts / 受限用户权限 | 客户接口返回 403 且页面转到无权限页 | 通过 |
-| 17 | specs\recovery.spec.ts / 列表状态与网络恢复 | 空状态、慢响应、断网恢复和浏览器刷新均可用 | 通过 |
-| 18 | specs\recovery.spec.ts / 会话过期恢复 | 会话失效后重新登录返回原页面 | 通过 |
-| 19 | specs\recovery.spec.ts / 真实服务端 500 | 下载对象缺失时按钮返回 500、带请求号且不误改数据 | 通过 |
-| 20 | specs\settings.spec.ts / 系统设置按钮 | 保存设置重复点击只写入一次并在刷新后回显 | 通过 |
-| 21 | specs\settings.spec.ts / 受限设置权限 | 受限用户直达页面和接口均被拒绝 | 通过 |
-| 22 | specs\shell.mobile.spec.ts | 手机端使用抽屉导航且页面无横向溢出 | 通过 |
+| 13 | specs\modular-pages.spec.ts / 模块化页面回归 | 客户查看模式只读且编辑模式保留保存入口 | 通过 |
+| 14 | specs\modular-pages.spec.ts / 模块化页面回归 | 合作客户统计、编辑和合同备案入口可达 | 通过 |
+| 15 | specs\modular-pages.spec.ts / 模块化页面回归 | 提醒中心使用真实分组和统计结构渲染 | 通过 |
+| 16 | specs\modular-pages.spec.ts / 模块化页面回归 | 日报、每日客资和电销列表均能读取测试数据 | 通过 |
+| 17 | specs\permissions.spec.ts / 销售页面权限与导航 | 销售可导航到文件页且客户动作按权限隐藏 | 通过 |
+| 18 | specs\permissions.spec.ts / 销售页面权限与导航 | 销售无法读取管理员客户 | 通过 |
+| 19 | specs\permissions.spec.ts / 主管数据范围 | 主管可读取本人和下属客户 | 通过 |
+| 20 | specs\permissions.spec.ts / 受限用户权限 | 客户接口返回 403 且页面转到无权限页 | 通过 |
+| 21 | specs\recovery.spec.ts / 列表状态与网络恢复 | 空状态、慢响应、断网恢复和浏览器刷新均可用 | 通过 |
+| 22 | specs\recovery.spec.ts / 会话过期恢复 | 会话失效后重新登录返回原页面 | 通过 |
+| 23 | specs\recovery.spec.ts / 真实服务端 500 | 下载对象缺失时按钮返回 500、带请求号且不误改数据 | 通过 |
+| 24 | specs\settings.spec.ts / 系统设置按钮 | 保存设置重复点击只写入一次并在刷新后回显 | 通过 |
+| 25 | specs\settings.spec.ts / 受限设置权限 | 受限用户直达页面和接口均被拒绝 | 通过 |
+| 26 | specs\shell.mobile.spec.ts | 手机端使用抽屉导航且页面无横向溢出 | 通过 |
 
 ## 未自动化范围
 

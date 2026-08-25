@@ -42,7 +42,10 @@ export const fixtureNames = {
   salesPrefix: `E2E销售客户-${runId}`,
   managerCustomer: `E2E主管客户-${runId}`,
   adminCustomer: `E2E管理员客户-${runId}`,
+  cooperatingCustomer: `E2E合作客户-${runId}`,
   publicCustomer: `E2E公海客户-${runId}`,
+  telemarketing: `E2E电销客户-${runId}`,
+  dailyReport: `E2E日报-${runId}`,
 }
 
 export function authStatePath(role: RoleKey): string {

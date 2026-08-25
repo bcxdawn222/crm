@@ -1,80 +1,59 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, Tabs, Tag, Badge, Button, Empty, Spin, message, Modal, Form, Radio, Input } from 'antd'
+import { useEffect, useState } from 'react'
 import {
   BellOutlined,
-  PhoneOutlined,
   CalendarOutlined,
-  FileTextOutlined,
   ClockCircleOutlined,
+  CloseCircleOutlined,
   ExclamationCircleOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined
+  FileTextOutlined,
 } from '@ant-design/icons'
+import { Badge, Button, Card, Empty, Form, Spin, Tabs, message } from 'antd'
 import dynamic from 'next/dynamic'
-import { apiRequest } from '@/lib/http/client'
+
 import { usePermission } from '@/hooks/usePermission'
+import { apiRequest } from '@/lib/http/client'
+
+import { DisableReminderModal } from './disable-reminder-modal'
+import { DisabledReminderCard, ReminderCard } from './reminder-cards'
+import type { DisabledCustomer, ReminderGroups, ReminderItem } from './types'
 
 const FollowUpModal = dynamic(
   () => import('@/components/customers/follow-up-modal').then((module) => module.FollowUpModal),
   { ssr: false },
 )
 
-interface ReminderItem {
-  type: string
-  customerId?: string
-  customerName: string
-  company?: string
-  phone?: string
-  message: string
-  priority: 'HIGH' | 'MEDIUM' | 'LOW'
-  daysSinceLastFollowUp?: number | null
-  daysUntilExpiry?: number | null
-  daysUntilVisit?: number | null
-  daysUntilFollowUp?: number | null
-  lastFollowUpAt?: string | null
-  contractEndDate?: string | null
-  nextVisitAt?: string | null
-  nextFollowUpAt?: string | null
-  contractAmount?: number | null
-  visitFrequency?: string | null
-  content?: string
-  followUpId?: string
-}
-
-interface DisabledCustomer {
-  customerId: string
-  customerName: string
-  company?: string
-  phone?: string
-  reminderDisabledReason?: string
-  reminderDisabledAt?: string
-  daysSinceDisabled?: number | null
-}
-
-interface Summary {
-  totalOverdue: number
-  totalExpiring: number
-  totalUpcomingVisits: number
-  totalPlannedFollowUps: number
-  totalReminders: number
-}
-
 interface ReminderResponse {
   success: boolean
-  data: {
-    overdueFollowUp: ReminderItem[]
-    expiringContracts: ReminderItem[]
-    upcomingVisits: ReminderItem[]
-    plannedFollowUps: ReminderItem[]
-    summary: Summary
-  }
+  data: ReminderGroups
 }
 
 interface DisabledResponse {
   success: boolean
   data: DisabledCustomer[]
+}
+
+function ReminderStats({ reminders }: { reminders: ReminderGroups }) {
+  const stats = [
+    { value: reminders.summary.totalOverdue, label: '未跟进客户', color: '#ff4d4f', background: '#fff1f0', border: '#ffccc7' },
+    { value: reminders.summary.totalExpiring, label: '合同到期', color: '#faad14', background: '#fffbe6', border: '#ffe58f' },
+    { value: reminders.summary.totalUpcomingVisits, label: '回访计划', color: '#1890ff', background: '#e6f7ff', border: '#91d5ff' },
+    { value: reminders.summary.totalPlannedFollowUps, label: '计划跟进', color: '#52c41a', background: '#f6ffed', border: '#b7eb8f' },
+  ]
+
+  return (
+    <div style={{ marginBottom: 24, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      {stats.map((stat) => (
+        <Card key={stat.label} size="small" style={{ background: stat.background, borderColor: stat.border }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 32, fontWeight: 'bold', color: stat.color }}>{stat.value}</div>
+            <div style={{ color: '#666', marginTop: 8 }}>{stat.label}</div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  )
 }
 
 export default function RemindersPage() {
@@ -83,13 +62,7 @@ export default function RemindersPage() {
   const canUpdateCustomer = can('update', 'customer')
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('all')
-  const [reminders, setReminders] = useState<{
-    overdueFollowUp: ReminderItem[]
-    expiringContracts: ReminderItem[]
-    upcomingVisits: ReminderItem[]
-    plannedFollowUps: ReminderItem[]
-    summary: Summary
-  } | null>(null)
+  const [reminders, setReminders] = useState<ReminderGroups | null>(null)
   const [disabledList, setDisabledList] = useState<DisabledCustomer[]>([])
   const [disableModalVisible, setDisableModalVisible] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<ReminderItem | null>(null)
@@ -98,18 +71,13 @@ export default function RemindersPage() {
   const [enablingCustomerId, setEnablingCustomerId] = useState<string | null>(null)
   const [form] = Form.useForm()
 
-  useEffect(() => {
-    fetchReminders()
-    fetchDisabledList()
-  }, [])
-
   const fetchReminders = async () => {
     try {
       setLoading(true)
       const data = await apiRequest<ReminderResponse>('/api/reminders')
       setReminders(data.data)
     } catch (error) {
-      message.error('获取提醒失败')
+      message.error(error instanceof Error ? error.message : '获取提醒失败')
     } finally {
       setLoading(false)
     }
@@ -124,16 +92,12 @@ export default function RemindersPage() {
     }
   }
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'HIGH': return 'red'
-      case 'MEDIUM': return 'orange'
-      case 'LOW': return 'blue'
-      default: return 'default'
-    }
-  }
+  useEffect(() => {
+    void fetchReminders()
+    void fetchDisabledList()
+  }, [])
 
-  const handleFollowUp = (item: ReminderItem) => {
+  const openFollowUp = (item: ReminderItem) => {
     setSelectedCustomer(item)
     setFollowUpModalVisible(true)
   }
@@ -189,398 +153,86 @@ export default function RemindersPage() {
     }
   }
 
-  const reminderActions = (item: ReminderItem, label: string) => {
-    if (!canCreateFollowUp && !canUpdateCustomer) return null
-    return (
-      <div style={{ display: 'flex', gap: 8 }}>
-        {canCreateFollowUp && (
-          <Button type="primary" size="small" onClick={() => handleFollowUp(item)}>
-            {label}
-          </Button>
-        )}
-        {canUpdateCustomer && (
-          <Button size="small" onClick={() => handleDisableReminder(item)}>
-            不再提醒
-          </Button>
-        )}
-      </div>
-    )
-  }
-
-  const renderReminderCard = (item: ReminderItem) => {
-    const priorityTag = (
-      <Tag color={getPriorityColor(item.priority)} style={{ marginRight: 8 }}>
-        {item.priority === 'HIGH' ? '紧急' : item.priority === 'MEDIUM' ? '重要' : '普通'}
-      </Tag>
-    )
-
-    let icon
-    let actionButton
-    
-    switch (item.type) {
-      case 'OVERDUE_FOLLOWUP':
-        icon = <PhoneOutlined style={{ fontSize: 24, color: '#ff4d4f' }} />
-        actionButton = reminderActions(item, '立即跟进')
-        break
-      case 'EXPIRING_CONTRACT':
-        icon = <FileTextOutlined style={{ fontSize: 24, color: '#faad14' }} />
-        actionButton = reminderActions(item, '联系续签')
-        break
-      case 'UPCOMING_VISIT':
-        icon = <CalendarOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-        actionButton = reminderActions(item, '查看计划')
-        break
-      case 'PLANNED_FOLLOWUP':
-        icon = <ClockCircleOutlined style={{ fontSize: 24, color: '#52c41a' }} />
-        actionButton = reminderActions(item, '开始跟进')
-        break
-    }
-
-    return (
-      <Card 
+  const renderItems = (items: ReminderItem[], emptyText: string) => {
+    if (items.length === 0) return <Empty description={emptyText} />
+    return items.map((item) => (
+      <ReminderCard
         key={`${item.type}-${item.customerId || item.followUpId}`}
-        size="small"
-        style={{ marginBottom: 12 }}
-        hoverable
-      >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-          <div style={{ flexShrink: 0 }}>{icon}</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ marginBottom: 8 }}>
-              {priorityTag}
-              <strong style={{ fontSize: 16 }}>{item.customerName}</strong>
-              {item.company && <span style={{ marginLeft: 8, color: '#666' }}>({item.company})</span>}
-            </div>
-            
-            <div style={{ marginBottom: 8, color: '#333' }}>
-              {item.message}
-            </div>
-
-            {item.phone && (
-              <div style={{ marginBottom: 8, color: '#666', fontSize: 14 }}>
-                 {item.phone}
-              </div>
-            )}
-
-            {item.contractAmount && (
-              <div style={{ marginBottom: 8, color: '#666', fontSize: 14 }}>
-                💰 合同金额: ¥{item.contractAmount.toLocaleString()}
-              </div>
-            )}
-
-            {item.content && (
-              <div style={{ marginBottom: 8, color: '#666', fontSize: 14 }}>
-                📝 {item.content}
-              </div>
-            )}
-          </div>
-          {canUpdateCustomer && <div style={{ flexShrink: 0 }}>
-            {actionButton}
-          </div>}
-        </div>
-      </Card>
-    )
+        item={item}
+        canCreateFollowUp={canCreateFollowUp}
+        canUpdateCustomer={canUpdateCustomer}
+        onFollowUp={openFollowUp}
+        onDisable={handleDisableReminder}
+      />
+    ))
   }
 
-  const renderDisabledCard = (item: DisabledCustomer) => {
-    return (
-      <Card 
-        key={item.customerId}
-        size="small"
-        style={{ marginBottom: 12 }}
-        hoverable
-      >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-          <div style={{ flexShrink: 0 }}>
-            <CloseCircleOutlined style={{ fontSize: 24, color: '#999' }} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ marginBottom: 8 }}>
-              <strong style={{ fontSize: 16 }}>{item.customerName}</strong>
-              {item.company && <span style={{ marginLeft: 8, color: '#666' }}>({item.company})</span>}
-            </div>
-            
-            {item.reminderDisabledReason && (
-              <div style={{ marginBottom: 8, color: '#666', fontSize: 14 }}>
-                禁用原因: {item.reminderDisabledReason}
-              </div>
-            )}
-
-            {item.daysSinceDisabled !== null && (
-              <div style={{ marginBottom: 8, color: '#999', fontSize: 12 }}>
-                已禁用 {item.daysSinceDisabled} 天
-              </div>
-            )}
-
-            {item.phone && (
-              <div style={{ marginBottom: 8, color: '#666', fontSize: 14 }}>
-                📞 {item.phone}
-              </div>
-            )}
-          </div>
-          <div style={{ flexShrink: 0 }}>
-            <Button
-              type="primary"
-              size="small"
-              loading={enablingCustomerId === item.customerId}
-              disabled={enablingCustomerId !== null}
-              onClick={() => void handleEnableReminder(item.customerId)}
-            >
-              恢复提醒
-            </Button>
-          </div>
-        </div>
-      </Card>
-    )
-  }
+  const allItems = reminders
+    ? [...reminders.overdueFollowUp, ...reminders.expiringContracts, ...reminders.upcomingVisits, ...reminders.plannedFollowUps]
+    : []
 
   const tabs = [
     {
       key: 'all',
-      label: (
-        <span>
-          <BellOutlined />
-          全部提醒
-          <Badge count={reminders?.summary.totalReminders || 0} style={{ marginLeft: 8 }} />
-        </span>
-      ),
-      children: (
-        <div>
-          {reminders?.overdueFollowUp.map(renderReminderCard)}
-          {reminders?.expiringContracts.map(renderReminderCard)}
-          {reminders?.upcomingVisits.map(renderReminderCard)}
-          {reminders?.plannedFollowUps.map(renderReminderCard)}
-        </div>
-      ),
+      label: <><BellOutlined /> 全部提醒 <Badge count={reminders?.summary.totalReminders || 0} style={{ marginLeft: 8 }} /></>,
+      children: reminders ? renderItems(allItems, '暂无提醒') : <Empty description="暂无提醒" />,
     },
     {
       key: 'overdue',
-      label: (
-        <span>
-          <ExclamationCircleOutlined />
-          未跟进提醒
-          <Badge count={reminders?.summary.totalOverdue || 0} style={{ marginLeft: 8 }} />
-        </span>
-      ),
-      children: (
-        <div>
-          {reminders?.overdueFollowUp.length === 0 ? (
-            <Empty description="暂无未跟进的客户" />
-          ) : (
-            reminders?.overdueFollowUp.map(renderReminderCard)
-          )}
-        </div>
-      ),
+      label: <><ExclamationCircleOutlined /> 未跟进提醒 <Badge count={reminders?.summary.totalOverdue || 0} style={{ marginLeft: 8 }} /></>,
+      children: reminders ? renderItems(reminders.overdueFollowUp, '暂无未跟进的客户') : <Empty description="暂无提醒" />,
     },
     {
       key: 'contract',
-      label: (
-        <span>
-          <FileTextOutlined />
-          合同到期
-          <Badge count={reminders?.summary.totalExpiring || 0} style={{ marginLeft: 8 }} />
-        </span>
-      ),
-      children: (
-        <div>
-          {reminders?.expiringContracts.length === 0 ? (
-            <Empty description="暂无即将到期的合同" />
-          ) : (
-            reminders?.expiringContracts.map(renderReminderCard)
-          )}
-        </div>
-      ),
+      label: <><FileTextOutlined /> 合同到期 <Badge count={reminders?.summary.totalExpiring || 0} style={{ marginLeft: 8 }} /></>,
+      children: reminders ? renderItems(reminders.expiringContracts, '暂无即将到期的合同') : <Empty description="暂无提醒" />,
     },
     {
       key: 'visit',
-      label: (
-        <span>
-          <CalendarOutlined />
-          回访计划
-          <Badge count={reminders?.summary.totalUpcomingVisits || 0} style={{ marginLeft: 8 }} />
-        </span>
-      ),
-      children: (
-        <div>
-          {reminders?.upcomingVisits.length === 0 ? (
-            <Empty description="暂无回访计划" />
-          ) : (
-            reminders?.upcomingVisits.map(renderReminderCard)
-          )}
-        </div>
-      ),
+      label: <><CalendarOutlined /> 回访计划 <Badge count={reminders?.summary.totalUpcomingVisits || 0} style={{ marginLeft: 8 }} /></>,
+      children: reminders ? renderItems(reminders.upcomingVisits, '暂无回访计划') : <Empty description="暂无提醒" />,
     },
     {
       key: 'followup',
-      label: (
-        <span>
-          <ClockCircleOutlined />
-          计划跟进
-          <Badge count={reminders?.summary.totalPlannedFollowUps || 0} style={{ marginLeft: 8 }} />
-        </span>
-      ),
-      children: (
-        <div>
-          {reminders?.plannedFollowUps.length === 0 ? (
-            <Empty description="暂无计划跟进任务" />
-          ) : (
-            reminders?.plannedFollowUps.map(renderReminderCard)
-          )}
-        </div>
-      ),
+      label: <><ClockCircleOutlined /> 计划跟进 <Badge count={reminders?.summary.totalPlannedFollowUps || 0} style={{ marginLeft: 8 }} /></>,
+      children: reminders ? renderItems(reminders.plannedFollowUps, '暂无计划跟进任务') : <Empty description="暂无提醒" />,
     },
     {
       key: 'disabled',
-      label: (
-        <span>
-          <CloseCircleOutlined />
-          已禁用提醒
-          <Badge count={disabledList.length} style={{ marginLeft: 8 }} />
-        </span>
-      ),
-      children: (
-        <div>
-          {disabledList.length === 0 ? (
-            <Empty description="暂无已禁用的提醒" />
-          ) : (
-            disabledList.map(renderDisabledCard)
-          )}
-        </div>
-      ),
+      label: <><CloseCircleOutlined /> 已禁用提醒 <Badge count={disabledList.length} style={{ marginLeft: 8 }} /></>,
+      children: disabledList.length === 0
+        ? <Empty description="暂无已禁用的提醒" />
+        : disabledList.map((item) => <DisabledReminderCard key={item.customerId} item={item} loading={enablingCustomerId === item.customerId} disabled={enablingCustomerId !== null} onEnable={handleEnableReminder} />),
     },
   ]
 
-  if (loading) {
-    return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <Spin size="large" tip="加载提醒中..." />
-      </div>
-    )
-  }
+  if (loading) return <div style={{ padding: 24, textAlign: 'center' }}><Spin size="large" tip="加载提醒中..." /></div>
 
   return (
     <div style={{ padding: 24 }}>
-      <Card 
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <BellOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-            <span>智能提醒中心</span>
-            {(reminders?.summary.totalReminders ?? 0) > 0 && (
-              <Badge 
-                count={reminders?.summary.totalReminders ?? 0} 
-                style={{ backgroundColor: '#ff4d4f' }}
-              />
-            )}
-          </div>
-        }
-        extra={
-          <Button onClick={() => { fetchReminders(); fetchDisabledList(); }}>刷新</Button>
-        }
+      <Card
+        title={<div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><BellOutlined style={{ fontSize: 24, color: '#1890ff' }} /><span>智能提醒中心</span>{(reminders?.summary.totalReminders ?? 0) > 0 && <Badge count={reminders?.summary.totalReminders ?? 0} style={{ backgroundColor: '#ff4d4f' }} />}</div>}
+        extra={<Button onClick={() => { void fetchReminders(); void fetchDisabledList() }}>刷新</Button>}
       >
-        {/* Statistics Overview */}
-        {reminders && (
-          <div style={{ marginBottom: 24, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-            <Card size="small" style={{ background: '#fff1f0', borderColor: '#ffccc7' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32, fontWeight: 'bold', color: '#ff4d4f' }}>
-                  {reminders.summary.totalOverdue}
-                </div>
-                <div style={{ color: '#666', marginTop: 8 }}>未跟进客户</div>
-              </div>
-            </Card>
-            <Card size="small" style={{ background: '#fffbe6', borderColor: '#ffe58f' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32, fontWeight: 'bold', color: '#faad14' }}>
-                  {reminders.summary.totalExpiring}
-                </div>
-                <div style={{ color: '#666', marginTop: 8 }}>合同到期</div>
-              </div>
-            </Card>
-            <Card size="small" style={{ background: '#e6f7ff', borderColor: '#91d5ff' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32, fontWeight: 'bold', color: '#1890ff' }}>
-                  {reminders.summary.totalUpcomingVisits}
-                </div>
-                <div style={{ color: '#666', marginTop: 8 }}>回访计划</div>
-              </div>
-            </Card>
-            <Card size="small" style={{ background: '#f6ffed', borderColor: '#b7eb8f' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32, fontWeight: 'bold', color: '#52c41a' }}>
-                  {reminders.summary.totalPlannedFollowUps}
-                </div>
-                <div style={{ color: '#666', marginTop: 8 }}>计划跟进</div>
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* Reminder List */}
+        {reminders && <ReminderStats reminders={reminders} />}
         <Tabs items={tabs} activeKey={activeTab} onChange={setActiveTab} />
       </Card>
-
       <FollowUpModal
         open={followUpModalVisible}
         customerId={selectedCustomer?.customerId}
         customerName={selectedCustomer?.customerName}
         plannedFollowUpId={selectedCustomer?.followUpId}
         onClose={() => setFollowUpModalVisible(false)}
-        onSaved={() => {
-          setFollowUpModalVisible(false)
-          void fetchReminders()
-        }}
+        onSaved={() => { setFollowUpModalVisible(false); void fetchReminders() }}
       />
-
-      {/* Disable Reminder Modal */}
-      <Modal
-        title="确认不再提醒"
+      <DisableReminderModal
         open={disableModalVisible}
-        confirmLoading={disableSubmitting}
-        cancelButtonProps={{ disabled: disableSubmitting }}
-        onCancel={() => {
-          if (!disableSubmitting) setDisableModalVisible(false)
-        }}
-        onOk={confirmDisableReminder}
-        okText="确认禁用"
-        cancelText="取消"
-      >
-        <div style={{ marginBottom: 16 }}>
-          <p><strong>客户:</strong> {selectedCustomer?.customerName}</p>
-          {selectedCustomer?.company && <p><strong>公司:</strong> {selectedCustomer.company}</p>}
-          <p><strong>提醒内容:</strong> {selectedCustomer?.message}</p>
-        </div>
-        
-        <Form form={form} layout="vertical">
-          <Form.Item 
-            label="请选择禁用原因" 
-            name="reason" 
-            rules={[{ required: true, message: '请选择禁用原因' }]}
-          >
-            <Radio.Group>
-              <Radio value="LOST">客户已流失</Radio>
-              <Radio value="NO_INTEREST">客户无意向</Radio>
-              <Radio value="TEMPORARY">暂时不需要跟进</Radio>
-              <Radio value="OTHER">其他</Radio>
-            </Radio.Group>
-          </Form.Item>
-          
-          <Form.Item 
-            noStyle
-            shouldUpdate={(prevValues, currentValues) => prevValues.reason !== currentValues.reason}
-          >
-            {({ getFieldValue }) =>
-              getFieldValue('reason') === 'OTHER' ? (
-                <Form.Item
-                  name="otherReason"
-                  rules={[{ required: true, message: '请输入禁用原因' }]}
-                >
-                  <Input placeholder="请输入具体原因" />
-                </Form.Item>
-              ) : null
-            }
-          </Form.Item>
-        </Form>
-      </Modal>
+        selected={selectedCustomer}
+        submitting={disableSubmitting}
+        form={form}
+        onCancel={() => { if (!disableSubmitting) setDisableModalVisible(false) }}
+        onConfirm={confirmDisableReminder}
+      />
     </div>
   )
 }

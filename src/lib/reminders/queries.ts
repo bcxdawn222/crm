@@ -32,6 +32,7 @@ export async function loadReminderRows(input: ReminderQueryInput) {
       where: {
         ...input.customerWhere,
         isPublic: false,
+        status: 'COOPERATING',
         reminderDisabled: false,
         contractEndDate: { gte: input.now, lte: thirtyDaysLater },
       },
@@ -43,6 +44,7 @@ export async function loadReminderRows(input: ReminderQueryInput) {
       where: {
         ...input.customerWhere,
         isPublic: false,
+        status: 'COOPERATING',
         reminderDisabled: false,
         nextVisitAt: { gte: input.now, lte: sevenDaysLater },
       },

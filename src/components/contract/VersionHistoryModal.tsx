@@ -5,27 +5,14 @@ import { Modal, Timeline, Card, Tag, Button, Space, message } from 'antd'
 import { DownloadOutlined, EyeOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { apiRequest } from '@/lib/http/client'
-
-interface ArchiveVersion {
-  id: string
-  version: number
-  isLatest: boolean
-  fileName: string
-  fileSize: number
-  fileType: string
-  archivedAt: string
-  archivedUser?: {
-    id: string
-    realName: string
-  }
-}
+import type { ContractArchive } from './contract-types'
 
 interface VersionHistoryModalProps {
   visible: boolean
   archiveId: string
   contractName: string
   onClose: () => void
-  onPreview: (archive: any) => void
+  onPreview: (archive: ContractArchive) => void
   onDownload: (archiveId: string) => void
 }
 
@@ -38,7 +25,7 @@ export default function VersionHistoryModal({
   onDownload
 }: VersionHistoryModalProps) {
   const [loading, setLoading] = useState(false)
-  const [versions, setVersions] = useState<ArchiveVersion[]>([])
+  const [versions, setVersions] = useState<ContractArchive[]>([])
 
   // Load versions
   const loadVersions = async () => {
@@ -46,7 +33,7 @@ export default function VersionHistoryModal({
     
     setLoading(true)
     try {
-      const result = await apiRequest<{ success: true; data: ArchiveVersion[] }>(
+      const result = await apiRequest<{ success: true; data: ContractArchive[] }>(
         `/api/contract-archives/${archiveId}/versions`
       )
       setVersions(result.data)

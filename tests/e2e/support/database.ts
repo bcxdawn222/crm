@@ -190,6 +190,14 @@ export async function ensureE2EFixtures(): Promise<void> {
       id: randomUUID(), name: fixtureNames.adminCustomer, company: 'E2E管理公司',
       phone: `17${runId.slice(0, 10)}`, source: 'OTHER', level: 'NORMAL', status: 'ACTIVE', salesId: adminId, notes: marker,
     },
+    {
+      id: randomUUID(), name: fixtureNames.cooperatingCustomer, company: 'E2E合作公司',
+      phone: `14${runId.slice(0, 10)}`, source: 'OTHER', level: 'IMPORTANT', status: 'COOPERATING',
+      salesId: adminId, notes: marker, contractStartDate: new Date(),
+      contractEndDate: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000), contractAmount: 128000,
+      renewalReminderDays: 30, nextVisitAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      visitFrequency: 'MONTHLY', cooperationNotes: marker, operationManagerId: adminId,
+    },
   )
   await prisma.customer.createMany({ data: customers })
   await prisma.customer.create({
@@ -207,6 +215,28 @@ export async function ensureE2EFixtures(): Promise<void> {
       publicPoolEnteredAt: new Date(),
       publicPoolReason: 'MANUAL_ARCHIVE',
       notes: marker,
+    },
+  })
+  await prisma.telemarketingList.create({
+    data: {
+      name: fixtureNames.telemarketing,
+      company: 'E2E电销公司',
+      phone: `19${runId.slice(0, 10)}`,
+      source: marker,
+      status: 'PENDING',
+      salesId: adminId,
+      notes: marker,
+    },
+  })
+  await prisma.dailyReport.create({
+    data: {
+      userId: adminId,
+      title: fixtureNames.dailyReport,
+      content: marker,
+      workSummary: marker,
+      tomorrowPlan: '继续跟进测试客户',
+      reportDate: new Date(new Date().toISOString().slice(0, 10)),
+      status: 'SUBMITTED',
     },
   })
 }
