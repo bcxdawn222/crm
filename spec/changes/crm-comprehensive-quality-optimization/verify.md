@@ -447,3 +447,10 @@ conclusion: fail
 - `python scripts\manage.py perf --profile test` 退出码 0，前端性能预算报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\前端性能预算.md`，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-perf-20260825-201551.log`。
 - E2E 结束后已清理 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\output\playwright\results`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\output\playwright\report`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\output\playwright\.last-run.json` 和 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\storage\test` 下的测试上传内容；测试服务、端口和实例锁由 E2E 入口停止并复核。
 - 当前仍未执行线上 `promote`，未修改 stable 数据库或线上进程；真实服务器 TLS、反向代理、防火墙、备份介质权限和线上恢复能力仍需在服务器环境只读核对。18.5 保持未完成，等待用户明确确认后再执行。
+
+## Apply working evidence - 2026-08-25 最终 test 发布包
+
+- 提交 `4e7a8bc` 后重新生成 test 发布包：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\.build\test\release\1.0.0-4e7a8bc4.zip`，SHA256 为 `79c2941753a4bf1b3854231c9c76eef574e80fba26d4d84162edb8d0da000f1a`。
+- `release` 内置 typecheck 和生产构建均退出码 0，最终发布日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-release-20260825-201759.log`，构建日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260825-201806.log`。
+- 独立复核发布包 SHA256、`release-manifest.json` 的 `profile=test` 与 `gate_status=passed`、`.env.example` 保留、真实 `.env`/日志/存储/测试目录/Python 缓存排除；解压后的 `python scripts\manage.py --help` 退出码 0。客户说明 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\CRM系统客户运行说明.txt` 复核为 UTF-8 BOM + CRLF。
+- 当前工作区已清理；未执行线上 `promote`。稳定版当前状态和线上数据库没有被本轮修改。
