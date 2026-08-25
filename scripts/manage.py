@@ -39,6 +39,7 @@ TEST_FLOW_SCRIPTS = {
     "perf": "../performance/frontend_budget.py",
     "perf-runtime": "../performance/frontend_runtime.py",
     "api-perf": "../performance/api_database.py",
+    "stability": "../performance/stability.py",
     "e2e": "../e2e/run.py",
 }
 

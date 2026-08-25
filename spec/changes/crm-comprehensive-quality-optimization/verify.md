@@ -406,3 +406,12 @@ conclusion: fail
 - `network-session-flow` 首次因服务仍使用默认 8 小时会话而在等待 60 秒后得到 HTTP 200；这是测试环境未注入短会话参数，不是通过结果。test 服务以 `CRM_SESSION_MAX_AGE_SECONDS=60` 重启后再次真实等待 60 秒，接口返回 JSON 401，错误为“登录状态已过期”，响应体与 `x-request-id` 一致，退出码 0；最终日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-network-session-flow-20260825-163631.log`。
 - 最终 `python scripts\manage.py data-reachability --profile test` 退出码 0：`Customer`、`FollowUp`、`Lead`、`Order`、`Payment`、`File`、`Message`、`ContractArchive`、`SystemSetting` 均为 0，外键孤立项、异常订单金额和负回款均为 0；日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260825-163839.log`。
 - 最终 `python scripts\manage.py instance-status --profile test` 显示 `stopped`，PID 不存在、端口 `3001` 未监听、锁为 False；日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-instance-status-20260825-163839.log`。Playwright `.last-run.json` 状态文件已删除，`storage/test` 无测试上传残留。
+
+## Apply working evidence - 2026-08-25 长时间稳定性与性能压力测试
+
+- 新增 test-only k6 场景 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\k6\scripts\crm-stability.js`，并通过 `python scripts\manage.py stability --profile test` 统一执行；Windows/Python 和 shell 入口分别为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\scripts\performance\stability.py`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\scripts\performance\stability.sh`。
+- 第一轮执行未进入压测门禁，原因是 test 没有现成 `.next/BUILD_ID`，生产模式按规则拒绝启动；随后稳定性入口增加现有 `manage.py build --profile test` 前置步骤。第二轮 k6 初始失败的原因是 VU Cookie 在迭代间被清空，修正为 `noCookiesReset=true` 后重新执行，未修改业务接口或放宽断言。
+- 最终 k6 结果：3 分钟、8 个只读 VU、8 次受控客户写入、8270 个 HTTP 请求，吞吐 45.72 req/s，p95 80.55 ms，p99 174.63 ms，失败率 0%，检查通过率 100%，受控写入 p95 106.84 ms，丢弃迭代 0。
+- 资源采样 17 次：CRM 进程内存 163.48 至 348.72 MB，句柄 824 至 891，数据库连接 9 至 24，未超过预算；服务重启恢复 6.64 秒。完整报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\稳定性与压力测试.md`，原始 JSON 为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\stability-performance-20260825T093135Z.json`，k6 汇总为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\k6-stability-K6-STABILITY-20260825092546.json`。
+- 真实会话过期复验退出码 0，60 秒空闲后返回 JSON 401，错误文案为“登录状态已过期”，响应体和响应头 `requestId` 一致；日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-network-session-flow-20260825-173026.log`。
+- 最终数据可达性退出码 0，Customer、FollowUp、Lead、Order、Payment、File、Message、ContractArchive、SystemSetting 均为 0；日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260825-173203.log`。最终实例状态为 stopped，端口未监听、锁为 False；日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-instance-status-20260825-173210.log`。
