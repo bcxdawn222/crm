@@ -202,17 +202,6 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         bottom: 0,
       }}
     >
-      <div style={{ 
-        height: 64, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        color: 'white',
-        fontSize: collapsed ? 16 : 20,
-        fontWeight: 'bold',
-      }}>
-        {collapsed ? 'CRM' : 'CRM系统'}
-      </div>
       <Menu
         mode="inline"
         theme="dark"
