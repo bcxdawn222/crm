@@ -14,6 +14,11 @@ from typing import Any, Mapping, TypedDict, cast
 BASE_URL = os.environ.get("CRM_BASE_URL", "http://127.0.0.1:3000").rstrip("/")
 USERNAME = os.environ.get("CRM_SMOKE_USERNAME", "admin")
 PASSWORD = os.environ.get("CRM_SMOKE_PASSWORD", "123456")
+VERIFY_INVALID_LOGIN = os.environ.get("CRM_SMOKE_VERIFY_INVALID_LOGIN", "1").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+}
 
 
 class SessionUser(TypedDict):
@@ -140,18 +145,19 @@ def main() -> int:
     require(login_page.status == 200, f"登录页返回 {login_page.status}")
 
     protected = request(anonymous, "/api/customers")
-    protected_payload = json_body(protected)
+    protected_payload = read_json(protected)
     require(protected.status == 401, "未登录访问客户接口没有返回 401")
     require(isinstance(protected_payload.get("requestId"), str), "未登录 API 响应缺少 requestId")
 
-    invalid = build_opener(http.cookiejar.CookieJar())
-    login(invalid, USERNAME, f"{PASSWORD}-invalid")
-    invalid_session = get_session(invalid)
-    require(
-        invalid_session is None
-        or (isinstance(invalid_session, dict) and "user" not in invalid_session),
-        "错误密码意外获得登录 session",
-    )
+    if VERIFY_INVALID_LOGIN:
+        invalid = build_opener(http.cookiejar.CookieJar())
+        login(invalid, USERNAME, f"{PASSWORD}-invalid")
+        invalid_session = get_session(invalid)
+        require(
+            invalid_session is None
+            or (isinstance(invalid_session, dict) and "user" not in invalid_session),
+            "错误密码意外获得登录 session",
+        )
 
     authenticated = build_opener(http.cookiejar.CookieJar())
     login_result = login(authenticated, USERNAME, PASSWORD)

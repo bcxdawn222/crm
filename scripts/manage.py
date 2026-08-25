@@ -228,6 +228,7 @@ def main() -> int:
             (
                 ("runtime-test", (sys.executable, str(ROOT / "scripts" / "quality" / "runtime_checks.py"))),
                 ("instance-test", (sys.executable, str(ROOT / "scripts" / "quality" / "instance_flow_test.py"))),
+                ("smoke-script-test", (sys.executable, str(ROOT / "scripts" / "quality" / "smoke_script_test.py"))),
             ),
             logger,
         )

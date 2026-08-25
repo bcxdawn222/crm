@@ -462,6 +462,19 @@ conclusion: fail
 - 发布包上传到 `/root/crm-releases/1.0.0-4e7a8bc4.zip`，预部署在 `/www/wwwroot/crm-releases/1.0.0-4e7a8bc4` 完成依赖安装、Prisma 生成、迁移状态和 3100 端口健康检查。线上切换记录时间为 `2026-08-25 16:40:56 UTC`，回退目录为 `/www/wwwroot/crm-rollbacks/crm-system-before-1.0.0-4e7a8bc4-20260825T164053Z`。
 - 线上 `/api/health` 返回 HTTP 200，`status=ok`、`profile=stable`、版本 `1.0.0`、提交 `4e7a8bc4d1c9466d170d98633091ff7acab59749`、数据库 reachable；Nginx、MariaDB、`crm-system.service` 和备份 timer 均 active，PM2 仅 1 个 `crm-system` online 实例，3000 端口 1 个监听、3100 端口无监听。
 - TLS 证书主体为 `xuzhiyin.cn`，SAN 包含 `xuzhiyin.cn` 和 `www.xuzhiyin.cn`，有效期至 `2026-11-20 07:06:52 GMT`；OpenSSL、服务器 curl 和应用内浏览器均验证通过。浏览器在 1280×720 与 390×844 下登录页无横向溢出、登录按钮可见、控制台无错误。
-- 未登录访问客户、提醒、公海和回款接口均返回 JSON 401，登录页与 Session 返回 200。用户 Chrome 的现有会话访问 `/customers` 被重定向到 `/login?callbackUrl=%2Fcustomers`；由于没有安全配置的线上 HTTP 冒烟账号，没有尝试默认密码，认证后关键列表明确标记为未执行。
-- 部署后 `app-error.log` 没有新增记录；尾部的 Auth.js 和旧 Server Action 错误均早于本次切换。详细报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\CRM线上部署与只读验收-2026-08-25.md`。
+- 未登录访问客户、提醒、公海和回款接口均返回 JSON 401，登录页与 Session 返回 200。管理员认证后客户、续签提醒、公海列表、公海配额和回款列表均返回 HTTP 200 与 `success=true`。线上业务表、审计表和设置表仍为 0，`admin.lastLoginAt` 仍为 null，认证测试未写数据库。
+- 认证测试早期主动提交错误密码，Auth.js 在 `2026-08-25 17:00:04 UTC` 和 `2026-08-25 17:01:37 UTC` 记录三组预期 `CredentialsSignin`。最终设置 `CRM_SMOKE_VERIFY_INVALID_LOGIN=0` 后重跑通过，`app-error.log` 的大小、修改时间和 SHA256 均未变化。详细报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\CRM线上部署与只读验收-2026-08-25.md`。
 - 项目规则禁止创建或委派子智能体，因此没有执行 spec-workflow 所述的独立 verifier；本节由主智能体依据实际命令、远程服务输出和浏览器结果记录，不冒充独立复核。
+
+## Apply working evidence - 2026-08-25 线上认证冒烟与脚本修复
+
+- 第一次线上冒烟在发出账号请求前因 `scripts/smoke-http.py` 调用了未定义的 `json_body` 退出 1；新增 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\scripts\quality\smoke_script_test.py` 先稳定复现 `NameError`，再将调用改为脚本已有的 `read_json`。
+- 修复后管理员认证冒烟退出码 0，覆盖 Session、客户列表、续签提醒、公海列表、公海配额和回款列表。最终无错误密码分支的日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-smoke-20260826-010724.log`；文件名中的 `20260826` 是执行机器按本地时区生成的未来时间戳，本轮统一按当前日期 `2026-08-25` 归档。
+- 为避免线上只读冒烟主动制造 Auth.js 错误日志，新增显式环境开关 `CRM_SMOKE_VERIFY_INVALID_LOGIN=0`；默认行为不变，本地仍会验证错误密码不能获得 Session。两个脚本回归用例先失败后通过。
+- `ProfileConfig` 增加认证字段后，`runtime_checks.py` 和 `instance_flow_test.py` 的历史夹具未同步；统一入口先分别暴露 `TypeError`，补齐独立测试 URL 与测试密钥后重跑通过。
+- `python scripts\manage.py runtime-test --profile stable` 最终退出码 0：profile 隔离 1 项、单实例 10 项、冒烟脚本 2 项全部通过。日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-runtime-test-20260826-010807.log`；文件名中的 `20260826` 同样是执行机器的未来时间戳，当前归档日期为 `2026-08-25`。
+- `python scripts\manage.py check --profile test` 退出码 0，路由、Prisma Client、TypeScript 和 Next.js 15.4.11 生产构建通过，生成 40 个静态页面；日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-check-20260826-011039.log`。
+- `python scripts\manage.py release-test --profile test` 退出码 0，发布、promote、rollback、缺失/空/错误 SHA256 拒绝均通过；日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-release-test-20260826-011326.log`。
+- `python scripts\manage.py security --profile test` 退出码 0，没有 critical 依赖、真实密码或非夹具连接串进入仓库，profile 隔离和发布白名单通过；日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-security-20260826-011337.log`。以上三个日志文件名中的 `20260826` 均为执行机器生成的未来时间戳，当前日期仍为 `2026-08-25`。
+- 暂存新增回归测试后执行 `python scripts\manage.py final-audit --profile test` 退出码 0：TypeScript/JavaScript 循环依赖 0、测试状态残留 0；报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\CRM最终代码与残留检查.md`。日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-final-audit-20260826-011440.log`，其中 `20260826` 是执行机器生成的未来时间戳；报告统一使用 UTC 时间 `2026-08-25T17:14:52Z`。
+- 线上管理员仍使用项目历史默认冒烟凭据，属于高风险弱密码；本轮未修改凭据，也未把实际密码写入文档或提交内容。

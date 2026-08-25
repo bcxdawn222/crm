@@ -44,6 +44,8 @@ def main() -> int:
             database_url="mysql://test:test@127.0.0.1:3307/crm_test",
             database_host="127.0.0.1",
             database_port=3307,
+            auth_url="http://127.0.0.1:3301",
+            auth_secret="runtime-check-secret-32-characters-minimum",
             upload_dir=root / "storage",
             log_dir=root / "logs",
             pid_file=root / "server.pid",

@@ -1,6 +1,6 @@
 # CRM 最终代码与残留检查
 
-生成时间：2026-08-25T16:48:51Z
+生成时间：2026-08-25T17:14:52Z
 
 ## 结果
 
@@ -23,8 +23,8 @@
 | 目录 | 文件数 |
 | --- | ---: |
 | `.` | 89 |
-| `scripts/quality` | 41 |
-| `docs` | 25 |
+| `scripts/quality` | 42 |
+| `docs` | 26 |
 | `scripts` | 13 |
 | `scripts/docs` | 12 |
 | `scripts/performance` | 11 |
