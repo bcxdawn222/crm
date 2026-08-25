@@ -1,13 +1,13 @@
 # CRM 最终代码与残留检查
 
-生成时间：2026-08-25T20:17:31+08:00
+生成时间：2026-08-25T16:48:51Z
 
 ## 结果
 
 - TypeScript/JavaScript import 循环：0。
 - 明确测试状态残留：0。
 - 超过 300 行的跟踪脚本：4。
-- 单层超过 8 个跟踪文件的目录：8。
+- 单层超过 8 个跟踪文件的目录：9。
 
 ## 超长文件
 
@@ -23,13 +23,14 @@
 | 目录 | 文件数 |
 | --- | ---: |
 | `.` | 89 |
-| `scripts/quality` | 40 |
-| `docs` | 22 |
+| `scripts/quality` | 41 |
+| `docs` | 25 |
 | `scripts` | 13 |
 | `scripts/docs` | 12 |
 | `scripts/performance` | 11 |
 | `scripts/deploy` | 9 |
 | `scripts/runtime` | 9 |
+| `tests/e2e/specs` | 9 |
 
 ## 循环依赖
 

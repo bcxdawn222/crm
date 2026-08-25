@@ -454,3 +454,14 @@ conclusion: fail
 - `release` 内置 typecheck 和生产构建均退出码 0，最终发布日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-release-20260825-201759.log`，构建日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-build-20260825-201806.log`。
 - 独立复核发布包 SHA256、`release-manifest.json` 的 `profile=test` 与 `gate_status=passed`、`.env.example` 保留、真实 `.env`/日志/存储/测试目录/Python 缓存排除；解压后的 `python scripts\manage.py --help` 退出码 0。客户说明 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\CRM系统客户运行说明.txt` 复核为 UTF-8 BOM + CRLF。
 - 当前工作区已清理；未执行线上 `promote`。稳定版当前状态和线上数据库没有被本轮修改。
+
+## Apply working evidence - 2026-08-25 线上部署与只读验收
+
+- 用户明确要求部署后，本地执行 `python scripts\manage.py promote --profile stable --artifact ".build\test\release\1.0.0-4e7a8bc4.zip"` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-promote-20260826-004005.log`。该命令登记 stable 发布状态；远程切换另行在服务器执行。
+- 上线前备份 `/root/crm-backups/crm_system-20260825T163142Z.sql.gz` 的 `gzip -t` 和 SHA256 通过，SHA256 为 `0b89a102e58bf7a1e18e63712c2f17edad0fb34682aeebd21b58091ab4d1d5f4`；本机副本为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\output\database-backups\crm_system-20260825T163142Z.sql.gz`。临时库恢复核对 19 张表、1 个用户、4 个角色、46 个权限和 9 条有效迁移后删除，未修改原库。
+- 发布包上传到 `/root/crm-releases/1.0.0-4e7a8bc4.zip`，预部署在 `/www/wwwroot/crm-releases/1.0.0-4e7a8bc4` 完成依赖安装、Prisma 生成、迁移状态和 3100 端口健康检查。线上切换记录时间为 `2026-08-25 16:40:56 UTC`，回退目录为 `/www/wwwroot/crm-rollbacks/crm-system-before-1.0.0-4e7a8bc4-20260825T164053Z`。
+- 线上 `/api/health` 返回 HTTP 200，`status=ok`、`profile=stable`、版本 `1.0.0`、提交 `4e7a8bc4d1c9466d170d98633091ff7acab59749`、数据库 reachable；Nginx、MariaDB、`crm-system.service` 和备份 timer 均 active，PM2 仅 1 个 `crm-system` online 实例，3000 端口 1 个监听、3100 端口无监听。
+- TLS 证书主体为 `xuzhiyin.cn`，SAN 包含 `xuzhiyin.cn` 和 `www.xuzhiyin.cn`，有效期至 `2026-11-20 07:06:52 GMT`；OpenSSL、服务器 curl 和应用内浏览器均验证通过。浏览器在 1280×720 与 390×844 下登录页无横向溢出、登录按钮可见、控制台无错误。
+- 未登录访问客户、提醒、公海和回款接口均返回 JSON 401，登录页与 Session 返回 200。用户 Chrome 的现有会话访问 `/customers` 被重定向到 `/login?callbackUrl=%2Fcustomers`；由于没有安全配置的线上 HTTP 冒烟账号，没有尝试默认密码，认证后关键列表明确标记为未执行。
+- 部署后 `app-error.log` 没有新增记录；尾部的 Auth.js 和旧 Server Action 错误均早于本次切换。详细报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\CRM线上部署与只读验收-2026-08-25.md`。
+- 项目规则禁止创建或委派子智能体，因此没有执行 spec-workflow 所述的独立 verifier；本节由主智能体依据实际命令、远程服务输出和浏览器结果记录，不冒充独立复核。
