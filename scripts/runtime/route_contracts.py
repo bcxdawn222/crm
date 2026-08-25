@@ -22,27 +22,15 @@ def run_route_check(logger: logging.Logger) -> int:
             logger.error("路由文件不存在: %s", path)
             return 1
 
-    cooperating_route = (ROOT / "src/app/api/customers/cooperating/route.ts").read_text(
-        encoding="utf-8"
-    )
-    payments_page = (ROOT / "src/app/(dashboard)/finance/payments/page.tsx").read_text(
-        encoding="utf-8"
-    )
-    orders_page = (ROOT / "src/app/(dashboard)/finance/orders/page.tsx").read_text(
-        encoding="utf-8"
-    )
-    order_form = (
-        ROOT / "src/app/(dashboard)/finance/orders/order-form-modal.tsx"
-    ).read_text(encoding="utf-8")
+    cooperating_route = (ROOT / "src/app/api/customers/cooperating/route.ts").read_text(encoding="utf-8")
+    payments_page = (ROOT / "src/app/(dashboard)/finance/payments/page.tsx").read_text(encoding="utf-8")
+    orders_page = (ROOT / "src/app/(dashboard)/finance/orders/page.tsx").read_text(encoding="utf-8")
+    order_form = (ROOT / "src/app/(dashboard)/finance/orders/order-form-modal.tsx").read_text(encoding="utf-8")
     tasks_page = (ROOT / "src/app/(dashboard)/tasks/page.tsx").read_text(encoding="utf-8")
-    task_form = (ROOT / "src/app/(dashboard)/tasks/task-form-modal.tsx").read_text(
-        encoding="utf-8"
-    )
+    task_form = (ROOT / "src/app/(dashboard)/tasks/task-form-modal.tsx").read_text(encoding="utf-8")
     order_api = (ROOT / "src/app/api/finance/orders/route.ts").read_text(encoding="utf-8")
     task_api = (ROOT / "src/app/api/tasks/route.ts").read_text(encoding="utf-8")
-    assignee_api = (ROOT / "src/app/api/tasks/assignees/route.ts").read_text(
-        encoding="utf-8"
-    )
+    assignee_api = (ROOT / "src/app/api/tasks/assignees/route.ts").read_text(encoding="utf-8")
     forbidden_fragments = (
         ("GET_REMINDERS", cooperating_route),
         ("/api/finance/payments/${id}", payments_page),

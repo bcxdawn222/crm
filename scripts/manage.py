@@ -19,7 +19,7 @@ from runtime.manager import (
 from runtime.instance_state import inspect_instance
 from runtime.release_actions import run_release_action
 from runtime.profile_config import ProfileConfig, get_profile_config
-from quality.route_contracts import run_route_check
+from runtime.route_contracts import run_route_check
 ROOT = Path(__file__).resolve().parents[1]
 TEST_FLOW_SCRIPTS = {
     "data-flow": "data_flow_test.py",

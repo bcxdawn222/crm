@@ -43,6 +43,18 @@ def check_release_payload_contract() -> None:
     require("prisma/schema.prisma" in included, "发布包缺少 Prisma schema，无法在服务器生成 Client")
     require("next.config.mjs" in included, "发布包缺少 Next.js ESM 运行配置")
     require("scripts/cli" in included, "发布包缺少 manage.py 的 CLI 依赖")
+    require("scripts/runtime" in included, "发布包缺少 manage.py 的运行时依赖")
+    require("scripts/release.py" in included, "发布包缺少发布管理脚本")
+    require("src" in included and "tsconfig.json" in included, "发布包缺少 check 所需源码或类型配置")
+    require("CRM系统客户运行说明.txt" in included, "发布包缺少客户运行说明")
+    require("docs/CRM系统维护与发布回滚手册.md" in included, "发布包缺少维护手册")
+    files = release.included_files()
+    require(all("__pycache__" not in path.parts for path in files), "发布包仍包含 __pycache__")
+    require(all(path.suffix not in {".pyc", ".pyo"} for path in files), "发布包仍包含 Python 缓存文件")
+    require(
+        all(not path.relative_to(ROOT).as_posix().startswith("public/uploads/") for path in files),
+        "发布包仍包含 public/uploads 中的上传文件",
+    )
 
 
 def write_artifact(root: Path, release_id: str, commit: str) -> tuple[Path, release.ReleaseManifest]:

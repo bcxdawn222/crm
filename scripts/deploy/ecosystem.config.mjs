@@ -1,4 +1,4 @@
-const root = process.env.CRM_ROOT || '/opt/crm-system';
+const root = process.env.CRM_ROOT || '/www/wwwroot/crm-system';
 
 export default {
   apps: [

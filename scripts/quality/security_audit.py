@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from runtime.mysql_client import parse_database_url, run_mysql
 from runtime.profile_config import get_profile_config
+import release
 
 
 class AuditVulnerability(TypedDict, total=False):
@@ -122,28 +123,7 @@ def profile_isolation() -> CheckResult:
 
 
 def release_files() -> tuple[Path, ...]:
-    roots = (
-        ROOT / ".next",
-        ROOT / "next.config.mjs",
-        ROOT / "package.json",
-        ROOT / "package-lock.json",
-        ROOT / "public",
-        ROOT / "prisma" / "schema.prisma",
-        ROOT / "prisma" / "migrations",
-        ROOT / "scripts" / "manage.py",
-        ROOT / "scripts" / "cli",
-        ROOT / "scripts" / "runtime",
-        ROOT / "scripts" / "deploy",
-    )
-    files: list[Path] = []
-    for entry in roots:
-        if not entry.exists():
-            raise RuntimeError(f"发布白名单路径不存在: {entry}")
-        if entry.is_file():
-            files.append(entry)
-        else:
-            files.extend(path for path in entry.rglob("*") if path.is_file())
-    return tuple(files)
+    return release.included_files()
 
 
 def contains_bytes(path: Path, needles: tuple[bytes, ...]) -> bool:

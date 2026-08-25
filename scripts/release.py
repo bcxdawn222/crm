@@ -12,6 +12,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+from release_payload import included_files as payload_files
+from release_payload import required_paths as payload_paths
 from release_state import previous_promoted_artifact, read_state, write_state
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -83,34 +85,9 @@ def release_paths(profile: str, release_id: str) -> tuple[Path, Path]:
     root = ROOT / ".build" / profile / "release"
     return root / release_id, root / f"{release_id}.zip"
 def required_paths() -> tuple[Path, ...]:
-    return (
-        ROOT / ".next",
-        ROOT / "next.config.mjs",
-        ROOT / "package.json",
-        ROOT / "package-lock.json",
-        ROOT / "public",
-        ROOT / "prisma" / "schema.prisma",
-        ROOT / "prisma" / "migrations",
-        ROOT / "scripts" / "manage.py",
-        ROOT / "scripts" / "cli",
-        ROOT / "scripts" / "runtime",
-        ROOT / "scripts" / "deploy",
-    )
+    return payload_paths(ROOT)
 def included_files() -> tuple[Path, ...]:
-    files: list[Path] = []
-    for entry in required_paths():
-        if not entry.exists():
-            raise RuntimeError(f"发布所需路径不存在: {entry}")
-        if entry.is_file():
-            files.append(entry)
-        else:
-            files.extend(
-                item
-                for item in entry.rglob("*")
-                if item.is_file() and ".next/cache" not in item.relative_to(ROOT).as_posix()
-            )
-    unique = {path.resolve(): path for path in files}
-    return tuple(sorted(unique.values()))
+    return payload_files(ROOT)
 def write_manifest(path: Path, manifest: ReleaseManifest) -> None:
     path.write_text(
         json.dumps(asdict(manifest), ensure_ascii=False, indent=2) + "\n",

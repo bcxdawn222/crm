@@ -1,0 +1,127 @@
+﻿CRM 系统客户运行说明
+====================
+
+更新日期：2026 年 8 月 25 日
+
+一、适用范围
+------------
+
+本文用于已经完成环境配置和依赖安装的 CRM 系统。
+Windows 项目目录示例：D:\Desktop\CRM系统代码 (2)\CRM系统代码
+服务器默认目录：/www/wwwroot/crm-system
+
+运行命令使用系统 Python，不需要安装 uv。
+
+二、日常启动
+------------
+
+1. 打开 PowerShell 或命令提示符。
+2. 进入项目目录：
+
+cd /d "D:\Desktop\CRM系统代码 (2)\CRM系统代码"
+
+3. 查看系统状态：
+
+python scripts\manage.py status --profile stable
+
+4. 启动正式系统：
+
+python scripts\manage.py start --profile stable --mode production
+
+看到“服务已启动”后，在浏览器打开配置好的正式访问地址。
+
+同一个 stable 不能重复启动。第二次启动被拒绝属于正常保护，不会出现两个服务同时写数据。
+
+三、停止系统
+------------
+
+python scripts\manage.py stop --profile stable
+
+停止命令只会结束经过项目路径、profile 和端口校验的当前 CRM 进程。
+
+四、检查系统
+------------
+
+查看运行状态：
+
+python scripts\manage.py status --profile stable
+
+检查路由、类型和生产构建：
+
+python scripts\manage.py check --profile stable
+
+说明：check 会执行生产构建，耗时比 status 长。日常查看是否在运行只用 status。
+
+五、查看日志
+------------
+
+管理命令日志目录：
+D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable
+
+服务运行日志：
+D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\server.log
+
+出现页面错误时，请记录页面显示的 requestId，再在 server.log 中查找同一个 requestId。不要因为页面提示失败就直接修改数据库。
+
+六、常见状态
+------------
+
+running：系统正在运行。
+stopped：系统没有运行，可以执行启动命令。
+starting：系统正在启动，稍后再次查看状态。
+port_conflict：端口被其他程序占用，需要先确认占用程序。
+foreign_pid：PID 指向其他程序，系统会拒绝误停该程序。
+corrupt：运行记录与实际进程不一致，需要技术人员检查。
+
+遇到 port_conflict、foreign_pid 或 corrupt 时，不要直接删除 .runtime 文件，也不要结束不认识的进程。请保留对应 manage 日志和 server.log。
+
+七、正式版和测试版
+------------------
+
+stable 是正式系统，默认端口 3000。
+test 是验收系统，默认端口 3001。
+
+两者必须使用不同数据库、认证密钥、访问地址和上传目录。测试数据只能写入 test，不能在 stable 或线上数据库运行自动化测试。
+
+八、数据库备份
+--------------
+
+Linux 服务器默认每天北京时间 03:20 自动备份数据库。
+默认备份目录：/root/crm-backups
+默认备份日志：/www/wwwroot/crm-system/logs/database-backup.log
+
+备份文件存在不等于一定可恢复。维护人员还需要检查任务退出码、文件大小和 gzip 完整性。
+
+数据库恢复不会自动执行。恢复前必须停止写入、重新备份当前数据库，并优先恢复到临时数据库检查。
+
+九、版本发布
+------------
+
+新版本先在 test 环境验收。发布包包含 ZIP、SHA256 和 release-manifest.json。
+
+promote 只登记通过验收的 test 发布包，不会自动上传服务器、切换 Nginx、迁移数据库或重启正式服务。没有明确发布确认时，不执行 promote。
+
+rollback 只能切回记录中的上一版本，也不会自动回滚数据库或删除业务数据。
+
+十、需要保留的信息
+------------------
+
+每次启动、停止、检查、发布和回滚后，至少保留：
+
+1. 执行时间和操作人。
+2. 使用的 profile。
+3. manage 日志完整路径。
+4. 发布包完整路径和 SHA256。
+5. 页面错误的 requestId。
+6. 数据库备份完整路径和大小。
+
+十一、已知限制
+--------------
+
+1. 当前浏览器自动化主要覆盖 Chromium 桌面版和 390 像素手机视口。
+2. 线上 TLS、云防火墙、数据库最小权限和备份介质权限需要在实际服务器检查。
+3. 发布脚本不会代替服务器部署人员执行远程上线。
+4. 数据库恢复需要人工核对，不能只依靠代码版本回滚。
+
+更详细的维护说明：
+D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\CRM系统维护与发布回滚手册.md
