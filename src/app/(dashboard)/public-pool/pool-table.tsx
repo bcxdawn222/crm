@@ -50,16 +50,18 @@ export function PoolTable(props: PoolTableProps) {
     },
   ]
   return (
-    <Table
-      columns={columns}
-      dataSource={props.customers}
-      rowKey="id"
-      loading={props.loading}
-      pagination={{
-        current: props.page, pageSize: props.pageSize, total: props.total,
-        showSizeChanger: true, showQuickJumper: true, showTotal: (count) => `共 ${count} 条`, onChange: props.onPageChange,
-      }}
-      scroll={{ x: 1200 }}
-    />
+    <div className="crm-public-pool-table">
+      <Table
+        columns={columns}
+        dataSource={props.customers}
+        rowKey="id"
+        loading={props.loading}
+        pagination={{
+          current: props.page, pageSize: props.pageSize, total: props.total,
+          showSizeChanger: true, showQuickJumper: true, showTotal: (count) => `共 ${count} 条`, onChange: props.onPageChange,
+        }}
+        scroll={{ x: 1200 }}
+      />
+    </div>
   )
 }

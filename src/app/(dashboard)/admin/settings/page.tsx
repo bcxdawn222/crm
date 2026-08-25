@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { usePermission } from '@/hooks/usePermission'
 import { apiRequest } from '@/lib/http/client'
+import { PageShell } from '@/components/common/PageShell'
 import type { SettingsFormValues, SettingsResponse } from './types'
 
 
@@ -49,8 +50,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <section style={{ maxWidth: 720 }}>
-      <h1 style={{ margin: '0 0 16px', fontSize: 22 }}>系统设置</h1>
+    <PageShell title="系统设置" maxWidth={720}>
       <Spin spinning={loading}>
         <Form<SettingsFormValues>
           form={form}
@@ -82,6 +82,6 @@ export default function SettingsPage() {
           ) : null}
         </Form>
       </Spin>
-    </section>
+    </PageShell>
   )
 }

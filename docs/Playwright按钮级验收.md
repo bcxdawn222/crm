@@ -2,11 +2,11 @@
 
 ## 本轮结果
 
-- 生成时间：2026-08-25 19:41:57 +0800
+- 生成时间：2026-08-25 20:12:54 +0800
 - 运行环境：`CRM_PROFILE=test`
 - 数据库保护：仅允许数据库名以 `_test` 结尾
 - 浏览器：Chromium Desktop、Chromium Mobile（390px）
-- 结果：26 项通过，0 项未通过，共 26 项
+- 结果：28 项通过，0 项未通过，共 28 项
 - 原始 JSON：`output/playwright/report.json`
 - 失败产物：`output/playwright/results/`，仅失败时保留 screenshot、video 和 trace
 
@@ -49,7 +49,9 @@
 | 23 | specs\recovery.spec.ts / 真实服务端 500 | 下载对象缺失时按钮返回 500、带请求号且不误改数据 | 通过 |
 | 24 | specs\settings.spec.ts / 系统设置按钮 | 保存设置重复点击只写入一次并在刷新后回显 | 通过 |
 | 25 | specs\settings.spec.ts / 受限设置权限 | 受限用户直达页面和接口均被拒绝 | 通过 |
-| 26 | specs\shell.mobile.spec.ts | 手机端使用抽屉导航且页面无横向溢出 | 通过 |
+| 26 | specs\ui-quality.spec.ts | 18 个页面在五档视口无整体溢出且按钮名称可读 | 通过 |
+| 27 | specs\ui-quality.spec.ts | 键盘焦点、表单标签和 reduced-motion 状态可识别 | 通过 |
+| 28 | specs\shell.mobile.spec.ts | 手机端使用抽屉导航且页面无横向溢出 | 通过 |
 
 ## 未自动化范围
 

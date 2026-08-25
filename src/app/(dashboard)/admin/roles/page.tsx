@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { usePermission } from '@/hooks/usePermission'
 import { apiRequest } from '@/lib/http/client'
+import { PageShell } from '@/components/common/PageShell'
 import RoleEditModal from './RoleEditModal'
 import type {
   PermissionOption,
@@ -88,8 +89,7 @@ export default function RolesPage() {
   ], [canEdit])
 
   return (
-    <section>
-      <h1 style={{ margin: '0 0 16px', fontSize: 22 }}>角色管理</h1>
+    <PageShell title="角色管理">
       <Table
         columns={columns}
         dataSource={roles}
@@ -106,6 +106,6 @@ export default function RolesPage() {
         onCancel={() => setEditingRole(null)}
         onSubmit={saveRole}
       />
-    </section>
+    </PageShell>
   )
 }

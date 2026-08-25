@@ -38,6 +38,7 @@ TEST_FLOW_SCRIPTS = {
     "api-perf": "../performance/api_database.py",
     "stability": "../performance/stability.py",
     "security-flow": "security_flow_test.py",
+    "final-audit": "final_repository_audit.py",
     "e2e": "../e2e/run.py",
 }
 

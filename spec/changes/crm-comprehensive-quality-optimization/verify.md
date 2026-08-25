@@ -435,3 +435,15 @@ conclusion: fail
 - 性能门禁第一次按旧 100 kB 公共预算退出码 1，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-perf-20260825-194214.log`。历史构建证明公共包从 88.2 kB 变为 101 kB 与 React 19 的 Ant Design 兼容补丁同时发生；页面路由预算没有超限。公共预算按当前强制技术栈基线改为 105 kB，关键路由和全页面 500 kB 上限不变，复测退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-perf-20260825-194555.log`。
 - 安全检查继续登记 Next.js 15.4.11 运行依赖残余风险；线上 TLS、云防火墙、数据库最小权限、备份介质权限、真实服务器恢复和浏览器兼容范围未由本地 test 验证。尚未执行 `promote` 或线上写操作。
 - 项目规则禁止创建或委派子智能体，因此没有执行 spec-workflow 所述的独立 verifier；本节由主智能体依据实际命令退出码和日志记录，不冒充独立复核。
+
+## Apply working evidence - 2026-08-25 最终 UI、数据与回溯复验
+
+- 本轮修复了两个 390px 移动端横向溢出：提醒卡片补充内容区 `min-width: 0`、操作区换行和长文本断行；公海池搜索区改为移动端换行，表格限制在自身滚动容器内。修改文件为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\src\app\(dashboard)\reminders\reminder-cards.tsx`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\src\app\(dashboard)\public-pool\page.tsx`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\src\app\(dashboard)\public-pool\pool-table.tsx` 和 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\src\app\globals.css`。
+- `python scripts\manage.py typecheck --profile test` 退出码 0；`python scripts\manage.py check --profile test` 退出码 0，完成路由、Prisma、TypeScript 和生产构建检查，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-check-20260825-201423.log`。
+- `python scripts\manage.py e2e --profile test` 最终 28/28 通过，覆盖业务按钮、权限、恢复、18 个页面的 1440、1280、1024、768、390px 视口、键盘焦点、表单标签、reduced-motion 和手机抽屉导航；最终日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-e2e-20260825-201043.log`，按钮报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\Playwright按钮级验收.md`。
+- 中间复测曾先发现 `/reminders`、随后发现 `/public-pool` 在 390px 横向溢出，均保留在日志中并实际修复；没有放宽 UI 断言、跳过页面或改为只检查局部容器。
+- `python scripts\manage.py button-audit --profile test` 退出码 0，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-button-audit-20260825-201527.log`；`python scripts\manage.py data-reachability --profile test` 退出码 0，数据库网络、`SELECT 1`、15 张核心表、12 条页面到 API 到模型到审计链路、外键孤立项和金额质量检查均通过，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260825-201539.log`。
+- 数据可达性复核显示 test 数据库中的 Customer、FollowUp、Lead、Order、Payment、File、Message、ContractArchive、SystemSetting 均为 0；保留 2 条既有 `AuditEvent` 历史，不删除原始审计数据。
+- `python scripts\manage.py perf --profile test` 退出码 0，前端性能预算报告为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\docs\前端性能预算.md`，日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-perf-20260825-201551.log`。
+- E2E 结束后已清理 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\output\playwright\results`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\output\playwright\report`、`D:\Desktop\CRM系统代码 (2)\CRM系统代码\output\playwright\.last-run.json` 和 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\storage\test` 下的测试上传内容；测试服务、端口和实例锁由 E2E 入口停止并复核。
+- 当前仍未执行线上 `promote`，未修改 stable 数据库或线上进程；真实服务器 TLS、反向代理、防火墙、备份介质权限和线上恢复能力仍需在服务器环境只读核对。18.5 保持未完成，等待用户明确确认后再执行。

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { usePermission } from '@/hooks/usePermission'
 import { apiRequest } from '@/lib/http/client'
+import { PageShell } from '@/components/common/PageShell'
 import UserFormModal from './UserFormModal'
 import type {
   RoleListResponse,
@@ -150,16 +151,15 @@ export default function UsersPage() {
   ], [can, currentUser?.id])
 
   return (
-    <section>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h1 style={{ margin: 0, fontSize: 22 }}>用户管理</h1>
-        {can('create', 'user') && canManageRoles ? (
+    <PageShell
+      title="用户管理"
+      actions={can('create', 'user') && canManageRoles ? (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => {
             setEditingUser(null)
             setModalOpen(true)
           }}>新增用户</Button>
         ) : null}
-      </div>
+    >
       <Table
         columns={columns}
         dataSource={users}
@@ -189,6 +189,6 @@ export default function UsersPage() {
         onCancel={() => setModalOpen(false)}
         onSubmit={saveUser}
       />
-    </section>
+    </PageShell>
   )
 }

@@ -95,6 +95,7 @@ export default function PublicPoolPage() {
 
   return (
     <Card
+      className="crm-public-pool-card"
       title="公海池"
       extra={(
         <Button
@@ -111,8 +112,9 @@ export default function PublicPoolPage() {
     >
       {showDashboard && statistics && <PublicPoolDashboard stats={statistics} />}
       <QuotaCard status={quotaStatus} />
-      <Space style={{ marginBottom: 16 }}>
+      <Space className="crm-public-pool-search" style={{ marginBottom: 16 }}>
         <Input
+          className="crm-public-pool-search-input"
           placeholder="搜索姓名、公司、电话"
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}

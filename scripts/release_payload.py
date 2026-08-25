@@ -5,6 +5,8 @@ from pathlib import Path
 
 CUSTOMER_GUIDE_NAME = "CRM系统客户运行说明.txt"
 MAINTENANCE_DOCS = (
+    "docs/CRM按钮契约清单.md",
+    "docs/CRM页面与交互验收清单.md",
     "docs/CRM系统维护与发布回滚手册.md",
     "docs/CRM稳定版发布清单.md",
 )
