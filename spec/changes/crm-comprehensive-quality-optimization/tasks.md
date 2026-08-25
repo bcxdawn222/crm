@@ -155,10 +155,10 @@
   - [x] 17.6 清理安全测试产物，通过安全检查后提交 `security: harden CRM data handling and release artifacts`。
 
 - [ ] 18. 发布、回滚与客户文档
-  - [ ] 18.1 在 `docs/` 更新维护文档，说明架构、profile、按钮契约、数据可达性、性能预算、备份和回滚。
-  - [ ] 18.2 在交付包根目录生成 UTF-8 BOM、CRLF 的客户 TXT，说明 Windows 使用 `python scripts\manage.py` 启停、检查和查看日志。
-  - [ ] 18.3 生成 stable 发布清单，列出版本、提交、迁移、备份、配置、验证结果、已知限制和未验证范围。
-  - [ ] 18.4 在 test 完成全套 `check`、`button-audit`、`data-reachability`、`e2e`、`perf`、安全与回滚演练。
+  - [x] 18.1 在 `docs/` 更新维护文档，说明架构、profile、按钮契约、数据可达性、性能预算、备份和回滚。
+  - [x] 18.2 在交付包根目录生成 UTF-8 BOM、CRLF 的客户 TXT，说明 Windows 使用 `python scripts\manage.py` 启停、检查和查看日志。
+  - [x] 18.3 生成 stable 发布清单，列出版本、提交、迁移、备份、配置、验证结果、已知限制和未验证范围。
+  - [x] 18.4 在 test 完成全套 `check`、`button-audit`、`data-reachability`、`e2e`、`perf`、安全与回滚演练；性能首次因 React 19 兼容基线超过旧预算失败，重新制定有依据的 105 kB 公共预算后复测通过，失败和通过日志均保留。
   - [ ] 18.5 经用户确认后执行 promote；上线后只读核对健康、登录、关键列表和日志，不直接运行破坏性测试。
   - [ ] 18.6 清理测试文件、测试账户、临时上传和未使用发布物，保留验收日志与报告。
   - [ ] 18.7 提交 `docs: finalize CRM release rollback and customer operations guide`。

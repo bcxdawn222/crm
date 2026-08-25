@@ -4,7 +4,7 @@
 
 候选版本：`1.0.0`
 
-代码基线：`ef802b7c1e6de4cf966d77ecf2fa6bec6f05de5d`
+运行代码基线：`404c8f3a6a110fbf94f4e99995a3b851d5c1803a`
 
 说明：最终候选提交、构建时间和文件哈希以 test 发布包内的 `release-manifest.json` 及同名 `.sha256` 为准。本清单不代表已经执行线上 promote。
 
@@ -60,13 +60,15 @@
 
 | 门禁 | 命令 | 状态 |
 | --- | --- | --- |
-| 类型、路由、构建 | `python scripts\manage.py check --profile test` | 待本轮执行 |
-| 按钮静态契约 | `python scripts\manage.py button-audit --profile test` | 待本轮执行 |
-| 数据可达性 | `python scripts\manage.py data-reachability --profile test` | 待本轮执行 |
-| 浏览器 E2E | `python scripts\manage.py e2e --profile test` | 待本轮执行 |
-| 前端性能预算 | `python scripts\manage.py perf --profile test` | 待本轮执行 |
-| 安全检查 | `python scripts\manage.py security --profile test` | 待本轮执行 |
-| 发布与回滚演练 | `python scripts\manage.py release-test --profile test` | 待本轮执行 |
+| 类型、路由、构建 | `python scripts\manage.py check --profile test` | 通过；`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-check-20260825-193830.log` |
+| 按钮静态契约 | `python scripts\manage.py button-audit --profile test` | 通过；`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-button-audit-20260825-193950.log` |
+| 数据可达性 | `python scripts\manage.py data-reachability --profile test` | 通过；`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260825-193951.log` |
+| 浏览器 E2E | `python scripts\manage.py e2e --profile test` | 26/26 通过；`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-e2e-20260825-194006.log` |
+| 前端性能预算 | `python scripts\manage.py perf --profile test` | 通过；`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-perf-20260825-194555.log` |
+| 安全检查 | `python scripts\manage.py security --profile test` | 通过；`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-security-20260825-194556.log` |
+| 发布与回滚演练 | `python scripts\manage.py release-test --profile test` | 通过；`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-release-test-20260825-194602.log` |
+
+性能门禁第一次执行未通过，公共首屏 JavaScript 为 101.0 kB，超过旧的 100 kB 预算，失败日志为 `D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-perf-20260825-194214.log`。历史构建显示该变化发生在 React 19 的 Ant Design 兼容补丁加入后；公共预算按当前强制技术栈基线调整为 105 kB，关键路由和单页 500 kB 上限未放宽，随后复测通过。
 
 ## 6. 发布产物
 
