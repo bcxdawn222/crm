@@ -9,26 +9,12 @@ import {
   serverErrorResponse,
 } from "@/lib/http/request-context";
 import { canAccessSalesData } from "@/lib/data-permission";
-import { OrderStatus, Prisma } from "@prisma/client";
-import { z } from "zod";
-
-const updateOrderSchema = z
-  .object({
-    contractNo: z.string().trim().max(50).nullable().optional(),
-    contractAmount: z.coerce.number().positive().max(99_999_999.99).optional(),
-    currency: z.enum(["CNY", "USD", "EUR"]).optional(),
-    signDate: z.coerce.date().nullable().optional(),
-    deliveryDate: z.coerce.date().nullable().optional(),
-    remarks: z.string().trim().max(10_000).nullable().optional(),
-    status: z.nativeEnum(OrderStatus).optional(),
-  })
-  .refine(
-    (data) =>
-      !data.signDate ||
-      !data.deliveryDate ||
-      data.deliveryDate >= data.signDate,
-    "交付日期不能早于签约日期",
-  );
+import { Prisma } from "@prisma/client";
+import {
+  serializeOrderAmounts,
+  serializeOrderDetails,
+  updateOrderSchema,
+} from "./order-route-helpers";
 
 // GET /api/finance/orders/[id] - 获取订单详情
 export async function GET(
@@ -100,16 +86,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: {
-        ...order,
-        contractAmount: order.contractAmount.toNumber(),
-        paidAmount: order.paidAmount.toNumber(),
-        unpaidAmount: order.unpaidAmount.toNumber(),
-        payments: order.payments.map((p) => ({
-          ...p,
-          amount: p.amount.toNumber(),
-        })),
-      },
+      data: serializeOrderDetails(order),
     });
   } catch (error) {
     return serverErrorResponse(
@@ -226,12 +203,7 @@ export async function PUT(
     return jsonWithRequestId(
       {
         success: true,
-        data: {
-          ...order,
-          contractAmount: order.contractAmount.toNumber(),
-          paidAmount: order.paidAmount.toNumber(),
-          unpaidAmount: order.unpaidAmount.toNumber(),
-        },
+        data: serializeOrderAmounts(order),
         message: "订单更新成功",
       },
       requestId,

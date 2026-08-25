@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { defineAbility } from "@/lib/casl";
-import { CustomerLevel, CustomerSource, CustomerStatus } from "@prisma/client";
 import { recordAuditEvent } from "@/lib/audit/record";
 import { canAccessSalesData } from "@/lib/data-permission";
 import {
@@ -10,17 +9,11 @@ import {
   jsonWithRequestId,
   serverErrorResponse,
 } from "@/lib/http/request-context";
-
-class CustomerRouteError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly code: string,
-  ) {
-    super(message);
-    this.name = "CustomerRouteError";
-  }
-}
+import {
+  buildCustomerUpdateData,
+  CustomerRouteError,
+  parseCustomerUpdate,
+} from "./customer-route-helpers";
 
 // GET /api/customers/[id] - 获取客户详情
 export async function GET(
@@ -120,23 +113,19 @@ export async function PUT(
       return NextResponse.json({ error: "无权更新客户" }, { status: 403 });
     }
 
-    const body = await request.json();
-    const {
-      name,
-      company,
-      phone,
-      email,
-      address,
-      category,
-      source,
-      notes,
-      status,
-    } = body;
-
-    // 验证必填字段
-    if (!name || !phone) {
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
       return NextResponse.json(
-        { error: "姓名和电话为必填项" },
+        { error: "请求内容不是有效 JSON" },
+        { status: 400 },
+      );
+    }
+    const parsed = parseCustomerUpdate(payload);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "客户参数不正确" },
         { status: 400 },
       );
     }
@@ -163,7 +152,7 @@ export async function PUT(
     // 检查电话是否与其他客户重复
     const duplicatePhone = await prisma.customer.findFirst({
       where: {
-        phone,
+        phone: parsed.data.phone,
         id: { not: id },
       },
     });
@@ -175,39 +164,11 @@ export async function PUT(
       );
     }
 
-    // 将category映射为level
-    const categoryMap: Record<string, CustomerLevel> = {
-      潜在客户: "POTENTIAL",
-      普通客户: "NORMAL",
-      重要客户: "IMPORTANT",
-      VIP客户: "VIP",
-    };
-
     // 更新客户
     const customer = await prisma.$transaction(async (tx) => {
       const updated = await tx.customer.update({
         where: { id },
-        data: {
-          name,
-          company,
-          phone,
-          email,
-          address,
-          level: category
-            ? categoryMap[category] || existingCustomer.level
-            : existingCustomer.level,
-          source: Object.values(CustomerSource).includes(
-            source as CustomerSource,
-          )
-            ? (source as CustomerSource)
-            : existingCustomer.source,
-          notes,
-          status: Object.values(CustomerStatus).includes(
-            status as CustomerStatus,
-          )
-            ? (status as CustomerStatus)
-            : existingCustomer.status,
-        },
+        data: buildCustomerUpdateData(parsed.data, existingCustomer),
       });
       await recordAuditEvent(tx, {
         actorId: session.user.id,
