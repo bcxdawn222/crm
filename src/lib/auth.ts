@@ -7,11 +7,13 @@ import {
 import type { AuthenticatedDatabaseUser } from '@/lib/auth/database-user'
 import type { JWT } from 'next-auth/jwt'
 
+import { getAuthSecret } from '@/lib/auth/config'
+
 const DEFAULT_SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
 const MIN_SESSION_MAX_AGE_SECONDS = 60
 const MAX_SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 const authUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL
-const authSecret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
+const authSecret = getAuthSecret()
 
 if (!authSecret || authSecret.length < 32) {
   throw new Error('AUTH_SECRET 或 NEXTAUTH_SECRET 必须配置且长度不能少于 32 个字符')

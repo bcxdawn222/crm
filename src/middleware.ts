@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { hasPageAccess } from '@/lib/access/page-access'
+import { getAuthSecret } from '@/lib/auth/config'
 
 // 公开路由(不需要认证)
 const publicRoutes = ['/login', '/api/auth', '/api/health']
@@ -59,7 +60,7 @@ export async function middleware(request: NextRequest) {
 
   const token = await getToken({
     req: request,
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: getAuthSecret(),
     secureCookie: forwardedProtocol === 'https',
   })
   

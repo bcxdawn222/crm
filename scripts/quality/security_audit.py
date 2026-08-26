@@ -178,6 +178,7 @@ def source_contracts() -> CheckResult:
     checks = {
         "src/middleware.ts": ("isCrossOriginWrite", "sec-fetch-site", "请求来源校验失败"),
         "src/lib/auth.ts": ("useSecureCookies", "trustHost: true", "authSecret.length < 32"),
+        "src/lib/auth/config.ts": ("getAuthSecret", "process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET"),
         "src/lib/files/validation.ts": ("validateUploadedFile", "文件内容与扩展名不一致", "safeOriginalName"),
         "src/lib/audit/sanitize.ts": ("SENSITIVE_KEY", "PRIVATE_KEY", "[REDACTED]"),
         "next.config.mjs": ("Content-Security-Policy", "X-Content-Type-Options", "Permissions-Policy"),

@@ -2,11 +2,24 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Modal, Form, Input, DatePicker, InputNumber, Select, Upload, message, Button, Space } from 'antd'
+import type { RcFile, UploadChangeParam, UploadFile } from 'antd/es/upload/interface'
 import { InboxOutlined, UploadOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
+import type { Dayjs } from 'dayjs'
 import { apiRequest } from '@/lib/http/client'
 
 const { TextArea } = Input
+
+type ContractType = 'SALES' | 'SERVICE' | 'COOPERATION' | 'OTHER'
+
+interface ContractUploadValues {
+  contractName: string
+  contractType?: ContractType
+  signDate?: Dayjs
+  effectiveDate?: Dayjs
+  expiryDate?: Dayjs
+  contractAmount?: number
+  remarks?: string
+}
 
 interface ContractUploadFormProps {
   visible: boolean
@@ -23,7 +36,7 @@ export default function ContractUploadForm({
 }: ContractUploadFormProps) {
   const [form] = Form.useForm()
   const [uploading, setUploading] = useState(false)
-  const [fileList, setFileList] = useState<any[]>([])
+  const [fileList, setFileList] = useState<UploadFile[]>([])
   const submissionIdRef = useRef('')
 
   useEffect(() => {
@@ -31,7 +44,7 @@ export default function ContractUploadForm({
   }, [visible])
 
   // Handle submit
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: ContractUploadValues) => {
     if (fileList.length === 0) {
       message.error('请上传合同文件')
       return
@@ -39,7 +52,11 @@ export default function ContractUploadForm({
 
     setUploading(true)
     try {
-      const file = fileList[0].originFileObj
+      const file = fileList[0]?.originFileObj
+      if (!file) {
+        message.error('合同文件读取失败，请重新选择文件')
+        return
+      }
       const formData = new FormData()
       
       formData.append('file', file)
@@ -69,12 +86,12 @@ export default function ContractUploadForm({
   }
 
   // Handle file change
-  const handleFileChange = ({ fileList: newFileList }: any) => {
-    setFileList(newFileList)
+  const handleFileChange = (info: UploadChangeParam<UploadFile>) => {
+    setFileList(info.fileList)
   }
 
   // Before upload validation
-  const beforeUpload = (file: File) => {
+  const beforeUpload = (file: RcFile) => {
     const allowedTypes = [
       'application/pdf',
       'application/msword',
