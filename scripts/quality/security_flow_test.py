@@ -82,6 +82,57 @@ def check_request_guards(opener, base_url: str) -> None:
     require(bool(returned_id) and returned_id != "bad request id", "非法 requestId 未被替换")
 
 
+def check_input_validation(opener, base_url: str) -> None:
+    invalid_date_paths = (
+        "/api/daily-reports?page=1&pageSize=1&startDate=not-a-date&endDate=2026-01-01",
+        "/api/daily-leads?page=1&pageSize=1&startDate=not-a-date&endDate=2026-01-01",
+        "/api/finance/payments?page=1&pageSize=1&startDate=not-a-date&endDate=2026-01-01",
+        "/api/finance/reports/summary?startDate=not-a-date&endDate=2026-01-01",
+    )
+    for path in invalid_date_paths:
+        result = request(opener, base_url, path)
+        require(result.status == 400, f"非法日期未返回 400: {path} HTTP {result.status}")
+
+    reversed_range = request(
+        opener,
+        base_url,
+        "/api/daily-reports?page=1&pageSize=1&startDate=2026-02-02&endDate=2026-02-01",
+    )
+    require(reversed_range.status == 400, "倒序日期范围未返回 400")
+
+    invalid_report = request(
+        opener,
+        base_url,
+        "/api/daily-reports",
+        method="POST",
+        payload={"reportDate": "2026-02-31", "content": "输入校验测试"},
+    )
+    require(invalid_report.status == 400, "日报接口非法日期未返回 400")
+
+    malformed_task = request(
+        opener,
+        base_url,
+        "/api/tasks",
+        method="POST",
+        body=b"{",
+        content_type="application/json",
+    )
+    require(malformed_task.status == 400, f"任务接口非法 JSON 未返回 400，HTTP {malformed_task.status}")
+
+    invalid_task_date = request(
+        opener,
+        base_url,
+        "/api/tasks",
+        method="POST",
+        payload={
+            "title": "输入校验测试",
+            "assigneeId": "00000000-0000-0000-0000-000000000000",
+            "dueDate": "not-a-date",
+        },
+    )
+    require(invalid_task_date.status == 400, "任务接口非法截止日期未返回 400")
+
+
 def check_upload_guards(opener, base_url: str, database_url: str) -> None:
     body, content_type = multipart_file("file", "fake.pdf", b"not-a-pdf", "application/pdf")
     mismatch = request(
@@ -128,6 +179,7 @@ def main() -> int:
     check_headers(base_url)
     opener = login_and_check_cookie(base_url, username, password)
     check_request_guards(opener, base_url)
+    check_input_validation(opener, base_url)
     check_upload_guards(opener, base_url, database_url)
     print("安全 HTTP 验收通过：响应头、Cookie、同源写校验、错误脱敏、requestId、上传签名和路径均符合要求")
     return 0

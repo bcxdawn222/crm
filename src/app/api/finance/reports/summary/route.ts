@@ -7,6 +7,7 @@ import { defineAbility } from '@/lib/casl'
 import { Prisma } from '@prisma/client'
 import { buildDataFilter } from '@/lib/data-permission'
 import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { parseDateRangeQuery } from '@/lib/http/date-validation'
 
 // GET /api/finance/reports/summary - Get financial summary
 export async function GET(request: Request) {
@@ -26,8 +27,10 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const startDate = searchParams.get('startDate') || ''
-    const endDate = searchParams.get('endDate') || ''
+    const dateRange = parseDateRangeQuery(searchParams)
+    if (!dateRange.success) {
+      return NextResponse.json({ error: dateRange.error }, { status: 400 })
+    }
 
     // Build query conditions
     const where: Prisma.OrderWhereInput = {
@@ -35,10 +38,10 @@ export async function GET(request: Request) {
     }
 
     // Date range filter
-    if (startDate && endDate) {
+    if (dateRange.data) {
       where.signDate = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
+        gte: dateRange.data.startDate,
+        lte: dateRange.data.endDate,
       }
     }
 

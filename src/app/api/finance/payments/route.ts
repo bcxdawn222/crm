@@ -8,6 +8,7 @@ import { createPayment, CreatePaymentError } from '@/lib/payments/create'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { getAccessibleUserIds } from '@/lib/data-permission'
 import { parsePagination } from '@/lib/http/pagination'
+import { parseDateRangeQuery } from '@/lib/http/date-validation'
 
 
 const createPaymentSchema = z.object({
@@ -44,8 +45,10 @@ export async function GET(request: Request) {
     }
     const { page, pageSize } = pagination
     const keyword = searchParams.get('keyword') || ''
-    const startDate = searchParams.get('startDate') || ''
-    const endDate = searchParams.get('endDate') || ''
+    const dateRange = parseDateRangeQuery(searchParams)
+    if (!dateRange.success) {
+      return NextResponse.json({ error: dateRange.error }, { status: 400 })
+    }
 
     // Build query conditions
     const where: Prisma.PaymentWhereInput = {}
@@ -66,10 +69,10 @@ export async function GET(request: Request) {
     }
 
     // Date range filter
-    if (startDate && endDate) {
+    if (dateRange.data) {
       where.paymentDate = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
+        gte: dateRange.data.startDate,
+        lte: dateRange.data.endDate,
       }
     }
 

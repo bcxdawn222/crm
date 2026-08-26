@@ -5,6 +5,16 @@ import { getAccessibleUserIds } from '@/lib/data-permission'
 import { parsePagination } from '@/lib/http/pagination'
 import { Prisma } from '@prisma/client'
 import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { dateOnlySchema, parseDateRangeQuery } from '@/lib/http/date-validation'
+import { z } from 'zod'
+
+const createDailyReportSchema = z.object({
+  reportDate: dateOnlySchema,
+  content: z.string().trim().min(1, '工作内容不能为空'),
+  tomorrowPlan: z.string().optional().nullable(),
+  issues: z.string().optional().nullable(),
+  attachments: z.string().max(1000).optional().nullable(),
+})
 
 // GET /api/daily-reports - Get daily report list
 export async function GET(request: Request) {
@@ -27,8 +37,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Pagination parameters are invalid' }, { status: 400 })
     }
     const { page, pageSize } = pagination
-    const startDate = searchParams.get('startDate') || ''
-    const endDate = searchParams.get('endDate') || ''
+    const dateRange = parseDateRangeQuery(searchParams)
+    if (!dateRange.success) {
+      return NextResponse.json({ error: dateRange.error }, { status: 400 })
+    }
 
     // Build query conditions
     const where: Prisma.DailyReportWhereInput = {}
@@ -41,10 +53,10 @@ export async function GET(request: Request) {
     // Admin and Finance can view all reports
 
     // Date range filter
-    if (startDate && endDate) {
+    if (dateRange.data) {
       where.reportDate = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
+        gte: dateRange.data.startDate,
+        lte: dateRange.data.endDate,
       }
     }
 
@@ -98,19 +110,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No permission to create daily report' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { reportDate, content, tomorrowPlan, issues, attachments } = body
-
-    // Validate required fields
-    if (!reportDate || !content) {
-      return NextResponse.json({ error: 'Report date and work content are required' }, { status: 400 })
+    let payload: unknown
+    try {
+      payload = await request.json()
+    } catch {
+      return NextResponse.json({ error: '请求内容不是有效 JSON' }, { status: 400 })
     }
+    const parsed = createDailyReportSchema.safeParse(payload)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? '日报参数不正确' },
+        { status: 400 },
+      )
+    }
+    const { reportDate, content, tomorrowPlan, issues, attachments } = parsed.data
 
     // Create daily report
     const report = await prisma.dailyReport.create({
       data: {
-        reportDate: new Date(reportDate),
-        title: `${reportDate} 工作日报`,
+        reportDate,
+        title: `${reportDate.toISOString().slice(0, 10)} 工作日报`,
         content,
         tomorrowPlan,
         issues,

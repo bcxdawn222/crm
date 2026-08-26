@@ -7,6 +7,16 @@ import { canCreateTask, findTaskAssigneeWithinScope } from '@/lib/tasks/assignee
 import { Prisma, TaskPriority, TaskStatus } from '@prisma/client'
 import { getAccessibleUserIds } from '@/lib/data-permission'
 import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { dateOnlySchema } from '@/lib/http/date-validation'
+import { z } from 'zod'
+
+const createTaskSchema = z.object({
+  title: z.string().trim().min(1, '任务标题不能为空').max(200),
+  description: z.string().max(10000).optional().nullable(),
+  assigneeId: z.string().uuid('负责人 ID 格式不正确'),
+  dueDate: dateOnlySchema.nullable().optional(),
+  priority: z.nativeEnum(TaskPriority).default(TaskPriority.MEDIUM),
+})
 
 // GET /api/tasks - Get task list
 export async function GET(request: Request) {
@@ -116,29 +126,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No permission to create task' }, { status: 403 })
     }
 
-    const body = await request.json() as {
-      title?: string
-      description?: string
-      assigneeId?: string
-      dueDate?: string | null
-      priority?: string
+    let payload: unknown
+    try {
+      payload = await request.json()
+    } catch {
+      return NextResponse.json({ error: '请求内容不是有效 JSON' }, { status: 400 })
     }
-    const { title, description, assigneeId, dueDate, priority } = body
-
-    // Validate required fields
-    if (!title?.trim() || !assigneeId) {
-      return NextResponse.json({ error: 'Title and assignee are required' }, { status: 400 })
+    const parsed = createTaskSchema.safeParse(payload)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? '任务参数不正确' },
+        { status: 400 },
+      )
     }
-
-    const normalizedPriority = priority || TaskPriority.MEDIUM
-    if (!Object.values(TaskPriority).includes(normalizedPriority as TaskPriority)) {
-      return NextResponse.json({ error: 'Task priority is invalid' }, { status: 400 })
-    }
-
-    const dueDateValue = dueDate ? new Date(dueDate) : null
-    if (dueDateValue && Number.isNaN(dueDateValue.getTime())) {
-      return NextResponse.json({ error: 'Task due date is invalid' }, { status: 400 })
-    }
+    const { title, description, assigneeId, dueDate, priority } = parsed.data
 
     const assignee = await findTaskAssigneeWithinScope(session.user.id, roles, assigneeId)
     if (!assignee) {
@@ -158,8 +159,8 @@ export async function POST(request: Request) {
         title: title.trim(),
         description,
         assigneeId,
-        endDate: dueDateValue,
-        priority: normalizedPriority as TaskPriority,
+        endDate: dueDate ?? null,
+        priority,
         creatorId: session.user.id,
         status: 'TODO',
       }

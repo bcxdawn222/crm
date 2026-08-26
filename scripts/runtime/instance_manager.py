@@ -161,6 +161,7 @@ def start_server(
                     "AUTH_TRUST_HOST": os.environ.get("AUTH_TRUST_HOST", "true"),
                     "NEXTAUTH_SECRET": config.auth_secret,
                     "NEXTAUTH_URL": config.auth_url,
+                    "CRM_SESSION_MAX_AGE_SECONDS": os.environ.get("CRM_SESSION_MAX_AGE_SECONDS", ""),
                 },
                 stdout=server_log,
                 stderr=subprocess.STDOUT,

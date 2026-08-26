@@ -8,6 +8,7 @@ import { canAccessSalesData, getAccessibleUserIds } from '@/lib/data-permission'
 import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { parsePagination } from '@/lib/http/pagination'
 import { queryDailyLeads } from '@/lib/reports/daily-leads'
+import { parseDateRangeQuery } from '@/lib/http/date-validation'
 
 // GET /api/daily-leads - 获取每日新增客资统计
 export async function GET(request: Request) {
@@ -27,9 +28,11 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const startDate = searchParams.get('startDate')
-    const endDate = searchParams.get('endDate')
     const salesId = searchParams.get('salesId')
+    const dateRange = parseDateRangeQuery(searchParams)
+    if (!dateRange.success) {
+      return NextResponse.json({ error: dateRange.error }, { status: 400 })
+    }
     const pagination = parsePagination(searchParams)
     if (!pagination) {
       return NextResponse.json({ error: 'Pagination parameters are invalid' }, { status: 400 })
@@ -44,8 +47,8 @@ export async function GET(request: Request) {
     const result = await queryDailyLeads({
       accessibleUserIds: await getAccessibleUserIds(session.user.id, session.user.roles),
       salesId: salesId || undefined,
-      startDate: startDate ? new Date(`${startDate}T00:00:00.000Z`) : undefined,
-      endDate: endDate ? new Date(`${endDate}T23:59:59.999Z`) : undefined,
+      startDate: dateRange.data?.startDate,
+      endDate: dateRange.data?.endDate,
       ...pagination,
     })
 
