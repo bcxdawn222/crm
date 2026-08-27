@@ -2,6 +2,7 @@
 
 import { Card, Radio, Spin } from 'antd'
 import CRMChart from '@/components/charts/CRMChart'
+import type { CallbackDataParams } from 'echarts/types/dist/shared'
 import { useState, useEffect } from 'react'
 import { apiRequest } from '@/lib/http/client'
 
@@ -10,6 +11,22 @@ interface TrendDataPoint {
   revenue: number
   orders: number
   newCustomers: number
+}
+
+interface TrendTooltipParam extends CallbackDataParams {
+  axisValue?: string | number
+}
+
+type TrendTooltipParams = TrendTooltipParam | TrendTooltipParam[]
+
+function tooltipItems(params: TrendTooltipParams): TrendTooltipParam[] {
+  const items = Array.isArray(params) ? params : [params]
+  return items as TrendTooltipParam[]
+}
+
+function numericTooltipValue(value: CallbackDataParams['value']): number {
+  const firstValue = Array.isArray(value) ? value[0] : value
+  return Number(firstValue ?? 0)
 }
 
 export default function RevenueTrendChart() {
@@ -48,18 +65,20 @@ export default function RevenueTrendChart() {
         type: 'cross',
         crossStyle: { color: '#999' }
       },
-      formatter: (params: any) => {
-        const date = params[0].axisValue
+      formatter: (params: TrendTooltipParams) => {
+        const items = tooltipItems(params)
+        const date = items[0]?.axisValue ?? items[0]?.name ?? ''
         let html = `<div style="padding: 8px;"><strong>${date}</strong><br/>`
-        
-        params.forEach((item: any) => {
-          const value = item.seriesName === '合同金额' 
-            ? `¥${item.value.toLocaleString()}`
-            : `${item.value}${item.seriesName === '订单数' ? '单' : '个'}`
+
+        items.forEach((item) => {
+          const numericValue = numericTooltipValue(item.value)
+          const value = item.seriesName === '合同金额'
+            ? `¥${numericValue.toLocaleString()}`
+            : `${numericValue}${item.seriesName === '订单数' ? '单' : '个'}`
           
           html += `
             <div style="margin-top: 4px; display: flex; align-items: center;">
-              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ${item.color}; margin-right: 8px;"></span>
+              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ${item.color ?? '#999'}; margin-right: 8px;"></span>
               <span>${item.seriesName}: <strong>${value}</strong></span>
             </div>
           `

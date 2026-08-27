@@ -1,6 +1,6 @@
 'use client'
 
-import { DeleteOutlined, EditOutlined, ExportOutlined, EyeOutlined, SwapOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, DeleteOutlined, EditOutlined, ExportOutlined, EyeOutlined, SwapOutlined } from '@ant-design/icons'
 import { Button, Input, Select, Space, Table, Tag } from 'antd'
 import type { ColumnGroupType, ColumnsType, ColumnType } from 'antd/es/table'
 import { useState } from 'react'
@@ -31,6 +31,7 @@ interface CustomerTableProps {
   onDelete: (customer: Customer) => void
   onArchive: (customer: Customer) => void
   onTransfer: (customer: Customer) => void
+  onCooperate: (customer: Customer) => void
 }
 
 const initialWidths = {
@@ -56,7 +57,14 @@ export function CustomerTable(props: CustomerTableProps) {
     { title: '分类', dataIndex: 'category', key: 'category', width: widths.category, render: (text: string) => <Tag color="blue">{text}</Tag>, onHeaderCell: header('category') },
     {
       title: '状态', dataIndex: 'status', key: 'status', width: widths.status,
-      render: (text: string) => <Tag color={text === 'ACTIVE' ? 'green' : 'red'}>{text === 'ACTIVE' ? '活跃' : '停用'}</Tag>,
+      render: (text: string) => {
+        const status = {
+          ACTIVE: { color: 'green', label: '活跃' },
+          INACTIVE: { color: 'red', label: '停用' },
+          COOPERATING: { color: 'blue', label: '已合作' },
+        }[text] || { color: 'default', label: text }
+        return <Tag color={status.color}>{status.label}</Tag>
+      },
       onHeaderCell: header('status'),
     },
     {
@@ -77,7 +85,7 @@ export function CustomerTable(props: CustomerTableProps) {
       render: (text: string) => new Date(text).toLocaleString('zh-CN'), onHeaderCell: header('createdAt'),
     },
     {
-      title: '操作', key: 'action', width: widths.action, fixed: 'right', onHeaderCell: header('action'),
+      title: '操作', key: 'action', width: 340, fixed: 'right', onHeaderCell: header('action'),
       render: (_, record) => (
         <Space size="small">
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => props.onView(record)}>查看</Button>
@@ -88,6 +96,7 @@ export function CustomerTable(props: CustomerTableProps) {
             <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => props.onDelete(record)}>删除</Button>
           </PermissionGuard>
           {!record.isPublic && <PermissionGuard action="update" subject="customer"><Button type="link" size="small" icon={<ExportOutlined />} onClick={() => props.onArchive(record)}>归档</Button></PermissionGuard>}
+          {!record.isPublic && record.status !== 'COOPERATING' && <PermissionGuard action="update" subject="customer"><Button type="link" size="small" icon={<CheckCircleOutlined />} onClick={() => props.onCooperate(record)}>转已合作</Button></PermissionGuard>}
           {!record.isPublic && props.canTransferCustomers && <Button type="link" size="small" icon={<SwapOutlined />} onClick={() => props.onTransfer(record)}>转移</Button>}
         </Space>
       ),
@@ -103,7 +112,7 @@ export function CustomerTable(props: CustomerTableProps) {
           { label: '重要客户', value: '重要客户' }, { label: 'VIP客户', value: 'VIP客户' },
         ]} />
         <Select placeholder="选择状态" value={props.status} onChange={props.onStatusChange} style={{ width: 120 }} allowClear options={[
-          { label: '活跃', value: 'ACTIVE' }, { label: '停用', value: 'INACTIVE' },
+          { label: '活跃', value: 'ACTIVE' }, { label: '停用', value: 'INACTIVE' }, { label: '已合作', value: 'COOPERATING' },
         ]} />
         <Button type="primary" onClick={props.onSearch}>搜索</Button>
         <Button onClick={props.onReset}>重置</Button>

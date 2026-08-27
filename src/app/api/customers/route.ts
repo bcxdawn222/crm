@@ -5,8 +5,28 @@ import { defineAbility } from '@/lib/casl'
 import { buildDataFilter } from '@/lib/data-permission'
 import { parsePagination } from '@/lib/http/pagination'
 import { CustomerLevel, CustomerSource, CustomerStatus, Prisma } from '@prisma/client'
+import { z } from 'zod'
 import { recordAuditEvent } from '@/lib/audit/record'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+
+const optionalText = (max: number) => z.preprocess(
+  (value) => value === '' || value === null ? undefined : value,
+  z.string().trim().max(max).optional(),
+)
+
+const customerCreateSchema = z.object({
+  name: z.string().trim().min(1, '请输入客户姓名').max(100),
+  company: optionalText(200),
+  phone: z.string().trim().min(3, '联系电话格式不正确').max(20),
+  email: z.preprocess(
+    (value) => value === '' || value === null ? undefined : value,
+    z.string().trim().email('邮箱格式不正确').max(100).optional(),
+  ),
+  address: optionalText(500),
+  category: optionalText(20),
+  source: optionalText(50),
+  notes: optionalText(10_000),
+})
 
 // GET /api/customers - Get customer list
 export async function GET(request: Request) {
@@ -147,13 +167,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No permission to create customer' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { name, company, phone, email, address, category, source, notes } = body
-
-    // Validate required fields
-    if (!name || !phone) {
-      return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 })
+    let payload: unknown
+    try {
+      payload = await request.json()
+    } catch {
+      return jsonWithRequestId({ error: '请求内容不是有效 JSON' }, requestId, { status: 400 })
     }
+    const parsed = customerCreateSchema.safeParse(payload)
+    if (!parsed.success) {
+      return jsonWithRequestId(
+        { error: parsed.error.issues[0]?.message ?? '客户信息不正确' },
+        requestId,
+        { status: 400 },
+      )
+    }
+    const { name, company, phone, email, address, category, source, notes } = parsed.data
 
     // Check if already exists
     const existing = await prisma.customer.findFirst({
@@ -186,14 +214,14 @@ export async function POST(request: Request) {
           phone,
           email,
           address,
-          level: categoryMap[category] || 'POTENTIAL',
+          level: category ? categoryMap[category] || CustomerLevel.POTENTIAL : CustomerLevel.POTENTIAL,
           source: Object.values(CustomerSource).includes(source as CustomerSource)
             ? source as CustomerSource
             : CustomerSource.OTHER,
           notes,
           salesId: session.user.id,
           isPublic: false,
-          status: 'ACTIVE',
+          status: CustomerStatus.ACTIVE,
         }
       })
       await recordAuditEvent(tx, {

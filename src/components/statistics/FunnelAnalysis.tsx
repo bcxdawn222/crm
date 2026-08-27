@@ -1,6 +1,7 @@
 'use client'
 
 import { Card, Table, Statistic, Row, Col } from 'antd'
+import type { CallbackDataParams } from 'echarts/types/dist/shared'
 import CRMChart from '@/components/charts/CRMChart'
 
 interface FunnelStage {
@@ -27,7 +28,7 @@ export default function FunnelAnalysis({ data }: { data: FunnelData }) {
     },
     tooltip: { 
       trigger: 'item',
-      formatter: (params: any) => {
+      formatter: (params: CallbackDataParams) => {
         const stage = data.stages[params.dataIndex]
         return `
           <div style="padding: 8px;">

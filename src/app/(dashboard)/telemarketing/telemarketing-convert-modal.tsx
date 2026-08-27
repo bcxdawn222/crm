@@ -8,7 +8,7 @@ import { apiRequest } from '@/lib/http/client'
 
 interface ConvertRecord {
   id: string
-  notes?: string
+  notes?: string | null
 }
 
 interface ConvertFormValues {
@@ -62,7 +62,7 @@ export function TelemarketingConvertModal({
     form.setFieldsValue({
       level: 'POTENTIAL',
       source: 'COLD_CALL',
-      notes: record.notes,
+      notes: record.notes ?? undefined,
     })
     if (draft.restore()) message.info('已恢复未提交的转客户草稿')
   }, [form, record])

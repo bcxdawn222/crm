@@ -119,6 +119,49 @@ def check_input_validation(opener, base_url: str) -> None:
     )
     require(malformed_task.status == 400, f"任务接口非法 JSON 未返回 400，HTTP {malformed_task.status}")
 
+    malformed_customer = request(
+        opener,
+        base_url,
+        "/api/customers",
+        method="POST",
+        body=b"{",
+        content_type="application/json",
+    )
+    require(malformed_customer.status == 400, "客户接口非法 JSON 未返回 400")
+
+    invalid_customer = request(
+        opener,
+        base_url,
+        "/api/customers",
+        method="POST",
+        payload={
+            "name": "输入校验测试",
+            "phone": "13800138000",
+            "email": "not-an-email",
+        },
+    )
+    require(invalid_customer.status == 400, "客户接口非法邮箱未返回 400")
+
+    for path in ("/api/reminders/disable", "/api/reminders/enable"):
+        malformed_reminder = request(
+            opener,
+            base_url,
+            path,
+            method="POST",
+            body=b"{",
+            content_type="application/json",
+        )
+        require(malformed_reminder.status == 400, f"提醒接口非法 JSON 未返回 400: {path}")
+
+    invalid_reminder_id = request(
+        opener,
+        base_url,
+        "/api/reminders/enable",
+        method="POST",
+        payload={"customerId": "not-a-uuid"},
+    )
+    require(invalid_reminder_id.status == 400, "提醒接口非法 UUID 未返回 400")
+
     invalid_task_date = request(
         opener,
         base_url,
@@ -178,6 +221,12 @@ def main() -> int:
     password = os.environ.get("CRM_SMOKE_PASSWORD", "123456")
     check_headers(base_url)
     opener = login_and_check_cookie(base_url, username, password)
+    second_opener = login_and_check_cookie(base_url, username, password)
+    require(
+        request(opener, base_url, "/api/auth/session").status == 200
+        and request(second_opener, base_url, "/api/auth/session").status == 200,
+        "两个登录会话不能同时保持有效",
+    )
     check_request_guards(opener, base_url)
     check_input_validation(opener, base_url)
     check_upload_guards(opener, base_url, database_url)

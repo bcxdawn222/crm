@@ -2,6 +2,7 @@
 
 import { PlusOutlined, UploadOutlined } from '@ant-design/icons'
 import { Button, Card, Form, Modal, Space, message } from 'antd'
+import type { Dayjs } from 'dayjs'
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -13,6 +14,7 @@ import { isCustomerDraft, type CustomerDraft } from '@/lib/forms/crm-drafts'
 import { apiRequest } from '@/lib/http/client'
 
 import { CustomerFormModal } from './customer-form-modal'
+import { CustomerCooperationModal } from './customer-cooperation-modal'
 import { CustomerImportModal } from './customer-import-modal'
 import { CustomerTable } from './customer-table'
 import type {
@@ -49,8 +51,10 @@ export default function CustomersPage() {
   const [followUpCustomer, setFollowUpCustomer] = useState<Customer | null>(null)
   const [followUpModalVisible, setFollowUpModalVisible] = useState(false)
   const [transferCustomer, setTransferCustomer] = useState<Customer | null>(null)
+  const [cooperationCustomer, setCooperationCustomer] = useState<Customer | null>(null)
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [cooperationSubmitting, setCooperationSubmitting] = useState(false)
   const [form] = Form.useForm<CustomerFormValues>()
   const formRequestIdRef = useRef('')
   const listRequestSequenceRef = useRef(0)
@@ -176,6 +180,30 @@ export default function CustomersPage() {
     })
   }
 
+  const markCooperating = async (values: { contractStartDate?: Dayjs | null; contractEndDate: Dayjs; contractAmount?: number }) => {
+    if (!cooperationCustomer || cooperationSubmitting) return
+    setCooperationSubmitting(true)
+    try {
+      await apiRequest<{ success: true }>('/api/customers/cooperating', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: cooperationCustomer.id,
+          contractStartDate: values.contractStartDate?.format('YYYY-MM-DD'),
+          contractEndDate: values.contractEndDate.format('YYYY-MM-DD'),
+          contractAmount: values.contractAmount,
+        }),
+      }, { requestKey: `customer-cooperate-${cooperationCustomer.id}` })
+      message.success('客户已转为已合作')
+      setCooperationCustomer(null)
+      await loadCustomers()
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '转为已合作失败')
+    } finally {
+      setCooperationSubmitting(false)
+    }
+  }
+
   const importCustomers = async (file: File) => {
     if (uploading) return false
     setUploading(true)
@@ -205,12 +233,20 @@ export default function CustomersPage() {
           onPageChange={changePage}
           onView={(customer) => openCustomer(customer, true)} onEdit={(customer) => openCustomer(customer)}
           onDelete={deleteCustomer} onArchive={archiveCustomer} onTransfer={setTransferCustomer}
+          onCooperate={setCooperationCustomer}
         />
       </Card>
       <CustomerFormModal open={modalVisible} customer={editingCustomer} readOnly={customerReadOnly} submitting={submitting} form={form} onCancel={() => { if (!submitting) { if (!customerReadOnly) customerDraft.clear(); setModalVisible(false) } }} onSubmit={handleSubmit} onValuesChange={customerDraft.save} onFollowUp={(customer) => { setModalVisible(false); setFollowUpCustomer(customer); setFollowUpModalVisible(true) }} />
       <FollowUpModal open={followUpModalVisible} customerId={followUpCustomer?.id} customerName={followUpCustomer?.name} onClose={() => setFollowUpModalVisible(false)} onSaved={() => { setFollowUpModalVisible(false); setFollowUpCustomer(null); void loadCustomers() }} />
       <CustomerTransferModal customer={transferCustomer} onClose={() => setTransferCustomer(null)} onSaved={() => { setTransferCustomer(null); return loadCustomers() }} />
       <CustomerImportModal open={importModalVisible} uploading={uploading} onCancel={() => { if (!uploading) setImportModalVisible(false) }} onUpload={importCustomers} />
+      <CustomerCooperationModal
+        open={Boolean(cooperationCustomer)}
+        customerName={cooperationCustomer?.name}
+        submitting={cooperationSubmitting}
+        onCancel={() => { if (!cooperationSubmitting) setCooperationCustomer(null) }}
+        onSubmit={markCooperating}
+      />
     </div>
   )
 }

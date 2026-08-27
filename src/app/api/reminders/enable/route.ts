@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
 import { buildDataFilter } from '@/lib/data-permission'
 import { getRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { enableReminderSchema } from '@/app/api/reminders/request-schema'
 
 // POST /api/reminders/enable - Enable reminders for a customer
 export async function POST(request: Request) {
@@ -22,12 +23,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No permission to enable reminders' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { customerId } = body
-
-    if (!customerId) {
-      return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 })
+    let payload: unknown
+    try {
+      payload = await request.json()
+    } catch {
+      return NextResponse.json({ error: '请求内容不是有效 JSON' }, { status: 400 })
     }
+    const parsed = enableReminderSchema.safeParse(payload)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? '提醒参数不正确' }, { status: 400 })
+    }
+    const { customerId } = parsed.data
 
     // Verify user has permission to modify this customer
     const customer = await prisma.customer.findFirst({
