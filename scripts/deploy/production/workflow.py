@@ -56,6 +56,7 @@ def audit(client: RemoteClient) -> Path:
         + result.stdout.strip()
         + "\n```\n",
         encoding="utf-8",
+        newline="\n",
     )
     print(f"线上部署漂移报告: {report_path}")
     return report_path

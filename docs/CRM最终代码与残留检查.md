@@ -1,13 +1,13 @@
 # CRM 最终代码与残留检查
 
-生成时间：2026-08-27T17:58:16+08:00
+生成时间：2026-08-29T13:29:56+08:00
 
 ## 结果
 
 - TypeScript/JavaScript import 循环：0。
 - 明确测试状态残留：0。
-- 超过 300 行的跟踪脚本：4。
-- 单层超过 8 个跟踪文件的目录：9。
+- 超过 300 行的跟踪脚本：6。
+- 单层超过 8 个跟踪文件的目录：8。
 
 ## 超长文件
 
@@ -15,22 +15,23 @@
 | --- | ---: | --- |
 | `generate-test-data.ts` | 375 | 历史测试脚本 |
 | `comprehensive-test.ts` | 370 | 历史测试脚本 |
-| `scripts/docs/build_mediation_document.py` | 353 | 历史文档脚本 |
+| `scripts/docs/build_mediation_document.py` | 353 | 文档生成脚本 |
 | `generate-all-test-data.js` | 335 | 历史测试脚本 |
+| `src/app/api/customers/[id]/route.ts` | 319 | API 路由 |
+| `src/app/api/customers/cooperating/route.ts` | 303 | API 路由 |
 
 ## 目录规模
 
 | 目录 | 文件数 |
 | --- | ---: |
 | `.` | 89 |
-| `scripts/quality` | 42 |
-| `docs` | 26 |
+| `scripts/quality` | 46 |
+| `docs` | 27 |
 | `scripts` | 13 |
 | `scripts/docs` | 12 |
 | `scripts/performance` | 11 |
-| `scripts/deploy` | 9 |
+| `tests/e2e/specs` | 10 |
 | `scripts/runtime` | 9 |
-| `tests/e2e/specs` | 9 |
 
 ## 循环依赖
 

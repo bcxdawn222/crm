@@ -1,12 +1,10 @@
 from __future__ import annotations
-
 import argparse
 import logging
 import os
 import sys
 from pathlib import Path
 from typing import Sequence
-
 sys.dont_write_bytecode = True
 from cli.command_runner import configure_logger, run_sequence as execute_sequence
 from runtime.manager import (
@@ -43,11 +41,8 @@ TEST_FLOW_SCRIPTS = {
     "e2e": "../e2e/run.py",
 }
 SELF_MANAGED_SERVER_FLOWS = {"sop-flow"}
-
 def run_sequence(commands: Sequence[tuple[str, Sequence[str]]], logger: logging.Logger) -> int:
     return execute_sequence(commands, logger, ROOT)
-
-
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -128,7 +123,6 @@ def main() -> int:
         profile.database_port,
         profile.app_port,
     )
-
     if args.action == "start":
         return start_server(logger, profile, mode=args.mode)
     if args.action == "stop":
@@ -300,7 +294,5 @@ def main() -> int:
         ),
         logger,
     )
-
-
 if __name__ == "__main__":
     raise SystemExit(main())

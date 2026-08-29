@@ -41,7 +41,16 @@ def line_findings(files: tuple[Path, ...]) -> tuple[FileSizeFinding, ...]:
         if lines <= 300:
             continue
         relative = path.relative_to(ROOT).as_posix()
-        category = "历史测试脚本" if path.parent == ROOT and "test" in path.name.lower() else "历史文档脚本"
+        if path.parent == ROOT and "test" in path.name.lower():
+            category = "历史测试脚本"
+        elif relative.startswith("scripts/docs/"):
+            category = "文档生成脚本"
+        elif relative.startswith("src/app/api/"):
+            category = "API 路由"
+        elif relative.startswith("scripts/"):
+            category = "项目脚本"
+        else:
+            category = "源码"
         findings.append(FileSizeFinding(relative, lines, category))
     return tuple(sorted(findings, key=lambda item: (-item.lines, item.path)))
 
