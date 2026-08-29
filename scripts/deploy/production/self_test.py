@@ -22,6 +22,8 @@ def main() -> int:
     require("127.0.0.1 --port 3000" in source, "stable 没有限制为本机监听")
     require("nginx -t" in source and "nginx -s reopen" in source, "Nginx 缺少校验或日志 reopen")
     require("rollback_after_failure" in source, "切换失败没有自动恢复")
+    require('candidate_pgid=$(ps -o pgid=' in source, "候选服务没有从记录 PID 解析实际进程组")
+    require('kill -- "-$candidate_pgid"' in source, "候选服务没有按实际进程组清理 Next.js 子进程")
     require("crm_connection_upgrade" in nginx, "Nginx 模板缺少动态 Connection map")
     require("127.0.0.1" in service and "Restart=always" in service, "systemd 模板缺少本机监听或重启策略")
     require(not (ROOT / "scripts/deploy/ecosystem.config.mjs").exists(), "仍保留会造成双管理的 PM2 模板")

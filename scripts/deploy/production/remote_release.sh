@@ -180,10 +180,11 @@ stage() {
   pid_file="$release_dir/.deployment/candidate.pid"
   health_file="$release_dir/.deployment/candidate-health.json"
   su -s /bin/bash crmapp -c "cd '$release_dir' && nohup env CRM_PROFILE=stable CRM_BUILD_VERSION='$version' CRM_BUILD_COMMIT='$commit' PORT='$CANDIDATE_PORT' node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port '$CANDIDATE_PORT' >'$SHARED/logs/candidate-$release_id.log' 2>&1 & echo \$! >'$pid_file'"
-  trap 'test ! -f "$pid_file" || kill "$(cat "$pid_file")" 2>/dev/null || true' RETURN
+  trap 'if test -f "$pid_file"; then candidate_pid=$(cat "$pid_file"); candidate_pgid=$(ps -o pgid= -p "$candidate_pid" | tr -d " "); test -z "$candidate_pgid" || kill -- "-$candidate_pgid" 2>/dev/null || true; fi' RETURN
   wait_health "http://127.0.0.1:$CANDIDATE_PORT" "$commit" "$health_file"
   asset_hash "http://127.0.0.1:$CANDIDATE_PORT" "$release_dir/.deployment/candidate-assets.sha256"
-  kill "$(cat "$pid_file")"
+  candidate_pid=$(cat "$pid_file"); candidate_pgid=$(ps -o pgid= -p "$candidate_pid" | tr -d ' ')
+  kill -- "-$candidate_pgid"
   for _ in $(seq 1 20); do ss -ltn | grep -q ":$CANDIDATE_PORT " || break; sleep 0.25; done
   ! ss -ltn | grep -q ":$CANDIDATE_PORT "
   rm -f "$pid_file"

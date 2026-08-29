@@ -27,3 +27,16 @@
 | R1-4 | 数据可达性 | pass | `python scripts\manage.py data-reachability --profile test` 退出码 0；15 张核心表、13 条业务链路通过，孤立关系、异常订单金额和负回款均为 0，Customer、FollowUp、Order、Payment 等测试业务表为 0。日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260829-120936.log` |
 | R1-5 | 构建与静态检查 | pass | E2E 前置生产构建退出码 0，编译、Lint 和类型检查通过；`git diff --check` 无输出。生产构建证据包含在 R1-1 日志中。 |
 | R1-6 | 范围与残留 | pass | 当前只有 `crm-sales-sop-completion` 一个活动变更；专项脚本和 E2E 结束后服务停止，测试业务表无残留；未新增商机、报价、审批、AI 或客户字段。 |
+
+## Round 2 - production governance working checks - 2026-08-29
+
+> 本轮仍为主智能体实施复核，不属于独立 verifier。线上备用端口验收只读取正式数据库，没有写入业务数据，也没有切换正式流量。
+
+| ID | Scope | Status | Evidence |
+|---|---|---|---|
+| R2-1 | 线上只读漂移审计 | pass | `python scripts\manage.py production-audit --profile stable` 退出码 0，确认旧 stable 提交、全网卡 3000、systemd 包装 PM2、固定 Connection upgrade 和 8 个旧回滚目录日志句柄。报告：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\discuss\线上部署漂移报告-2026-08-29.md`；日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-production-audit-20260829-122252.log` |
+| R2-2 | 发布治理契约 | pass | `python scripts\manage.py production-ops-test --profile test` 退出码 0；覆盖 SHA256、迁移状态、数据库备份可读性、127.0.0.1 监听、Nginx 校验/reopen、失败恢复和候选进程组清理。日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-production-ops-test-20260829-123930.log` |
+| R2-3 | release/promote/rollback | pass | `python scripts\manage.py release-test --profile test` 退出码 0。日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-release-test-20260829-122446.log` |
+| R2-4 | 服务故障演练 | pass | `python scripts\manage.py server-runtime-drill --profile test` 退出码 0；健康与重启、数据库不可达 503、存储不可达 503 均通过并释放随机端口。日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-server-runtime-drill-20260829-122457.log` |
+| R2-5 | 线上备用端口 | pass | `python scripts\manage.py production-stage --profile stable --artifact D:\Desktop\CRM系统代码 (2)\CRM系统代码\.build\test\release\1.0.0-3b0162be.zip` 退出码 0；SHA256、9 个迁移、健康提交和静态资源通过，结束后 `127.0.0.1:3002` 无监听，正式 `3000` 仍为旧 stable 提交。日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\stable\manage-production-stage-20260829-124010.log` |
+| R2-6 | 连接重置状态 | unresolved | 仍未稳定复现 `ERR_CONNECTION_RESET`。当前证据只能确认旧代理和日志漂移，不能把客户端、运营商或云网络层问题表述为已修复。 |
