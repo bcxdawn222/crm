@@ -109,9 +109,9 @@ def render(report: PlaywrightReport) -> str:
 
 - 未使用 `skip`；业务写操作、权限和数据断言均连接真实 test 服务及 test 数据库。
 - 销售漏斗视觉边界用例仅替换 `/api/statistics/funnel` 的只读响应为五层全零数据，用于稳定复现截图中的布局问题，不作为业务接口正确性的证据。
-- 未对 stable 或线上数据库执行写操作，线上只允许发布后进行只读核对。
+- 未对 stable 或线上数据库执行写操作；线上受控写入冒烟由独立发布步骤执行，并使用可识别、可清理的验收记录。
 - 本阶段覆盖 Chromium Desktop 和 390px Chromium Mobile；Firefox、WebKit 及更多尺寸仍属于最终发布验收范围。
-- E2E 不替代持续压力测试、依赖安全审计和真实 Nginx/PM2/systemd 主机演练，这些由后续任务单独验证。
+- E2E 不替代持续压力测试、依赖安全审计和真实 Nginx/systemd 主机演练，这些由发布治理步骤单独验证。
 """
 
 

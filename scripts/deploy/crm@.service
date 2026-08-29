@@ -5,11 +5,11 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=crm
-Group=crm
+User=crmapp
+Group=crmapp
 WorkingDirectory=/www/wwwroot/crm-system
 EnvironmentFile=/etc/crm-system/%i.env
-ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port ${CRM_PORT}
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port ${CRM_PORT}
 ExecStartPost=/usr/bin/curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1:${CRM_PORT}/api/health
 Restart=always
 RestartSec=5

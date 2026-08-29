@@ -87,6 +87,11 @@ def main() -> int:
             "release",
             "promote",
             "rollback",
+            "production-audit",
+            "production-stage",
+            "production-deploy",
+            "production-rollback",
+            "production-ops-test",
         ),
     )
     parser.add_argument("--profile", choices=("stable", "test"), default="stable")
@@ -259,6 +264,24 @@ def main() -> int:
         return run_sequence((("release-test", command),), logger)
     if args.action in {"release", "promote", "rollback"}:
         return run_release_action(args.action, profile, args.artifact, logger, run_sequence, ROOT)
+    if args.action == "production-ops-test":
+        if profile.name != "test":
+            logger.error("production-ops-test 只允许 --profile test")
+            return 2
+        command = [sys.executable, str(ROOT / "scripts/deploy/production/self_test.py")]
+        return run_sequence(((args.action, command),), logger)
+    if args.action in {"production-audit", "production-stage", "production-deploy", "production-rollback"}:
+        if profile.name != "stable":
+            logger.error("%s 只允许 --profile stable", args.action)
+            return 2
+        command = [
+            sys.executable,
+            str(ROOT / "scripts/deploy/production/cli.py"),
+            args.action.removeprefix("production-"),
+        ]
+        if args.artifact:
+            command.extend(("--artifact", args.artifact))
+        return run_sequence(((args.action, command),), logger)
     route_result = run_route_check(logger)
     if route_result != 0:
         return route_result

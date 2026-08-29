@@ -18,7 +18,7 @@
 | 数据模型 | Prisma schema 和迁移 | `prisma/` |
 | 运行管理 | 启停、检查、构建、测试和发布 | `scripts/manage.py` |
 | 发布管理 | ZIP、SHA256、promote 和 rollback 状态 | `scripts/release.py` |
-| 服务器模板 | Nginx、PM2、systemd、数据库备份 | `scripts/deploy/` |
+| 服务器模板 | Nginx、systemd、数据库备份和远程发布 | `scripts/deploy/` |
 | 日志 | 每次管理命令和服务日志 | `logs/<profile>/` |
 
 ## 2. stable 与 test 隔离
@@ -74,9 +74,7 @@ python scripts\manage.py check --profile stable
 
 ## 4. Linux 服务器运行
 
-服务器默认项目目录为 `/www/wwwroot/crm-system`。PM2 与 systemd 二选一，不要同时管理同一个端口。
-
-PM2 模板：`/www/wwwroot/crm-system/scripts/deploy/ecosystem.config.mjs`
+服务器默认项目目录为 `/www/wwwroot/crm-system`。正式环境使用 systemd 直接管理 Next.js，避免 systemd 与 PM2 同时维护同一个进程状态。
 
 systemd 模板：`/www/wwwroot/crm-system/scripts/deploy/crm@.service`
 
@@ -101,7 +99,7 @@ GET /api/health
 1. 执行 `python scripts\manage.py status --profile stable`，确认实例和端口状态。
 2. 查看 `logs/stable/server.log` 和最近的 `logs/stable/manage-*.log`。
 3. 请求 `/api/health`，记录响应中的版本、提交和 `requestId`。
-4. 检查 Nginx error log、PM2 或 systemd 状态。
+4. 检查 Nginx error log 和 systemd 状态。
 5. 检查数据库端口和磁盘剩余空间。
 
 API 未知异常只向浏览器返回通用错误和 `requestId`，完整错误保留在服务日志。排查时使用同一个 `requestId` 查找对应日志，避免只依据页面提示修改数据。
@@ -231,9 +229,26 @@ python scripts\manage.py release --profile test
 
 发布包不包含 `.env`、日志、上传文件、数据库备份、Playwright 登录状态或测试截图。解压到服务器后仍需安装 package-lock 中的依赖，并由服务器环境文件注入密钥和数据库连接。
 
+线上只读审计和候选验收：
+
+```text
+python scripts\manage.py production-audit --profile stable
+python scripts\manage.py production-stage --profile stable --artifact <test发布包绝对路径>
+```
+
+`production-stage` 会上传并校验 ZIP/SHA256，在独立备用端口启动候选版本，核对健康提交、数据库、迁移状态和浏览器静态资源，完成后停止候选进程。它不会切换 stable 服务。
+
+正式部署：
+
+```text
+python scripts\manage.py production-deploy --profile stable --artifact <test发布包绝对路径>
+```
+
+正式部署会先执行候选验收和新的数据库备份，再停止旧服务、同步共享上传与日志目录、切换版本、改为 systemd 直接管理、原位合并 Nginx 代理指令并保留现有 TLS/Certbot 配置。`nginx -t`、健康提交、静态资源或日志句柄任一门禁失败时，脚本恢复上一稳定目录和配置。
+
 ## 11. promote 与 rollback
 
-`promote` 只接受通过 SHA256 检查、且 manifest 中 `profile=test`、`gate_status=passed` 的 test 产物。该命令只登记和复制发布产物，不会自动上传服务器、切换 Nginx、执行数据库迁移或重启线上服务。
+`promote` 只接受通过 SHA256 检查、且 manifest 中 `profile=test`、`gate_status=passed` 的 test 产物。该命令只登记和复制发布产物；远程上传、备用端口验收和线上切换由 `production-stage`、`production-deploy` 完成。
 
 必须经用户明确确认后执行：
 
@@ -247,7 +262,13 @@ python scripts\manage.py promote --profile stable --artifact <test发布包绝�
 python scripts\manage.py rollback --profile stable --artifact <上一发布包绝对路径>
 ```
 
-回滚后仍需由运维人员把目标产物部署到服务器并重启服务。数据库不会自动回退；若旧代码不能读取当前 schema，应停止回滚并按数据库恢复流程处理。
+线上回滚入口：
+
+```text
+python scripts\manage.py production-rollback --profile stable
+```
+
+回滚只切回发布状态记录中的上一稳定目录，并继续使用共享上传与日志目录。数据库不会自动回退；若旧代码不能读取当前 schema，应停止回滚并按数据库恢复流程处理。
 
 ## 12. 上线后只读验收
 
