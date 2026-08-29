@@ -125,7 +125,10 @@ async function executeRequest<T>(
       }
       return payload as T
     } catch (error) {
-      if (error instanceof ApiError) throw error
+      if (error instanceof ApiError) {
+        if (canRetry && error.status >= 500 && attempt < attempts) continue
+        throw error
+      }
       if (externalSignal?.aborted) throw new ApiError('请求已取消', 'CANCELLED', 0, requestId)
       if (controller.signal.aborted) {
         if (attempt < attempts) continue

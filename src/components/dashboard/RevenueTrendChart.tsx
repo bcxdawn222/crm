@@ -229,6 +229,7 @@ export default function RevenueTrendChart() {
 
   return (
     <Card
+      data-testid="revenue-trend-card"
       loading={loading}
       title={
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

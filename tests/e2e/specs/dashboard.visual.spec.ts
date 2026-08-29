@@ -61,3 +61,31 @@ test('仪表盘在关键宽度切换侧栏且没有横向溢出', async ({ page 
     expect(viewportFits, `${viewport.width}px 视口出现横向溢出`).toBe(true)
   }
 })
+
+test('趋势局部失败保留旧数据并可独立重试', async ({ page }) => {
+  let failuresRemaining = 2
+  await page.route('**/api/statistics/trend?*', async (route) => {
+    const period = new URL(route.request().url()).searchParams.get('period')
+    if (period === '7d' && failuresRemaining > 0) {
+      failuresRemaining -= 1
+      await route.fulfill({ status: 500, json: { error: '趋势测试故障' } })
+      return
+    }
+    await route.fulfill({
+      json: {
+        success: true,
+        data: { dataPoints: [{ date: '2026-08-29', revenue: 1200, orders: 2, newCustomers: 1 }] },
+      },
+    })
+  })
+
+  await page.goto('/')
+  const trendCard = page.getByTestId('revenue-trend-card')
+  await expect(page.getByText('2026-08-29', { exact: true })).toBeVisible()
+  await trendCard.getByText('近7天', { exact: true }).click()
+  await expect(trendCard.getByText('数据可能已过期', { exact: true })).toBeVisible()
+  await expect(page.getByText('2026-08-29', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('sales-funnel-card')).toBeVisible()
+  await trendCard.getByRole('button', { name: '重新加载' }).click()
+  await expect(trendCard.getByText('数据可能已过期', { exact: true })).toHaveCount(0)
+})

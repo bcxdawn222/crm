@@ -23,6 +23,7 @@ from runtime.route_contracts import run_route_check
 ROOT = Path(__file__).resolve().parents[1]
 TEST_FLOW_SCRIPTS = {
     "data-flow": "data_flow_test.py",
+    "sop-flow": "sop_flow_test.py",
     "content-flow": "content_flow_test.py",
     "user-flow": "user_flow_test.py",
     "role-flow": "role_flow_test.py",
@@ -41,6 +42,7 @@ TEST_FLOW_SCRIPTS = {
     "final-audit": "final_repository_audit.py",
     "e2e": "../e2e/run.py",
 }
+SELF_MANAGED_SERVER_FLOWS = {"sop-flow"}
 
 def run_sequence(commands: Sequence[tuple[str, Sequence[str]]], logger: logging.Logger) -> int:
     return execute_sequence(commands, logger, ROOT)
@@ -222,7 +224,24 @@ def main() -> int:
             sys.executable,
             str((ROOT / "scripts" / "quality" / TEST_FLOW_SCRIPTS[args.action]).resolve()),
         ]
-        return run_sequence(((args.action, command),), logger)
+        started_here = args.action in SELF_MANAGED_SERVER_FLOWS and not is_port_open(
+            profile.app_host,
+            profile.app_port,
+        )
+        if started_here:
+            start_code = start_server(logger, profile, mode="development")
+            if start_code != 0:
+                return start_code
+        flow_code = 1
+        stop_code = 0
+        try:
+            flow_code = run_sequence(((args.action, command),), logger)
+        finally:
+            if started_here:
+                stop_code = stop_server(logger, profile)
+                if stop_code != 0:
+                    logger.error("%s 结束后停止 test 服务失败，退出码 %s", args.action, stop_code)
+        return flow_code if flow_code != 0 else stop_code
     if args.action == "runtime-test":
         return run_sequence(
             (

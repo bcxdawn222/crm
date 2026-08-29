@@ -14,3 +14,16 @@
 | V-6 | necessity | major | open | 服务器进程、数据库和连续 60 次外部健康请求均正常，现有证据未复现 `ERR_CONNECTION_RESET`；代理配置和页面恢复改进可能提升可观测性，但不能保证消除客户端、运营商或云网络层的连接重置 | research 记录 PM2/MariaDB 重启次数为 0、资源正常、Nginx 无同期 5xx；proposal 已禁止宣称原因已定位，tasks 6.5 保留取证和未定位状态 |
 | V-7 | regression-compat | major | fixed(r0) | 线上受控写入冒烟如果清理失败会留下测试客户、订单或回款 | tasks 7.3-7.6 要求先备份、使用可识别验收记录、失败回滚和最终残留复核；不允许操作原始业务记录 |
 | V-8 | workflow | major | fixed(r0) | `spec/changes/` 曾存在另一个未归档的 `crm-comprehensive-quality-optimization`，会阻止单活动变更实施门禁 | 已于 2026-08-29 归档到 `spec/archive/2026-08-29-crm-comprehensive-quality-optimization`，提交 `85def9b`；当前只剩 `crm-sales-sop-completion` |
+
+## Round 1 - implementation working checks - 2026-08-29
+
+> 项目明确禁止子智能体，因此本轮是主智能体对任务 2-5 的实施复核，不属于独立 verifier 复核。最终独立验证要求受该项目约束阻止，不能虚构为已完成。
+
+| ID | Scope | Status | Evidence |
+|---|---|---|---|
+| R1-1 | 完整浏览器回归 | pass | `python scripts\manage.py e2e --profile test` 退出码 0，31/31 通过；覆盖完整销售 SOP、真实 500、断网恢复、会话过期、五档视口和 390px 手机端。日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-e2e-20260829-120610.log` |
+| R1-2 | 专项销售 SOP | pass | `python scripts\manage.py sop-flow --profile test` 退出码 0；电销转客户、详情、跟进、转已合作、合作维护、建单、回款、提醒、统计、双会话和审计一致，结束后自动清理夹具并停止 test 服务。日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-sop-flow-20260829-120307.log` |
+| R1-3 | 失败路径 | pass | 设置 `CRM_SOP_EXPECT_FAILURE=1` 后 `sop-flow` 返回退出码 1，日志同时记录测试夹具已清理和 test 服务已停止。日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-sop-flow-20260829-110513.log` |
+| R1-4 | 数据可达性 | pass | `python scripts\manage.py data-reachability --profile test` 退出码 0；15 张核心表、13 条业务链路通过，孤立关系、异常订单金额和负回款均为 0，Customer、FollowUp、Order、Payment 等测试业务表为 0。日志：`D:\Desktop\CRM系统代码 (2)\CRM系统代码\logs\test\manage-data-reachability-20260829-120936.log` |
+| R1-5 | 构建与静态检查 | pass | E2E 前置生产构建退出码 0，编译、Lint 和类型检查通过；`git diff --check` 无输出。生产构建证据包含在 R1-1 日志中。 |
+| R1-6 | 范围与残留 | pass | 当前只有 `crm-sales-sop-completion` 一个活动变更；专项脚本和 E2E 结束后服务停止，测试业务表无残留；未新增商机、报价、审批、AI 或客户字段。 |

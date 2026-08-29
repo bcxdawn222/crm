@@ -59,8 +59,9 @@ export default function ReportsPage() {
     <div>
       <Card title="财务报表">
         {/* 日期筛选 */}
-        <Space style={{ marginBottom: 24 }}>
+        <Space style={{ marginBottom: 24, width: '100%' }} wrap>
           <RangePicker
+            style={{ width: '100%', maxWidth: 300 }}
             value={dateRange}
             onChange={(dates) => {
               if (dates && dates[0] && dates[1]) {
@@ -74,8 +75,8 @@ export default function ReportsPage() {
         </Space>
 
         {/* 统计卡片 */}
-        <Row gutter={16} style={{ marginBottom: 24 }}>
-          <Col span={6}>
+        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+          <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
                 title="订单总数"
@@ -85,7 +86,7 @@ export default function ReportsPage() {
               />
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
                 title="合同总金额"
@@ -96,7 +97,7 @@ export default function ReportsPage() {
               />
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
                 title="已收金额"
@@ -108,7 +109,7 @@ export default function ReportsPage() {
               />
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
                 title="未收金额"
@@ -123,8 +124,8 @@ export default function ReportsPage() {
         </Row>
 
         {/* 完成率 */}
-        <Row gutter={16}>
-          <Col span={8}>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12} lg={8}>
             <Card>
               <Statistic
                 title="收款完成率"
