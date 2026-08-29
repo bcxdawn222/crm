@@ -1,6 +1,6 @@
 'use client'
 
-import { Card, Row, Col, Statistic, Spin } from 'antd'
+import { Card, Row, Col } from 'antd'
 import { 
   DollarOutlined, 
   ShoppingCartOutlined, 
@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { apiRequest } from '@/lib/http/client'
+import { DashboardSectionStatus } from './dashboard-section-status'
 
 interface KPIData {
   monthlyRevenue: number
@@ -22,6 +23,8 @@ interface KPIData {
 export default function KPICards() {
   const [data, setData] = useState<KPIData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null)
 
   useEffect(() => {
     loadKPIData()
@@ -29,14 +32,16 @@ export default function KPICards() {
 
   const loadKPIData = async () => {
     try {
-      setLoading(true)
+      if (!data) setLoading(true)
+      setError(null)
       // 复用销售业绩总览API
       const result = await apiRequest<{ success: true; data: KPIData }>(
         '/api/statistics/sales-overview'
       )
       setData(result.data)
+      setUpdatedAt(new Date().toISOString())
     } catch (error) {
-      console.error('Failed to load KPI data:', error)
+      setError(error instanceof Error ? error.message : '核心指标加载失败')
     } finally {
       setLoading(false)
     }
@@ -55,7 +60,7 @@ export default function KPICards() {
   }
 
   if (!data) {
-    return null
+    return <DashboardSectionStatus error={error} updatedAt={updatedAt} hasData={false} onRetry={() => void loadKPIData()} />
   }
 
   const kpiCards = [
@@ -93,8 +98,9 @@ export default function KPICards() {
     }
   ]
 
-  return (
-    <Row gutter={16} style={{ marginBottom: 24 }}>
+  return (<>
+    <DashboardSectionStatus error={error} updatedAt={updatedAt} hasData onRetry={() => void loadKPIData()} />
+    <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
       {kpiCards.map((card, index) => (
         <Col key={index} xs={24} sm={12} xl={6}>
           <Card 
@@ -177,5 +183,5 @@ export default function KPICards() {
         </Col>
       ))}
     </Row>
-  )
+  </>)
 }

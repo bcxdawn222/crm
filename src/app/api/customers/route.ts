@@ -8,6 +8,7 @@ import { CustomerLevel, CustomerSource, CustomerStatus, Prisma } from '@prisma/c
 import { z } from 'zod'
 import { recordAuditEvent } from '@/lib/audit/record'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
+import { buildOrderEligibleCustomerWhere } from '@/lib/customers/order-eligibility'
 
 const optionalText = (max: number) => z.preprocess(
   (value) => value === '' || value === null ? undefined : value,
@@ -58,12 +59,22 @@ export async function GET(request: Request) {
     const category = searchParams.get('category') || ''
     const status = searchParams.get('status') || ''
     const publicPool = searchParams.get('publicPool') === 'true'
+    const orderEligibleValue = searchParams.get('orderEligible')
+    if (orderEligibleValue !== null && !['true', 'false'].includes(orderEligibleValue)) {
+      return jsonWithRequestId({ error: 'orderEligible 参数必须为 true 或 false' }, requestId, { status: 400 })
+    }
+    const orderEligible = orderEligibleValue === 'true'
+    if (orderEligible && publicPool) {
+      return jsonWithRequestId({ error: '订单候选不能同时查询公海客户' }, requestId, { status: 400 })
+    }
 
     // Build query conditions
     const where: Prisma.CustomerWhereInput = {}
     
     // If querying public pool
-    if (publicPool) {
+    if (orderEligible) {
+      Object.assign(where, await buildOrderEligibleCustomerWhere(session.user.id, session.user.roles || []))
+    } else if (publicPool) {
       where.isPublic = true
     } else {
       // Apply the data filter for every role. Admin/finance return an empty

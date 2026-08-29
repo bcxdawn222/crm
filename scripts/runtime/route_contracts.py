@@ -29,6 +29,8 @@ def run_route_check(logger: logging.Logger) -> int:
     tasks_page = (ROOT / "src/app/(dashboard)/tasks/page.tsx").read_text(encoding="utf-8")
     task_form = (ROOT / "src/app/(dashboard)/tasks/task-form-modal.tsx").read_text(encoding="utf-8")
     order_api = (ROOT / "src/app/api/finance/orders/route.ts").read_text(encoding="utf-8")
+    customer_page = (ROOT / "src/app/(dashboard)/customers/page.tsx").read_text(encoding="utf-8")
+    customer_api = (ROOT / "src/app/api/customers/route.ts").read_text(encoding="utf-8")
     task_api = (ROOT / "src/app/api/tasks/route.ts").read_text(encoding="utf-8")
     assignee_api = (ROOT / "src/app/api/tasks/assignees/route.ts").read_text(encoding="utf-8")
     forbidden_fragments = (
@@ -48,6 +50,10 @@ def run_route_check(logger: logging.Logger) -> int:
         ("任务负责人远程查询", "/api/tasks/assignees?", task_form),
         ("任务负责人选项", "assigneeOptions", task_form),
         ("订单客户范围校验", "buildDataFilter", order_api),
+        ("客户详情按 ID 加载", "/api/customers/${encodeURIComponent(id)}", customer_page),
+        ("订单候选显式参数", "orderEligible: 'true'", order_form),
+        ("订单候选服务端规则", "buildOrderEligibleCustomerWhere", customer_api),
+        ("订单创建共享资格规则", "checkOrderEligibility", order_api),
         ("任务负责人范围校验", "findTaskAssigneeWithinScope", task_api),
         ("任务负责人接口分页", "parsePagination", assignee_api),
     )

@@ -1,3 +1,5 @@
+import type { CustomerDetailOrder } from '@/lib/customers/sop-contracts'
+
 export interface CustomerFollowUp {
   id?: string
   type?: string
@@ -7,6 +9,7 @@ export interface CustomerFollowUp {
   nextFollowUpAt?: string | null
   status?: string
   createdAt: string
+  sales?: { id: string; realName: string } | null
 }
 
 export interface Customer {
@@ -27,6 +30,12 @@ export interface Customer {
   sales?: { realName: string }
   _count?: { followUps: number; orders: number }
   followUps?: CustomerFollowUp[]
+  orders?: CustomerDetailOrder[]
+  lastFollowUpAt?: string | null
+  nextFollowUpAt?: string | null
+  contractStartDate?: string | null
+  contractEndDate?: string | null
+  contractAmount?: number | null
 }
 
 export interface CustomerFormValues {
@@ -55,6 +64,11 @@ export interface CustomerListResponse {
 export interface CustomerMutationResponse {
   success: true
   data?: Customer
+}
+
+export interface CustomerDetailResponse {
+  success: true
+  data: Customer
 }
 
 export interface CustomerImportResponse {

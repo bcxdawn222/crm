@@ -5,6 +5,7 @@ import CRMChart from '@/components/charts/CRMChart'
 import type { CallbackDataParams } from 'echarts/types/dist/shared'
 import { useState, useEffect } from 'react'
 import { apiRequest } from '@/lib/http/client'
+import { DashboardSectionStatus } from './dashboard-section-status'
 
 interface TrendDataPoint {
   date: string
@@ -33,6 +34,8 @@ export default function RevenueTrendChart() {
   const [period, setPeriod] = useState('30d')
   const [data, setData] = useState<TrendDataPoint[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null)
 
   useEffect(() => {
     loadTrendData(period)
@@ -40,14 +43,16 @@ export default function RevenueTrendChart() {
 
   const loadTrendData = async (selectedPeriod: string) => {
     try {
-      setLoading(true)
+      if (data.length === 0) setLoading(true)
+      setError(null)
       const result = await apiRequest<{
         success: true
         data: { dataPoints: TrendDataPoint[] }
       }>(`/api/statistics/trend?period=${selectedPeriod}`)
       setData(result.data.dataPoints)
+      setUpdatedAt(new Date().toISOString())
     } catch (error) {
-      console.error('Failed to load trend data:', error)
+      setError(error instanceof Error ? error.message : '收入趋势加载失败')
     } finally {
       setLoading(false)
     }
@@ -243,6 +248,7 @@ export default function RevenueTrendChart() {
       }}
       styles={{ body: { minHeight: 400 } }}
     >
+      <DashboardSectionStatus error={error} updatedAt={updatedAt} hasData={data.length > 0} onRetry={() => void loadTrendData(period)} />
       {!loading && data.length > 0 && (
         <CRMChart
           option={option} 

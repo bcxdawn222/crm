@@ -38,7 +38,7 @@ const updateSchema = z.object({
 const markSchema = z.object({
   customerId: z.string().uuid(),
   contractStartDate: z.coerce.date().optional(),
-  contractEndDate: z.coerce.date().optional(),
+  contractEndDate: z.coerce.date({ message: '请选择合同到期日期' }),
   contractAmount: z.coerce.number().min(0).max(99_999_999.99).optional(),
 }).refine(
   (data) => !data.contractStartDate || !data.contractEndDate || data.contractStartDate <= data.contractEndDate,
@@ -257,6 +257,9 @@ export async function POST(request: Request) {
     }
     if (customer.status === 'COOPERATING') {
       return jsonWithRequestId({ error: '客户已经是合作状态' }, requestId, { status: 409 })
+    }
+    if (customer.status !== 'ACTIVE' || customer.isPublic) {
+      return jsonWithRequestId({ error: '只有已认领的活跃客户可以转为已合作' }, requestId, { status: 409 })
     }
 
     const { customerId, ...cooperationData } = parsed.data

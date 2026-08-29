@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma'
 import { defineAbility } from '@/lib/casl'
 import { buildDataFilter } from '@/lib/data-permission'
 import { parsePagination } from '@/lib/http/pagination'
-import { CustomerStatus, OrderStatus, Prisma } from '@prisma/client'
+import { OrderStatus, Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { createOrder, CreateOrderError } from '@/lib/orders/create'
+import { checkOrderEligibility } from '@/lib/customers/order-eligibility'
 
 const createOrderSchema = z.object({
   customerId: z.string().uuid('客户 ID 格式不正确'),
@@ -163,32 +164,19 @@ export async function POST(request: Request) {
 
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
-      select: { id: true, status: true, isPublic: true },
+      select: { id: true, status: true, isPublic: true, salesId: true },
     })
-    if (!customer || customer.status !== CustomerStatus.ACTIVE) {
-      return NextResponse.json({ error: 'Customer not found or inactive' }, { status: 404 })
+    if (!customer) {
+      return jsonWithRequestId({ error: '客户不存在', code: 'CUSTOMER_NOT_FOUND' }, requestId, { status: 404 })
     }
-    if (customer.isPublic) {
-      return NextResponse.json({ error: 'No permission to create an order for this customer' }, { status: 403 })
-    }
-
-    const customerDataFilter = await buildDataFilter(session.user.id, session.user.roles || [])
-    const accessibleCustomer = await prisma.customer.findFirst({
-      where: {
-        id: customerId,
-        status: CustomerStatus.ACTIVE,
-        isPublic: false,
-        ...customerDataFilter,
-      },
-      select: { id: true, salesId: true },
-    })
-    if (!accessibleCustomer) {
-      return NextResponse.json({ error: 'No permission to create an order for this customer' }, { status: 403 })
+    const eligibilityError = await checkOrderEligibility(session.user.id, session.user.roles || [], customer)
+    if (eligibilityError) {
+      return jsonWithRequestId({ error: eligibilityError, code: 'CUSTOMER_NOT_ORDER_ELIGIBLE' }, requestId, { status: 403 })
     }
 
     const { order, replayed } = await createOrder({
       ...parsed.data,
-      salesId: accessibleCustomer.salesId,
+      salesId: customer.salesId,
       actorId: session.user.id,
       requestId,
     })

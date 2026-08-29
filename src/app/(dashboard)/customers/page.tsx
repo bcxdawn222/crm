@@ -19,6 +19,7 @@ import { CustomerImportModal } from './customer-import-modal'
 import { CustomerTable } from './customer-table'
 import type {
   Customer,
+  CustomerDetailResponse,
   CustomerFilters,
   CustomerFormValues,
   CustomerImportResponse,
@@ -55,6 +56,9 @@ export default function CustomersPage() {
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [cooperationSubmitting, setCooperationSubmitting] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const detailTargetRef = useRef<{ id: string; readOnly: boolean; summary?: Customer } | null>(null)
   const [form] = Form.useForm<CustomerFormValues>()
   const formRequestIdRef = useRef('')
   const listRequestSequenceRef = useRef(0)
@@ -93,26 +97,50 @@ export default function CustomersPage() {
     }
   }
 
-  const openCustomer = useCallback((customer?: Customer, readOnly = false) => {
+  const loadCustomerDetail = useCallback(async (id: string, readOnly: boolean, summary?: Customer) => {
     formRequestIdRef.current = crypto.randomUUID()
-    setEditingCustomer(customer || null)
+    detailTargetRef.current = { id, readOnly, summary }
+    setEditingCustomer(summary || null)
     setCustomerReadOnly(readOnly)
-    if (customer) form.setFieldsValue(customer)
-    else form.resetFields()
+    setDetailError(null)
+    setDetailLoading(true)
+    form.resetFields()
     setModalVisible(true)
+    try {
+      const result = await apiRequest<CustomerDetailResponse>(`/api/customers/${encodeURIComponent(id)}`)
+      if (detailTargetRef.current?.id !== id) return
+      setEditingCustomer(result.data)
+      form.setFieldsValue(result.data)
+    } catch (error) {
+      if (detailTargetRef.current?.id !== id) return
+      setDetailError(error instanceof Error ? error.message : '加载客户详情失败')
+    } finally {
+      if (detailTargetRef.current?.id === id) setDetailLoading(false)
+    }
   }, [form])
+
+  const openCustomer = useCallback((customer?: Customer, readOnly = false) => {
+    if (customer) {
+      void loadCustomerDetail(customer.id, readOnly, customer)
+      return
+    }
+    detailTargetRef.current = null
+    formRequestIdRef.current = crypto.randomUUID()
+    setEditingCustomer(null)
+    setCustomerReadOnly(false)
+    setDetailError(null)
+    setDetailLoading(false)
+    form.resetFields()
+    setModalVisible(true)
+  }, [form, loadCustomerDetail])
 
   useEffect(() => { void loadCustomers() }, [page, pageSize])
 
   useEffect(() => {
     focusedCustomerIdRef.current = new URLSearchParams(window.location.search).get('id')
     if (!focusedCustomerIdRef.current) return
-    let active = true
-    void apiRequest<{ success: boolean; data: Customer }>(`/api/customers/${encodeURIComponent(focusedCustomerIdRef.current)}`)
-      .then((result) => { if (active) openCustomer(result.data, !canUpdateCustomer) })
-      .catch((error) => { if (active) message.error(error instanceof Error ? error.message : '加载客户详情失败') })
-    return () => { active = false }
-  }, [canUpdateCustomer, openCustomer])
+    void loadCustomerDetail(focusedCustomerIdRef.current, !canUpdateCustomer)
+  }, [canUpdateCustomer, loadCustomerDetail])
 
   useEffect(() => {
     if (modalVisible && !customerReadOnly && customerDraft.restore()) message.info('已恢复未提交的客户草稿')
@@ -236,7 +264,7 @@ export default function CustomersPage() {
           onCooperate={setCooperationCustomer}
         />
       </Card>
-      <CustomerFormModal open={modalVisible} customer={editingCustomer} readOnly={customerReadOnly} submitting={submitting} form={form} onCancel={() => { if (!submitting) { if (!customerReadOnly) customerDraft.clear(); setModalVisible(false) } }} onSubmit={handleSubmit} onValuesChange={customerDraft.save} onFollowUp={(customer) => { setModalVisible(false); setFollowUpCustomer(customer); setFollowUpModalVisible(true) }} />
+      <CustomerFormModal open={modalVisible} customer={editingCustomer} readOnly={customerReadOnly} submitting={submitting} detailLoading={detailLoading} detailError={detailError} form={form} onRetry={() => { const target = detailTargetRef.current; if (target) void loadCustomerDetail(target.id, target.readOnly, target.summary) }} onCancel={() => { if (!submitting) { detailTargetRef.current = null; if (!customerReadOnly) customerDraft.clear(); setModalVisible(false) } }} onSubmit={handleSubmit} onValuesChange={customerDraft.save} onFollowUp={(customer) => { setModalVisible(false); setFollowUpCustomer(customer); setFollowUpModalVisible(true) }} />
       <FollowUpModal open={followUpModalVisible} customerId={followUpCustomer?.id} customerName={followUpCustomer?.name} onClose={() => setFollowUpModalVisible(false)} onSaved={() => { setFollowUpModalVisible(false); setFollowUpCustomer(null); void loadCustomers() }} />
       <CustomerTransferModal customer={transferCustomer} onClose={() => setTransferCustomer(null)} onSaved={() => { setTransferCustomer(null); return loadCustomers() }} />
       <CustomerImportModal open={importModalVisible} uploading={uploading} onCancel={() => { if (!uploading) setImportModalVisible(false) }} onUpload={importCustomers} />

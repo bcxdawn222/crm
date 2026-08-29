@@ -4,6 +4,7 @@ import { Card } from 'antd'
 import CRMChart from '@/components/charts/CRMChart'
 import { useState, useEffect } from 'react'
 import { apiRequest } from '@/lib/http/client'
+import { DashboardSectionStatus } from './dashboard-section-status'
 
 interface FunnelStage {
   stage: string
@@ -33,6 +34,8 @@ function emptyStageWidth(index: number, stageCount: number): number {
 export default function FunnelChart() {
   const [data, setData] = useState<FunnelStage[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null)
 
   useEffect(() => {
     loadFunnelData()
@@ -40,13 +43,15 @@ export default function FunnelChart() {
 
   const loadFunnelData = async () => {
     try {
-      setLoading(true)
+      if (data.length === 0) setLoading(true)
+      setError(null)
       const result = await apiRequest<{ success: true; data: { stages: FunnelStage[] } }>(
         '/api/statistics/funnel'
       )
       setData(result.data.stages)
+      setUpdatedAt(new Date().toISOString())
     } catch (error) {
-      console.error('Failed to load funnel data:', error)
+      setError(error instanceof Error ? error.message : '销售漏斗加载失败')
     } finally {
       setLoading(false)
     }
@@ -147,6 +152,7 @@ export default function FunnelChart() {
       }}
       styles={{ body: { minHeight: 400, padding: '16px 20px 20px' } }}
     >
+      <DashboardSectionStatus error={error} updatedAt={updatedAt} hasData={data.length > 0} onRetry={() => void loadFunnelData()} />
       {!loading && data.length > 0 && (
         <CRMChart
           className="sales-funnel-chart"

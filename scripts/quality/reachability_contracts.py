@@ -24,6 +24,10 @@ CONTRACTS = (
         "src/app/api/customers/[id]/follow-ups/route.ts", "FollowUp", "FOLLOW_UP_CREATED",
     ),
     ReachabilityContract(
+        "客户转已合作", "src/app/(dashboard)/customers/page.tsx", "src/app/api/customers/cooperating/route.ts",
+        "src/app/api/customers/cooperating/route.ts", "Customer", "CUSTOMER_MARKED_COOPERATING",
+    ),
+    ReachabilityContract(
         "订单创建", "src/app/(dashboard)/finance/orders/page.tsx", "src/app/api/finance/orders/route.ts",
         "src/lib/orders/create.ts", "Order", "ORDER_CREATED",
     ),

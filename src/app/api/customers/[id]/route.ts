@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { defineAbility } from "@/lib/casl";
@@ -23,17 +24,20 @@ export async function GET(
   const { id } = await params;
   const requestId = getRequestId(request);
   try {
+    if (!z.string().uuid().safeParse(id).success) {
+      return jsonWithRequestId({ error: "客户 ID 格式不正确", code: "VALIDATION_ERROR" }, requestId, { status: 400 });
+    }
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "未授权" }, { status: 401 });
+      return jsonWithRequestId({ error: "未登录或登录已过期", code: "UNAUTHORIZED" }, requestId, { status: 401 });
     }
 
     // Check permissions
     const permissions = session.user?.permissions || [];
     const ability = defineAbility(permissions);
     if (ability.cannot("read", "customer")) {
-      return NextResponse.json({ error: "无权访问" }, { status: 403 });
+      return jsonWithRequestId({ error: "无权查看客户", code: "FORBIDDEN" }, requestId, { status: 403 });
     }
 
     const customer = await prisma.customer.findUnique({
@@ -71,7 +75,7 @@ export async function GET(
     });
 
     if (!customer) {
-      return NextResponse.json({ error: "客户不存在" }, { status: 404 });
+      return jsonWithRequestId({ error: "客户不存在", code: "CUSTOMER_NOT_FOUND" }, requestId, { status: 404 });
     }
 
     if (
@@ -81,13 +85,29 @@ export async function GET(
         customer.salesId,
       ))
     ) {
-      return NextResponse.json({ error: "无权查看该客户" }, { status: 403 });
+      return jsonWithRequestId({ error: "无权查看该客户", code: "FORBIDDEN" }, requestId, { status: 403 });
     }
 
-    return NextResponse.json({
+    const categoryMap: Record<string, string> = {
+      POTENTIAL: "潜在客户",
+      NORMAL: "普通客户",
+      IMPORTANT: "重要客户",
+      VIP: "VIP客户",
+    };
+    return jsonWithRequestId({
       success: true,
-      data: customer,
-    });
+      data: {
+        ...customer,
+        category: customer.level ? categoryMap[customer.level] || customer.level : "潜在客户",
+        contractAmount: customer.contractAmount?.toNumber() ?? null,
+        orders: customer.orders.map((order) => ({
+          ...order,
+          contractAmount: order.contractAmount.toNumber(),
+          paidAmount: order.paidAmount.toNumber(),
+          unpaidAmount: order.unpaidAmount.toNumber(),
+        })),
+      },
+    }, requestId);
   } catch (error) {
     return serverErrorResponse(error, "GET /api/customers/[id]", requestId);
   }

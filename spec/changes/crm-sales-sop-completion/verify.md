@@ -1,33 +1,16 @@
 # Verification Ledger: crm-sales-sop-completion
 
-## Round 0 - proposal critique
+## Round 0 - proposal critique - 2026-08-29
 
-> 受项目“禁止子智能体”约束，本轮未派发独立批评智能体；由主智能体按 necessity 和 regression-compat 两个固定视角审查，不能视为独立复核。
+> 项目禁止子智能体，本轮由主智能体分别按 necessity 和 regression-compat 两个固定视角审查，不能视为独立复核。
 
 | ID | Lens | Severity | Status | Finding | Evidence |
 |---|---|---|---|---|---|
-| V-1 | necessity | major | fixed(r0) | 如果把商机、报价、AI 或 ERP 一并加入本期，非功能治理会被业务扩展掩盖 | proposal 的 Not in this change 明确排除，PRD 只保留现有销售流程 |
-| V-2 | necessity | major | fixed(r0) | 只增加空审计表而不接入关键写入，无法证明审计目标已经实现 | proposal 和 tasks 明确要求接入客户、公海、订单、回款、合同和文件访问关键路径 |
-| V-3 | regression-compat | major | fixed(r0) | 全量重写接口可能破坏既有页面、错误文本和已验证流程 | design 将 Phase 1 限定为关键路径，旧业务入口和字段语义保持不变 |
-| V-4 | regression-compat | major | open | 线上业务数据基本为空，无法证明真实角色、审计查询和恢复演练覆盖生产场景 | Phase 2 另行安排四角色浏览器验收和恢复演练；本期报告必须标记未验证范围 |
-
-## Round 1 - Phase 1 implementation
-
-> 本轮由主智能体执行。项目约束禁止创建或委派子智能体，因此本轮不是独立复核；证据仅覆盖本地源码、生成、类型、路由、构建和只读脚本范围。
-
-| ID | Check | Status | Evidence |
-|---|---|---|---|
-| I-1 | Prisma Client 生成 | passed | `python scripts\manage.py generate`，退出码 0；生成 Prisma Client v5.22.0 |
-| I-2 | TypeScript 类型检查 | passed | `python scripts\manage.py typecheck`，退出码 0 |
-| I-3 | 路由契约检查 | passed | `python scripts\manage.py routes`，退出码 0，输出“路由契约静态检查通过” |
-| I-4 | 生产构建 | passed | `python scripts\manage.py build`，退出码 0；Next.js 14.2.35 完成生产构建 |
-| I-5 | 迁移与备份文件检查 | passed | `python scripts\manage.py audit-data --skip-db`，退出码 0；迁移目录检查通过，未找到本地备份文件并已记录警告 |
-| I-6 | 数据库只读检查 | blocked | `python scripts\manage.py audit-data` 退出码 1；本机 `127.0.0.1:3306` 未监听，连接返回 `ERROR 2003 (HY000)` |
-| I-7 | 本地 HTTP 冒烟 | blocked | `python scripts\manage.py dbstart` 尝试启动 `MySQL` 服务，Windows 返回 `OpenService FAILED 5: Access is denied`，因此未启动服务和 HTTP 冒烟 |
-| I-8 | 线上迁移 | not-run | 本轮只生成 `AuditEvent` migration，未连接或修改线上数据库 |
-
-### 当前未验证范围
-
-- `AuditEvent` migration 尚未在本地或线上数据库执行，因此管理员审计查询和关键写入审计只能确认代码可编译，不能声称真实数据库运行通过。
-- 尚未完成登录后四类角色的浏览器验收、真实审计记录查询、备份恢复演练和生产回滚演练。
-- 构建日志中仍有现有动态 API 在 Next.js 静态页面生成阶段输出 `Dynamic server usage` 提示，但生产构建最终退出码为 0；本轮未扩大范围处理这些既有提示。
+| V-1 | necessity | major | fixed(r0) | 把商机、报价、产品目录或审批加入本轮不能解决截图中的入口缺失、建单阻塞和仪表盘消失 | proposal 的 Not in this change 明确排除，设计只使用现有 Customer、FollowUp、Order、Payment 和 ContractArchive |
+| V-2 | necessity | major | fixed(r0) | 只部署本地“转已合作”按钮仍会保留已合作客户不能建单和详情数据不完整两个阻塞 | proposal What 1-3 与 tasks 2-3 要求同一轮修复完整详情、合作状态和订单资格 |
+| V-3 | regression-compat | major | fixed(r0) | 仪表盘保留最近成功数据可能让销售误以为旧数据仍然实时 | design 和 tasks 4.2 要求显示上次更新时间与“数据可能已过期” |
+| V-4 | regression-compat | major | fixed(r0) | 直接用仓库 Nginx 模板覆盖线上配置会丢失现有 TLS/Certbot 指令 | design 发布约束和 tasks 6.2/7.4 要求先备份线上实际配置，只合并代理、日志和版本标识 |
+| V-5 | regression-compat | major | fixed(r0) | 允许已合作客户建单可能扩大普通销售可选客户范围 | 设计把资格限定为当前数据范围、非公海且 `ACTIVE | COOPERATING`，tasks 5.3 要求四角色权限和数据库断言 |
+| V-6 | necessity | major | open | 服务器进程、数据库和连续 60 次外部健康请求均正常，现有证据未复现 `ERR_CONNECTION_RESET`；代理配置和页面恢复改进可能提升可观测性，但不能保证消除客户端、运营商或云网络层的连接重置 | research 记录 PM2/MariaDB 重启次数为 0、资源正常、Nginx 无同期 5xx；proposal 已禁止宣称原因已定位，tasks 6.5 保留取证和未定位状态 |
+| V-7 | regression-compat | major | fixed(r0) | 线上受控写入冒烟如果清理失败会留下测试客户、订单或回款 | tasks 7.3-7.6 要求先备份、使用可识别验收记录、失败回滚和最终残留复核；不允许操作原始业务记录 |
+| V-8 | workflow | major | fixed(r0) | `spec/changes/` 曾存在另一个未归档的 `crm-comprehensive-quality-optimization`，会阻止单活动变更实施门禁 | 已于 2026-08-29 归档到 `spec/archive/2026-08-29-crm-comprehensive-quality-optimization`，提交 `85def9b`；当前只剩 `crm-sales-sop-completion` |

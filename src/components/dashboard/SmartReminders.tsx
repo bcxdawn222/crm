@@ -5,6 +5,7 @@ import { BellOutlined, PhoneOutlined, FileTextOutlined, CalendarOutlined } from 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { apiRequest } from '@/lib/http/client'
+import { DashboardSectionStatus } from './dashboard-section-status'
 
 interface ReminderItem {
   type: string
@@ -18,6 +19,8 @@ interface ReminderItem {
 export default function SmartReminders() {
   const [reminders, setReminders] = useState<ReminderItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null)
 
   useEffect(() => {
     loadReminders()
@@ -25,7 +28,8 @@ export default function SmartReminders() {
 
   const loadReminders = async () => {
     try {
-      setLoading(true)
+      if (reminders.length === 0) setLoading(true)
+      setError(null)
       const result = await apiRequest<{
         success: true
         data: {
@@ -44,8 +48,9 @@ export default function SmartReminders() {
         return priorityOrder[a.priority] - priorityOrder[b.priority]
       })
       setReminders(allReminders.slice(0, 5))
+      setUpdatedAt(new Date().toISOString())
     } catch (error) {
-      console.error('Failed to load reminders:', error)
+      setError(error instanceof Error ? error.message : '提醒加载失败')
     } finally {
       setLoading(false)
     }
@@ -108,6 +113,7 @@ export default function SmartReminders() {
         boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
       }}
     >
+      <DashboardSectionStatus error={error} updatedAt={updatedAt} hasData={reminders.length > 0} onRetry={() => void loadReminders()} />
       {!loading && reminders.length > 0 ? (
         <List
           dataSource={reminders}

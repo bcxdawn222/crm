@@ -1,17 +1,17 @@
 'use client'
 
-import { Row, Col } from 'antd'
+import { Row, Col, Card } from 'antd'
 import dynamic from 'next/dynamic'
 import KPICards from '@/components/dashboard/KPICards'
 import SmartReminders from '@/components/dashboard/SmartReminders'
 
 const RevenueTrendChart = dynamic(() => import('@/components/dashboard/RevenueTrendChart'), {
   ssr: false,
-  loading: () => <div aria-hidden style={{ minHeight: 472 }} />,
+  loading: () => <Card loading aria-label="收入趋势加载中" style={{ minHeight: 472 }} />,
 })
 const FunnelChart = dynamic(() => import('@/components/dashboard/FunnelChart'), {
   ssr: false,
-  loading: () => <div aria-hidden style={{ minHeight: 472 }} />,
+  loading: () => <Card loading aria-label="销售漏斗加载中" style={{ minHeight: 472 }} />,
 })
 
 export default function DashboardPage() {

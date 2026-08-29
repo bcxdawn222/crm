@@ -98,7 +98,7 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
       const params = new URLSearchParams({
         page: '1',
         pageSize: '20',
-        status: 'ACTIVE',
+        orderEligible: 'true',
       })
       if (keyword.trim()) params.set('keyword', keyword.trim())
 
