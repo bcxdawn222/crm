@@ -20,6 +20,8 @@ def main() -> int:
     require("prisma migrate status" in source, "候选包缺少迁移状态门禁")
     require("crm-db-backup.service" in source and "gzip -t" in source, "部署前缺少可读备份检查")
     require("127.0.0.1 --port 3000" in source, "stable 没有限制为本机监听")
+    require("StandardOutput=append:" in source and "StandardError=append:" in source, "systemd 没有写入共享应用日志")
+    require("ExecStartPost=/usr/bin/curl" in source, "systemd 缺少启动后健康检查")
     require("nginx -t" in source and "nginx -s reopen" in source, "Nginx 缺少校验或日志 reopen")
     require("rollback_after_failure" in source, "切换失败没有自动恢复")
     require('candidate_pgid=$(ps -o pgid=' in source, "候选服务没有从记录 PID 解析实际进程组")
