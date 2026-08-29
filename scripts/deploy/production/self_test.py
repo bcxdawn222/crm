@@ -22,6 +22,7 @@ def main() -> int:
     require("127.0.0.1 --port 3000" in source, "stable 没有限制为本机监听")
     require("StandardOutput=append:" in source and "StandardError=append:" in source, "systemd 没有写入共享应用日志")
     require("ExecStartPost=/usr/bin/curl" in source, "systemd 缺少启动后健康检查")
+    require("--retry-connrefused" in source, "systemd 启动健康检查不会重试端口尚未监听")
     require("nginx -t" in source and "nginx -s reopen" in source, "Nginx 缺少校验或日志 reopen")
     require("rollback_after_failure" in source, "切换失败没有自动恢复")
     require('candidate_pgid=$(ps -o pgid=' in source, "候选服务没有从记录 PID 解析实际进程组")

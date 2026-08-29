@@ -76,7 +76,7 @@ Environment=CRM_PROFILE=stable
 Environment=CRM_BUILD_VERSION=$version
 Environment=CRM_BUILD_COMMIT=$commit
 ExecStart=/usr/bin/node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3000
-ExecStartPost=/usr/bin/curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1:3000/api/health
+ExecStartPost=/usr/bin/curl --fail --silent --show-error --retry 10 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health
 StandardOutput=append:$SHARED/logs/app-out.log
 StandardError=append:$SHARED/logs/app-error.log
 Restart=always
