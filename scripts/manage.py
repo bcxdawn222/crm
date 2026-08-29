@@ -91,6 +91,7 @@ def main() -> int:
             "production-stage",
             "production-deploy",
             "production-rollback",
+            "production-sop-smoke",
             "production-ops-test",
         ),
     )
@@ -281,6 +282,12 @@ def main() -> int:
         ]
         if args.artifact:
             command.extend(("--artifact", args.artifact))
+        return run_sequence(((args.action, command),), logger)
+    if args.action == "production-sop-smoke":
+        if profile.name != "stable":
+            logger.error("production-sop-smoke 只允许 --profile stable")
+            return 2
+        command = [sys.executable, str(ROOT / "scripts/quality/production_sop_smoke.py")]
         return run_sequence(((args.action, command),), logger)
     route_result = run_route_check(logger)
     if route_result != 0:

@@ -5,6 +5,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 WORKER = Path(__file__).with_name("remote_release.sh")
+PROBE = Path(__file__).with_name("sop_data_probe.py")
+SMOKE = ROOT / "scripts/quality/production_sop_smoke.py"
 
 
 def require(condition: bool, message: str) -> None:
@@ -14,6 +16,8 @@ def require(condition: bool, message: str) -> None:
 
 def main() -> int:
     source = WORKER.read_text(encoding="utf-8")
+    probe = PROBE.read_text(encoding="utf-8")
+    smoke = SMOKE.read_text(encoding="utf-8")
     nginx = (ROOT / "scripts/deploy/nginx-crm-system.conf").read_text(encoding="utf-8")
     service = (ROOT / "scripts/deploy/crm@.service").read_text(encoding="utf-8")
     require("sha256sum -c" in source, "候选包缺少 SHA256 门禁")
@@ -30,6 +34,13 @@ def main() -> int:
     require("crm_connection_upgrade" in nginx, "Nginx 模板缺少动态 Connection map")
     require("127.0.0.1" in service and "Restart=always" in service, "systemd 模板缺少本机监听或重启策略")
     require(not (ROOT / "scripts/deploy/ecosystem.config.mjs").exists(), "仍保留会造成双管理的 PM2 模板")
+    compile(probe, str(PROBE), "exec")
+    compile(smoke, str(SMOKE), "exec")
+    require("CRM_PRODUCTION_WRITE_ACK" in smoke, "线上写入验收缺少显式确认门禁")
+    require("create_backup(client)" in smoke, "线上写入验收缺少写前备份")
+    require('remote_probe(client, "cleanup"' in smoke, "线上写入验收缺少失败清理")
+    require("RIGHT(requestId, 12)" in probe, "线上写入验收不能按唯一 requestId 标记清理")
+    require("assert_no_residue" in probe, "线上写入验收缺少残留复核")
     print("线上发布治理脚本契约检查通过")
     return 0
 
