@@ -20,6 +20,11 @@ class ProcessRow(TypedDict, total=False):
     HandleCount: int
 
 
+class LoadGeneratorRow(TypedDict):
+    cpu: float
+    memory: float
+
+
 class MetricValues(TypedDict, total=False):
     count: float
     rate: float
@@ -39,6 +44,8 @@ class ResourceSample:
     handles: int
     database_connections: int
     server_log_bytes: int
+    load_generator_cpu_percent: float
+    load_generator_memory_percent: float
 
 
 @dataclass(frozen=True)
@@ -70,7 +77,7 @@ def _windows_stats(pids: set[int]) -> tuple[int, float, float, int]:
     )
     if result.returncode != 0 or not result.stdout.strip():
         raise RuntimeError("无法读取 CRM 进程资源数据")
-    payload = json.loads(result.stdout)
+    payload: object = json.loads(result.stdout)
     rows = payload if isinstance(payload, list) else [payload]
     typed_rows = cast(list[ProcessRow], rows)
     return (
@@ -79,6 +86,34 @@ def _windows_stats(pids: set[int]) -> tuple[int, float, float, int]:
         sum(int(row.get("WorkingSet64") or 0) for row in typed_rows) / 1024 / 1024,
         sum(int(row.get("HandleCount") or 0) for row in typed_rows),
     )
+
+
+def _windows_load_generator_stats() -> tuple[float, float]:
+    command = (
+        "$cpu=(Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter \"Name='_Total'\").PercentProcessorTime;"
+        "$os=Get-CimInstance Win32_OperatingSystem;"
+        "[pscustomobject]@{cpu=[double]$cpu;memory=[double](100*(1-$os.FreePhysicalMemory/$os.TotalVisibleMemorySize))}"
+        "|ConvertTo-Json -Compress"
+    )
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError("无法读取负载机资源数据")
+    payload: object = json.loads(result.stdout)
+    if not isinstance(payload, dict):
+        raise RuntimeError("负载机资源数据格式错误")
+    row = cast(LoadGeneratorRow, payload)
+    cpu = row.get("cpu")
+    memory = row.get("memory")
+    if not isinstance(cpu, (int, float)) or not isinstance(memory, (int, float)):
+        raise RuntimeError("负载机资源数据缺少 CPU 或内存")
+    return float(cpu), float(memory)
 
 
 def _posix_stats(pids: set[int]) -> tuple[int, float, float, int]:
@@ -102,6 +137,22 @@ def _posix_stats(pids: set[int]) -> tuple[int, float, float, int]:
     return len(rows), 0.0, rss_mb, handles
 
 
+def _posix_load_generator_stats() -> tuple[float, float]:
+    cpu_count = os.cpu_count() or 1
+    cpu = min(100.0, os.getloadavg()[0] / cpu_count * 100)
+    total_memory = available_memory = 0
+    for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
+        name, raw = line.split(":", 1)
+        if name == "MemTotal":
+            total_memory = int(raw.strip().split()[0])
+        elif name == "MemAvailable":
+            available_memory = int(raw.strip().split()[0])
+    if total_memory <= 0 or available_memory <= 0:
+        raise RuntimeError("无法读取负载机内存数据")
+    memory = 100 * (1 - available_memory / total_memory)
+    return cpu, memory
+
+
 def collect_sample(
     pids: set[int],
     database_connections: int,
@@ -109,6 +160,9 @@ def collect_sample(
 ) -> ResourceSample:
     process_count, cpu_seconds, rss_mb, handles = (
         _windows_stats(pids) if os.name == "nt" else _posix_stats(pids)
+    )
+    load_cpu, load_memory = (
+        _windows_load_generator_stats() if os.name == "nt" else _posix_load_generator_stats()
     )
     return ResourceSample(
         timestamp=datetime.now(timezone.utc).isoformat(),
@@ -118,6 +172,8 @@ def collect_sample(
         handles=handles,
         database_connections=database_connections,
         server_log_bytes=server_log.stat().st_size if server_log.exists() else 0,
+        load_generator_cpu_percent=round(load_cpu, 2),
+        load_generator_memory_percent=round(load_memory, 2),
     )
 
 
@@ -126,9 +182,15 @@ def sample_until_stopped(
     interval_seconds: int,
     sample_factory,
     output: list[ResourceSample],
+    errors: list[Exception],
 ) -> None:
     while not stop.is_set():
-        output.append(sample_factory())
+        try:
+            output.append(sample_factory())
+        except Exception as error:
+            errors.append(error)
+            stop.set()
+            return
         stop.wait(interval_seconds)
 
 
@@ -187,6 +249,9 @@ def write_reports(
     handle_values = [sample.handles for sample in samples]
     db_values = [sample.database_connections for sample in samples]
     log_values = [sample.server_log_bytes for sample in samples]
+    load_cpu_values = [sample.load_generator_cpu_percent for sample in samples]
+    load_memory_values = [sample.load_generator_memory_percent for sample in samples]
+    load_verdict = "OK" if max(load_cpu_values) <= 70 else "NOTE" if max(load_cpu_values) <= 90 else "WARNING"
     payload = {
         "generatedAt": generated_at.isoformat(),
         "profile": "test",
@@ -212,6 +277,7 @@ def write_reports(
 - 采样次数：{len(samples)}，内存范围：{min(rss_values):.2f} - {max(rss_values):.2f} MB。
 - 句柄范围：{min(handle_values)} - {max(handle_values)}，数据库连接范围：{min(db_values)} - {max(db_values)}。
 - 服务日志增长：{max(log_values) - min(log_values)} bytes。
+- 负载机 CPU 峰值：{max(load_cpu_values):.2f}%，内存峰值：{max(load_memory_values):.2f}%，判定：{load_verdict}。
 - 服务重启恢复：{restart_seconds:.2f} 秒；真实会话过期复验：{'通过' if session_expiry_verified else '未通过'}。
 
 ## 验收预算

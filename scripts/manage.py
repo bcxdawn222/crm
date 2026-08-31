@@ -36,6 +36,7 @@ TEST_FLOW_SCRIPTS = {
     "perf-runtime": "../performance/frontend_runtime.py",
     "api-perf": "../performance/api_database.py",
     "stability": "../performance/stability.py",
+    "load-dataset": "../performance/datasets/load_dataset.py",
     "security-flow": "security_flow_test.py",
     "final-audit": "final_repository_audit.py",
     "e2e": "../e2e/run.py",

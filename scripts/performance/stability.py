@@ -158,12 +158,14 @@ def run_k6(
     require(inspection.kind == InstanceKind.RUNNING and inspection.pid is not None, "test 服务未运行")
     pids = process_tree_ids(inspection.pid)
     samples: list[ResourceSample] = []
+    monitor_errors: list[Exception] = []
     stop = Event()
     server_log = ROOT / "logs" / "test" / "server.log"
     sample_factory = lambda: collect_sample(pids, database_connections(target), server_log)
+    samples.append(sample_factory())
     monitor = Thread(
         target=sample_until_stopped,
-        args=(stop, config.sample_interval_seconds, sample_factory, samples),
+        args=(stop, config.sample_interval_seconds, sample_factory, samples, monitor_errors),
         daemon=True,
     )
     monitor.start()
@@ -179,6 +181,8 @@ def run_k6(
     finally:
         stop.set()
         monitor.join(timeout=config.sample_interval_seconds + 5)
+    if monitor_errors:
+        raise RuntimeError(f"资源采样失败: {monitor_errors[0]}")
     require(summary_path.is_file(), "k6 未生成 summary 文件")
     require(bool(samples), "没有采集到服务资源数据")
     return summary_path, samples
@@ -226,9 +230,12 @@ def assert_budgets(result, samples: list[ResourceSample]) -> None:
     rss = [sample.rss_mb for sample in samples]
     handles = [sample.handles for sample in samples]
     connections = [sample.database_connections for sample in samples]
+    load_cpu = [sample.load_generator_cpu_percent for sample in samples]
+    load_memory = [sample.load_generator_memory_percent for sample in samples]
     require(max(rss) - min(rss) < 512, "CRM 进程内存增长超过 512 MB")
     require(max(handles) - min(handles) < 500, "CRM 进程句柄增长超过 500")
     require(max(connections) <= 50, "数据库连接峰值超过 50")
+    require(max(load_cpu) < 95 and max(load_memory) < 95, "负载机资源超过 95%，本次压测结果无效")
 
 
 def main() -> int:
