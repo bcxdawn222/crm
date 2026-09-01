@@ -15,10 +15,20 @@ const optionalText = (max: number) => z.preprocess(
   z.string().trim().max(max).optional(),
 )
 
+const customerName = z.preprocess(
+  (value) => value === undefined || value === null ? '' : value,
+  z.string().trim().max(100),
+)
+
+const optionalPhone = z.preprocess(
+  (value) => value === '' || value === null ? undefined : value,
+  z.string().trim().min(3, '联系电话格式不正确').max(20).optional(),
+)
+
 const customerCreateSchema = z.object({
-  name: z.string().trim().min(1, '请输入客户姓名').max(100),
+  name: customerName,
   company: optionalText(200),
-  phone: z.string().trim().min(3, '联系电话格式不正确').max(20),
+  phone: optionalPhone,
   email: z.preprocess(
     (value) => value === '' || value === null ? undefined : value,
     z.string().trim().email('邮箱格式不正确').max(100).optional(),
@@ -197,14 +207,13 @@ export async function POST(request: Request) {
     const { name, company, phone, email, address, category, source, notes } = parsed.data
 
     // Check if already exists
-    const existing = await prisma.customer.findFirst({
-      where: {
-        OR: [
-          { phone },
-          ...(email ? [{ email }] : []),
-        ]
-      }
-    })
+    const identifiers: Prisma.CustomerWhereInput[] = [
+      ...(phone ? [{ phone }] : []),
+      ...(email ? [{ email }] : []),
+    ]
+    const existing = identifiers.length > 0
+      ? await prisma.customer.findFirst({ where: { OR: identifiers } })
+      : null
 
     if (existing) {
       return NextResponse.json({ error: 'Customer already exists' }, { status: 400 })

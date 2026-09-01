@@ -50,7 +50,9 @@ test.describe('列表状态与网络恢复', () => {
       }))
     })
     await reloadPromise
-    await expect(page.evaluate(() => sessionStorage.getItem('e2e-page-load-count'))).resolves.toBe('2')
+    await expect.poll(async () => (
+      page.evaluate(() => sessionStorage.getItem('e2e-page-load-count')).catch(() => null)
+    )).toBe('2')
     await expect(page.getByRole('main')).toBeVisible()
 
     await page.evaluate(() => {
@@ -59,7 +61,9 @@ test.describe('列表状态与网络恢复', () => {
       }))
     })
     await page.waitForTimeout(500)
-    await expect(page.evaluate(() => sessionStorage.getItem('e2e-page-load-count'))).resolves.toBe('2')
+    await expect.poll(async () => (
+      page.evaluate(() => sessionStorage.getItem('e2e-page-load-count')).catch(() => null)
+    )).toBe('2')
   })
 })
 

@@ -110,7 +110,7 @@ export default function CustomersPage() {
       const result = await apiRequest<CustomerDetailResponse>(`/api/customers/${encodeURIComponent(id)}`)
       if (detailTargetRef.current?.id !== id) return
       setEditingCustomer(result.data)
-      form.setFieldsValue(result.data)
+      form.setFieldsValue({ ...result.data, phone: result.data.phone ?? undefined })
     } catch (error) {
       if (detailTargetRef.current?.id !== id) return
       setDetailError(error instanceof Error ? error.message : '加载客户详情失败')

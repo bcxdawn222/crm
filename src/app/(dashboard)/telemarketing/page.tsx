@@ -30,7 +30,7 @@ export default function TelemarketingPage() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<TelemarketingRecord[]>([])
   const [total, setTotal] = useState(0)
-  const { page, pageSize, changePage } = useTablePagination()
+  const { page, pageSize, setPage, changePage } = useTablePagination()
   const [modalVisible, setModalVisible] = useState(false)
   const [editingRecord, setEditingRecord] = useState<TelemarketingRecord | null>(null)
   const [convertRecord, setConvertRecord] = useState<TelemarketingRecord | null>(null)
@@ -112,7 +112,8 @@ export default function TelemarketingPage() {
     try {
       await apiRequest<TelemarketingMutationResponse>(`/api/telemarketing?id=${id}`, { method: 'DELETE' }, { requestKey: `telemarketing-delete-${id}` })
       message.success('删除成功')
-      await loadData()
+      if (data.length === 1 && page > 1) setPage((current) => current - 1)
+      else await loadData()
     } catch (error) {
       message.error(error instanceof Error ? error.message : '删除电销记录失败')
     } finally {

@@ -2,11 +2,11 @@
 
 ## 本轮结果
 
-- 生成时间：2026-09-01 14:55:56 +0800
+- 生成时间：2026-09-01 15:58:21 +0800
 - 运行环境：`CRM_PROFILE=test`
 - 数据库保护：仅允许数据库名以 `_test` 结尾
 - 浏览器：Chromium Desktop、Chromium Mobile（390px）
-- 结果：33 项通过，0 项未通过，共 33 项
+- 结果：38 项通过，0 项未通过，共 38 项
 - 原始 JSON：`output/playwright/report.json`
 - 失败产物：`output/playwright/results/`，仅失败时保留 screenshot、video 和 trace
 
@@ -27,36 +27,41 @@
 | 1 | auth.setup.ts | 准备夹具并生成四个角色的认证状态 | 通过 |
 | 2 | specs\customers.spec.ts / 客户列表与客户写操作 | 搜索、重置和分页使用真实服务端数据 | 通过 |
 | 3 | specs\customers.spec.ts / 客户列表与客户写操作 | 新增客户重复点击只写入一次并记录审计 | 通过 |
-| 4 | specs\customers.spec.ts / 客户列表与客户写操作 | 编辑客户同步更新页面、数据库和审计 | 通过 |
-| 5 | specs\customers.spec.ts / 客户列表与客户写操作 | 归档客户进入公海且流转可追溯 | 通过 |
-| 6 | specs\customers.spec.ts / 管理员客户删除 | 删除客户执行软删除且保留审计 | 通过 |
-| 7 | specs\customers.spec.ts / 主管客户转移 | 转移按钮写入目标销售并记录审计 | 通过 |
-| 8 | specs\customers.spec.ts / 公海认领 | 销售认领公海客户并更新归属与审计 | 通过 |
-| 9 | specs\dashboard.visual.spec.ts | 销售漏斗全零时仍显示清晰阶梯且不改变真实标签 | 通过 |
-| 10 | specs\dashboard.visual.spec.ts | 仪表盘在关键宽度切换侧栏且没有横向溢出 | 通过 |
-| 11 | specs\dashboard.visual.spec.ts | 趋势局部失败保留旧数据并可独立重试 | 通过 |
-| 12 | specs\files.spec.ts / 文件共享按钮 | 上传、下载和删除文件均写入真实存储、数据库和审计 | 通过 |
-| 13 | specs\files.spec.ts / 销售文件权限 | 销售可上传并下载自己的文件但看不到删除按钮 | 通过 |
-| 14 | specs\modular-pages.spec.ts / 模块化页面回归 | 客户查看模式只读且编辑模式保留保存入口 | 通过 |
-| 15 | specs\modular-pages.spec.ts / 模块化页面回归 | 订单新增下拉使用服务端资格并包含已合作客户 | 通过 |
-| 16 | specs\modular-pages.spec.ts / 模块化页面回归 | 合作客户统计、编辑和合同备案入口可达 | 通过 |
-| 17 | specs\modular-pages.spec.ts / 模块化页面回归 | 提醒中心使用真实分组和统计结构渲染 | 通过 |
-| 18 | specs\modular-pages.spec.ts / 模块化页面回归 | 日报、每日客资和电销列表均能读取测试数据 | 通过 |
-| 19 | specs\permissions.spec.ts / 销售页面权限与导航 | 销售可导航到文件页且客户动作按权限隐藏 | 通过 |
-| 20 | specs\permissions.spec.ts / 销售页面权限与导航 | 销售无法读取管理员客户 | 通过 |
-| 21 | specs\permissions.spec.ts / 主管数据范围 | 主管可读取本人和下属客户 | 通过 |
-| 22 | specs\permissions.spec.ts / 受限用户权限 | 客户接口返回 403 且页面转到无权限页 | 通过 |
-| 23 | specs\recovery.spec.ts / 列表状态与网络恢复 | 空状态、慢响应、断网恢复和浏览器刷新均可用 | 通过 |
-| 24 | specs\recovery.spec.ts / 列表状态与网络恢复 | 旧版本静态资源加载失败时最多自动刷新一次 | 通过 |
-| 25 | specs\recovery.spec.ts / 会话过期恢复 | 会话失效后重新登录返回原页面 | 通过 |
-| 26 | specs\recovery.spec.ts / 真实服务端 500 | 下载对象缺失时按钮返回 500、带请求号且不误改数据 | 通过 |
-| 27 | specs\sales-sop.spec.ts | 浏览器完成销售 SOP 并保持数据库与审计一致 | 通过 |
-| 28 | specs\settings.spec.ts / 系统设置按钮 | 保存设置重复点击只写入一次并在刷新后回显 | 通过 |
-| 29 | specs\settings.spec.ts / 受限设置权限 | 受限用户直达页面和接口均被拒绝 | 通过 |
-| 30 | specs\ui-quality.spec.ts | 19 个页面在五档视口无整体溢出且按钮名称可读 | 通过 |
-| 31 | specs\ui-quality.spec.ts | 账号菜单的个人中心可进入并显示当前账号 | 通过 |
-| 32 | specs\ui-quality.spec.ts | 键盘焦点、表单标签和 reduced-motion 状态可识别 | 通过 |
-| 33 | specs\shell.mobile.spec.ts | 手机端使用抽屉导航且页面无横向溢出 | 通过 |
+| 4 | specs\customers.spec.ts / 客户列表与客户写操作 | 客户姓名和联系电话可留空且保留输入提示 | 通过 |
+| 5 | specs\customers.spec.ts / 客户列表与客户写操作 | 编辑客户同步更新页面、数据库和审计 | 通过 |
+| 6 | specs\customers.spec.ts / 客户列表与客户写操作 | 归档客户进入公海且流转可追溯 | 通过 |
+| 7 | specs\customers.spec.ts / 管理员客户删除 | 删除客户执行软删除且保留审计 | 通过 |
+| 8 | specs\customers.spec.ts / 主管客户转移 | 转移按钮写入目标销售并记录审计 | 通过 |
+| 9 | specs\customers.spec.ts / 公海认领 | 销售认领公海客户并更新归属与审计 | 通过 |
+| 10 | specs\dashboard.visual.spec.ts | 销售漏斗全零时仍显示清晰阶梯且不改变真实标签 | 通过 |
+| 11 | specs\dashboard.visual.spec.ts | 仪表盘在关键宽度切换侧栏且没有横向溢出 | 通过 |
+| 12 | specs\dashboard.visual.spec.ts | 趋势局部失败保留旧数据并可独立重试 | 通过 |
+| 13 | specs\deletion-consistency.spec.ts / 删除后的列表一致性 | 电销名单删除最后一条后回到上一页 | 通过 |
+| 14 | specs\deletion-consistency.spec.ts / 删除后的列表一致性 | 订单删除最后一条后回到上一页 | 通过 |
+| 15 | specs\deletion-consistency.spec.ts / 删除后的列表一致性 | 消息删除后从服务端补齐当前页并同步统计 | 通过 |
+| 16 | specs\deletion-consistency.spec.ts / 删除后的列表一致性 | 合同备案删除最后一条后回到上一页 | 通过 |
+| 17 | specs\files.spec.ts / 文件共享按钮 | 上传、下载和删除文件均写入真实存储、数据库和审计 | 通过 |
+| 18 | specs\files.spec.ts / 销售文件权限 | 销售可上传并下载自己的文件但看不到删除按钮 | 通过 |
+| 19 | specs\modular-pages.spec.ts / 模块化页面回归 | 客户查看模式只读且编辑模式保留保存入口 | 通过 |
+| 20 | specs\modular-pages.spec.ts / 模块化页面回归 | 订单新增下拉使用服务端资格并包含已合作客户 | 通过 |
+| 21 | specs\modular-pages.spec.ts / 模块化页面回归 | 合作客户统计、编辑和合同备案入口可达 | 通过 |
+| 22 | specs\modular-pages.spec.ts / 模块化页面回归 | 提醒中心使用真实分组和统计结构渲染 | 通过 |
+| 23 | specs\modular-pages.spec.ts / 模块化页面回归 | 日报、每日客资和电销列表均能读取测试数据 | 通过 |
+| 24 | specs\permissions.spec.ts / 销售页面权限与导航 | 销售可导航到文件页且客户动作按权限隐藏 | 通过 |
+| 25 | specs\permissions.spec.ts / 销售页面权限与导航 | 销售无法读取管理员客户 | 通过 |
+| 26 | specs\permissions.spec.ts / 主管数据范围 | 主管可读取本人和下属客户 | 通过 |
+| 27 | specs\permissions.spec.ts / 受限用户权限 | 客户接口返回 403 且页面转到无权限页 | 通过 |
+| 28 | specs\recovery.spec.ts / 列表状态与网络恢复 | 空状态、慢响应、断网恢复和浏览器刷新均可用 | 通过 |
+| 29 | specs\recovery.spec.ts / 列表状态与网络恢复 | 旧版本静态资源加载失败时最多自动刷新一次 | 通过 |
+| 30 | specs\recovery.spec.ts / 会话过期恢复 | 会话失效后重新登录返回原页面 | 通过 |
+| 31 | specs\recovery.spec.ts / 真实服务端 500 | 下载对象缺失时按钮返回 500、带请求号且不误改数据 | 通过 |
+| 32 | specs\sales-sop.spec.ts | 浏览器完成销售 SOP 并保持数据库与审计一致 | 通过 |
+| 33 | specs\settings.spec.ts / 系统设置按钮 | 保存设置重复点击只写入一次并在刷新后回显 | 通过 |
+| 34 | specs\settings.spec.ts / 受限设置权限 | 受限用户直达页面和接口均被拒绝 | 通过 |
+| 35 | specs\ui-quality.spec.ts | 19 个页面在五档视口无整体溢出且按钮名称可读 | 通过 |
+| 36 | specs\ui-quality.spec.ts | 账号菜单的个人中心可进入并显示当前账号 | 通过 |
+| 37 | specs\ui-quality.spec.ts | 键盘焦点、表单标签和 reduced-motion 状态可识别 | 通过 |
+| 38 | specs\shell.mobile.spec.ts | 手机端使用抽屉导航且页面无横向溢出 | 通过 |
 
 ## 未自动化范围
 

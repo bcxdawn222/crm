@@ -16,7 +16,7 @@ export interface Customer {
   id: string
   name: string
   company?: string
-  phone: string
+  phone?: string | null
   email?: string
   address?: string
   category: string
@@ -39,9 +39,9 @@ export interface Customer {
 }
 
 export interface CustomerFormValues {
-  name: string
+  name?: string
   company?: string
-  phone: string
+  phone?: string
   email?: string
   address?: string
   category?: string

@@ -2,9 +2,12 @@ import { CustomerLevel, CustomerSource, CustomerStatus, Prisma, type Customer } 
 import { z } from 'zod'
 
 const customerUpdateSchema = z.object({
-  name: z.string().trim().min(1, '请输入客户姓名').max(100),
+  name: z.string().trim().max(100).optional(),
   company: z.string().trim().max(200).nullable().optional(),
-  phone: z.string().trim().min(1, '请输入联系电话').max(20),
+  phone: z.preprocess(
+    (value) => value === '' || value === null ? null : value,
+    z.string().trim().min(3, '联系电话格式不正确').max(20).nullable().optional(),
+  ),
   email: z.string().trim().max(100).nullable().optional(),
   address: z.string().trim().max(500).nullable().optional(),
   category: z.string().trim().optional(),
@@ -35,7 +38,7 @@ export function parseCustomerUpdate(payload: unknown) {
 
 export function buildCustomerUpdateData(payload: CustomerUpdatePayload, existing: Customer): Prisma.CustomerUpdateInput {
   return {
-    name: payload.name,
+    name: payload.name ?? existing.name,
     company: payload.company,
     phone: payload.phone,
     email: payload.email,

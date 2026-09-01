@@ -99,7 +99,8 @@ export default function OrdersPage() {
             requestKey: `order-delete-${id}`,
           })
           message.success('删除成功')
-          await loadOrders()
+          if (orders.length === 1 && page > 1) setPage((current) => current - 1)
+          else await loadOrders()
         } catch (error) {
           message.error(error instanceof Error ? error.message : '删除订单失败')
         }

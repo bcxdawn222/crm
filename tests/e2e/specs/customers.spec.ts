@@ -61,6 +61,28 @@ test.describe('客户列表与客户写操作', () => {
     })).toBe(1)
   })
 
+  test('客户姓名和联系电话可留空且保留输入提示', async ({ page }) => {
+    const notes = `${marker}:optional-customer`
+    await page.goto('/customers')
+    await page.getByRole('button', { name: antText('新增客户') }).click()
+
+    await expect(page.getByPlaceholder('请输入客户姓名')).toBeVisible()
+    await expect(page.getByPlaceholder('请输入联系电话')).toBeVisible()
+    await expect(page.locator('.ant-form-item-required').filter({ hasText: /客户姓名|联系电话/ })).toHaveCount(0)
+    await page.getByLabel('备注信息').fill(notes)
+
+    const responsePromise = page.waitForResponse((response) => (
+      response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/customers'
+    ))
+    await page.getByRole('button', { name: antText('创建') }).click()
+    expect((await responsePromise).status()).toBe(200)
+    await expectSuccessMessage(page, '创建成功')
+
+    const customer = await prisma.customer.findFirstOrThrow({ where: { notes } })
+    expect(customer.name).toBe('')
+    expect(customer.phone).toBeNull()
+  })
+
   test('编辑客户同步更新页面、数据库和审计', async ({ page }) => {
     const name = `${fixtureNames.salesPrefix}-02`
     const company = `E2E编辑公司-${runId}`

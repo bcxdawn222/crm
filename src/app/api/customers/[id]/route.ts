@@ -170,12 +170,14 @@ export async function PUT(
     }
 
     // 检查电话是否与其他客户重复
-    const duplicatePhone = await prisma.customer.findFirst({
-      where: {
-        phone: parsed.data.phone,
-        id: { not: id },
-      },
-    });
+    const duplicatePhone = parsed.data.phone
+      ? await prisma.customer.findFirst({
+          where: {
+            phone: parsed.data.phone,
+            id: { not: id },
+          },
+        })
+      : null;
 
     if (duplicatePhone) {
       return NextResponse.json(

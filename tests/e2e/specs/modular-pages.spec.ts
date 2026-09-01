@@ -86,7 +86,7 @@ test.describe('模块化页面回归', () => {
     await responsePromise
     await expect(page.getByText('智能提醒中心', { exact: true }).first()).toBeVisible()
     await expect(page.getByText(fixtureNames.cooperatingCustomer).first()).toBeVisible()
-    await expect(page.getByText(/合同金额:.*128,000/)).toBeVisible()
+    await expect(page.getByText(/合同金额:.*128,000/).first()).toBeVisible()
   })
 
   test('日报、每日客资和电销列表均能读取测试数据', async ({ page }) => {

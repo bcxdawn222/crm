@@ -45,11 +45,11 @@ export function CustomerFormModal(props: CustomerFormModalProps) {
         onValuesChange={props.onValuesChange}
         initialValues={{ category: '潜在客户', source: 'OTHER', status: 'ACTIVE' }}
       >
-        <Form.Item name="name" label="客户姓名" rules={[{ required: true, message: '请输入客户姓名' }]}>
+        <Form.Item name="name" label="客户姓名">
           <Input placeholder="请输入客户姓名" />
         </Form.Item>
         <Form.Item name="company" label="公司名称"><Input placeholder="请输入公司名称" /></Form.Item>
-        <Form.Item name="phone" label="联系电话" rules={[{ required: true, message: '请输入联系电话' }]}>
+        <Form.Item name="phone" label="联系电话">
           <Input placeholder="请输入联系电话" />
         </Form.Item>
         <Form.Item name="email" label="邮箱地址"><Input placeholder="请输入邮箱地址" /></Form.Item>

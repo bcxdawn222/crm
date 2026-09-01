@@ -90,7 +90,8 @@ export default function ContractArchiveModal(props: ContractArchiveModalProps) {
         try {
           await apiRequest<{ success: true }>(`/api/contract-archives/${archive.id}`, { method: 'DELETE' }, { requestKey: `contract-delete-${archive.id}` })
           message.success('删除成功')
-          await loadArchives()
+          if (archives.length === 1 && page > 1) setPage((current) => current - 1)
+          else await loadArchives()
           props.onSuccess()
         } catch (error) {
           message.error(error instanceof Error ? error.message : '删除合同备案失败')

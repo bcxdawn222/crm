@@ -97,11 +97,8 @@ export default function MessagesPage() {
     setMessagePending(id, true)
     try {
       await apiRequest<{ success: boolean }>(`/api/messages/${id}`, { method: 'DELETE' }, { requestKey: `message-delete:${id}` })
-      const deleted = items.find((entry) => entry.id === id)
-      setItems((current) => current.filter((entry) => entry.id !== id))
-      setTotal((current) => Math.max(0, current - 1))
-      if (deleted && !deleted.isRead) setUnread((current) => Math.max(0, current - 1))
       if (items.length === 1 && page > 1) setPage((current) => current - 1)
+      else await loadMessages()
       message.success('消息已删除')
     } catch (error) {
       message.error(error instanceof Error ? error.message : '删除消息失败')
