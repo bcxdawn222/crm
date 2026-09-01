@@ -11,9 +11,12 @@ import { dateOnlySchema } from '@/lib/http/date-validation'
 import { z } from 'zod'
 
 const createTaskSchema = z.object({
-  title: z.string().trim().min(1, '任务标题不能为空').max(200),
+  title: z.preprocess(
+    (value) => value === undefined || value === null ? '' : value,
+    z.string().trim().max(200),
+  ),
   description: z.string().max(10000).optional().nullable(),
-  assigneeId: z.string().uuid('负责人 ID 格式不正确'),
+  assigneeId: z.string().uuid('负责人 ID 格式不正确').optional(),
   dueDate: dateOnlySchema.nullable().optional(),
   priority: z.nativeEnum(TaskPriority).default(TaskPriority.MEDIUM),
 })
@@ -139,7 +142,8 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
-    const { title, description, assigneeId, dueDate, priority } = parsed.data
+    const { title, description, dueDate, priority } = parsed.data
+    const assigneeId = parsed.data.assigneeId ?? session.user.id
 
     const assignee = await findTaskAssigneeWithinScope(session.user.id, roles, assigneeId)
     if (!assignee) {

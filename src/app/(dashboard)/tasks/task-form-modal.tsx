@@ -21,11 +21,11 @@ interface AssigneeResponse { success: true; data: { list: AssigneeOption[] } }
 interface SubmitResponse { success: true }
 
 interface TaskFormValues {
-  title: string
+  title?: string
   description?: string
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
   dueDate?: Dayjs
-  assigneeId: string
+  assigneeId?: string
 }
 
 interface TaskDraft {
@@ -175,7 +175,7 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
       maskClosable={!isSubmitting}
     >
       <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={draft.save}>
-        <Form.Item name="title" label="任务标题" rules={[{ required: true, message: '请输入任务标题' }]}>
+        <Form.Item name="title" label="任务标题">
           <Input placeholder="请输入任务标题" />
         </Form.Item>
         <Form.Item name="description" label="任务描述">
@@ -192,7 +192,7 @@ export function TaskFormModal({ open, onClose, onSaved }: TaskFormModalProps) {
         <Form.Item name="dueDate" label="截止日期">
           <DatePicker style={{ width: '100%' }} />
         </Form.Item>
-        <Form.Item name="assigneeId" label="负责人" rules={[{ required: true, message: '请选择负责人' }]}>
+        <Form.Item name="assigneeId" label="负责人">
           <Select
             showSearch
             filterOption={false}

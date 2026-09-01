@@ -6,7 +6,7 @@ import { useEffect } from 'react'
 
 interface CooperationFormValues {
   contractStartDate?: Dayjs | null
-  contractEndDate: Dayjs
+  contractEndDate?: Dayjs | null
   contractAmount?: number
 }
 
@@ -47,7 +47,6 @@ export function CustomerCooperationModal(props: CustomerCooperationModalProps) {
         <Form.Item
           name="contractEndDate"
           label="合同到期日期"
-          rules={[{ required: true, message: '请选择合同到期日期' }]}
         >
           <DatePicker style={{ width: '100%' }} placeholder="选择到期日期" />
         </Form.Item>

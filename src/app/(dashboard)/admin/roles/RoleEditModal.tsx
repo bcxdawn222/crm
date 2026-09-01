@@ -55,13 +55,13 @@ export default function RoleEditModal({
       onOk={() => form.submit()}
     >
       <Form<RoleFormValues> form={form} layout="vertical" onFinish={onSubmit}>
-        <Form.Item name="displayName" label="显示名称" rules={[{ required: true }, { max: 100 }]}>
+        <Form.Item name="displayName" label="显示名称" rules={[{ max: 100 }]}>
           <Input />
         </Form.Item>
         <Form.Item name="description" label="描述" rules={[{ max: 255 }]}>
           <Input.TextArea rows={3} />
         </Form.Item>
-        <Form.Item name="permissionIds" label="权限" rules={[{ required: true, type: 'array', min: 1 }]}>
+        <Form.Item name="permissionIds" label="权限">
           <Checkbox.Group style={{ width: '100%' }} disabled={role?.name === 'admin'}>
             {groupedPermissions.map(([module, options]) => (
               <section key={module} style={{ marginBottom: 16 }}>

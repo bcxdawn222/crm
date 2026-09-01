@@ -11,15 +11,15 @@ import { createOrder, CreateOrderError } from '@/lib/orders/create'
 import { checkOrderEligibility } from '@/lib/customers/order-eligibility'
 
 const createOrderSchema = z.object({
-  customerId: z.string().uuid('客户 ID 格式不正确'),
+  customerId: z.string().uuid('客户 ID 格式不正确').optional(),
   contractNo: z.string().trim().max(50).optional(),
-  contractAmount: z.coerce.number().positive('合同金额必须大于 0').max(99_999_999.99),
+  contractAmount: z.coerce.number().min(0, '合同金额不能小于 0').max(99_999_999.99).default(0),
   currency: z.enum(['CNY', 'USD', 'EUR']).default('CNY'),
-  signDate: z.coerce.date(),
+  signDate: z.coerce.date().optional(),
   deliveryDate: z.coerce.date().optional(),
   remarks: z.string().trim().max(10_000).optional(),
 }).refine(
-  (data) => !data.deliveryDate || data.deliveryDate >= data.signDate,
+  (data) => !data.deliveryDate || !data.signDate || data.deliveryDate >= data.signDate,
   '交付日期不能早于签约日期'
 )
 
@@ -161,6 +161,9 @@ export async function POST(request: Request) {
       )
     }
     const { customerId } = parsed.data
+    if (!customerId) {
+      return jsonWithRequestId({ error: '请选择客户后再创建订单', requestId }, requestId, { status: 400 })
+    }
 
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
@@ -176,6 +179,7 @@ export async function POST(request: Request) {
 
     const { order, replayed } = await createOrder({
       ...parsed.data,
+      customerId,
       salesId: customer.salesId,
       actorId: session.user.id,
       requestId,

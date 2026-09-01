@@ -12,10 +12,10 @@ import { parseDateRangeQuery } from '@/lib/http/date-validation'
 
 
 const createPaymentSchema = z.object({
-  orderId: z.string().uuid('订单 ID 格式不正确'),
-  amount: z.coerce.number().positive('收款金额必须大于 0').max(99_999_999.99),
-  paymentMethod: z.nativeEnum(PaymentMethod),
-  paymentDate: z.coerce.date(),
+  orderId: z.string().uuid('订单 ID 格式不正确').optional(),
+  amount: z.coerce.number().min(0, '收款金额不能小于 0').max(99_999_999.99).default(0),
+  paymentMethod: z.nativeEnum(PaymentMethod).default(PaymentMethod.BANK_TRANSFER),
+  paymentDate: z.coerce.date().default(() => new Date()),
   invoiceNo: z.string().trim().max(50).optional(),
   invoiceType: z.nativeEnum(InvoiceType).optional(),
   remarks: z.string().trim().max(500).optional(),
@@ -152,6 +152,13 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
+    if (!parsed.data.orderId) {
+      return jsonWithRequestId(
+        { error: '请选择订单后再登记收款', requestId },
+        requestId,
+        { status: 400 }
+      )
+    }
 
     const accessibleUserIds = await getAccessibleUserIds(session.user.id, session.user.roles)
     const accessibleOrder = await prisma.order.findFirst({
@@ -171,6 +178,7 @@ export async function POST(request: Request) {
 
     const { payment, replayed } = await createPayment({
       ...parsed.data,
+      orderId: parsed.data.orderId,
       operatorId: session.user.id,
       requestId,
     })

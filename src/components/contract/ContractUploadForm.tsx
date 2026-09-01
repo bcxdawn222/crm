@@ -12,7 +12,7 @@ const { TextArea } = Input
 type ContractType = 'SALES' | 'SERVICE' | 'COOPERATION' | 'OTHER'
 
 interface ContractUploadValues {
-  contractName: string
+  contractName?: string
   contractType?: ContractType
   signDate?: Dayjs
   effectiveDate?: Dayjs
@@ -60,7 +60,7 @@ export default function ContractUploadForm({
       const formData = new FormData()
       
       formData.append('file', file)
-      formData.append('contractName', values.contractName)
+      formData.append('contractName', values.contractName || '')
       formData.append('contractType', values.contractType || '')
       formData.append('signDate', values.signDate ? values.signDate.format('YYYY-MM-DD') : '')
       formData.append('effectiveDate', values.effectiveDate ? values.effectiveDate.format('YYYY-MM-DD') : '')
@@ -137,7 +137,6 @@ export default function ContractUploadForm({
         <Form.Item
           name="contractName"
           label="合同名称"
-          rules={[{ required: true, message: '请输入合同名称' }]}
         >
           <Input placeholder="请输入合同名称" />
         </Form.Item>
@@ -193,7 +192,6 @@ export default function ContractUploadForm({
 
         <Form.Item
           label="上传合同文件"
-          required
         >
           <Upload.Dragger
             listType="text"

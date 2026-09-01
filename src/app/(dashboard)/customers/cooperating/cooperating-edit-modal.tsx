@@ -22,7 +22,7 @@ export function CooperatingEditModal(props: CooperatingEditModalProps) {
       <Form form={props.form} layout="vertical" onFinish={props.onSubmit} onValuesChange={props.onValuesChange}>
         <Row gutter={16}>
           <Col span={12}><Form.Item name="contractStartDate" label="合同开始日期"><DatePicker style={{ width: '100%' }} placeholder="选择开始日期" /></Form.Item></Col>
-          <Col span={12}><Form.Item name="contractEndDate" label="合同到期日期" rules={[{ required: true, message: '请选择合同到期日期' }]}><DatePicker style={{ width: '100%' }} placeholder="选择到期日期" /></Form.Item></Col>
+          <Col span={12}><Form.Item name="contractEndDate" label="合同到期日期"><DatePicker style={{ width: '100%' }} placeholder="选择到期日期" /></Form.Item></Col>
         </Row>
         <Row gutter={16}>
           <Col span={12}><Form.Item name="contractAmount" label="合同金额"><InputNumber<number> style={{ width: '100%' }} min={0} precision={2} formatter={(value) => `¥ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(value) => Number(value?.replace(/¥\s?|(,*)/g, '') || 0)} placeholder="输入合同金额" /></Form.Item></Col>

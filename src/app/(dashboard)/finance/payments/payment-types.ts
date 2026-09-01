@@ -36,10 +36,10 @@ export interface PaymentOrderOption {
 }
 
 export interface PaymentFormValues {
-  orderId: string
-  amount: number
-  paymentMethod: string
-  paymentDate: Dayjs
+  orderId?: string
+  amount?: number
+  paymentMethod?: string
+  paymentDate?: Dayjs
   invoiceNo?: string
   invoiceType?: string
   remarks?: string

@@ -79,7 +79,6 @@ export default function LoginPage() {
           >
             <Form.Item
               name="username"
-              rules={[{ required: true, message: '请输入用户名!' }]}
             >
               <Input
                 prefix={<UserOutlined />}
@@ -89,7 +88,6 @@ export default function LoginPage() {
 
             <Form.Item
               name="password"
-              rules={[{ required: true, message: '请输入密码!' }]}
             >
               <Input.Password
                 prefix={<LockOutlined />}

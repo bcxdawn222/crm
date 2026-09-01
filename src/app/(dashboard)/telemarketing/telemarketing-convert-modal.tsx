@@ -109,7 +109,7 @@ export function TelemarketingConvertModal({
       maskClosable={!submitting}
     >
       <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={draft.save}>
-        <Form.Item name="level" label="客户等级" rules={[{ required: true }]}>
+        <Form.Item name="level" label="客户等级">
           <Select
             options={[
               { label: '潜在客户', value: 'POTENTIAL' },
@@ -120,7 +120,7 @@ export function TelemarketingConvertModal({
           />
         </Form.Item>
 
-        <Form.Item name="source" label="客户来源" rules={[{ required: true }]}>
+        <Form.Item name="source" label="客户来源">
           <Select
             options={[
               { label: '电销', value: 'COLD_CALL' },

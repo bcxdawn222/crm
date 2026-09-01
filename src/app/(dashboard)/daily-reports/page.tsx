@@ -84,7 +84,7 @@ export default function DailyReportsPage() {
       await apiRequest<{ success: true }>('/api/daily-reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-request-id': requestIdRef.current },
-        body: JSON.stringify({ ...values, reportDate: values.reportDate.format('YYYY-MM-DD') }),
+        body: JSON.stringify({ ...values, reportDate: values.reportDate?.format('YYYY-MM-DD') }),
       }, { requestKey: `daily-report-create-${requestIdRef.current}` })
       message.success('提交成功')
       draft.clear()

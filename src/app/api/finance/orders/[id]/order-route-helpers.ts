@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 export const updateOrderSchema = z.object({
   contractNo: z.string().trim().max(50).nullable().optional(),
-  contractAmount: z.coerce.number().positive().max(99_999_999.99).optional(),
+  contractAmount: z.coerce.number().min(0).max(99_999_999.99).optional(),
   currency: z.enum(['CNY', 'USD', 'EUR']).optional(),
   signDate: z.coerce.date().nullable().optional(),
   deliveryDate: z.coerce.date().nullable().optional(),

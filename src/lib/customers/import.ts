@@ -43,9 +43,9 @@ type MappedRow = Partial<Record<ImportField, string>>
 
 const rawRowSchema = z.record(z.unknown())
 const customerRowSchema = z.object({
-  name: z.string().trim().min(1, '姓名为必填项').max(100, '姓名不能超过 100 个字符'),
+  name: z.string().trim().max(100, '姓名不能超过 100 个字符').default(''),
   company: z.string().trim().max(200, '公司不能超过 200 个字符').optional(),
-  phone: z.string().trim().min(1, '电话为必填项').max(20, '电话不能超过 20 个字符'),
+  phone: z.string().trim().max(20, '电话不能超过 20 个字符').optional(),
   email: z.string().trim().email('邮箱格式不正确').max(100, '邮箱不能超过 100 个字符').optional(),
   address: z.string().trim().max(500, '地址不能超过 500 个字符').optional(),
   category: z.string().trim().max(20).default('潜在客户'),
@@ -172,18 +172,18 @@ async function parseImportRows(file: File): Promise<Prisma.CustomerCreateManyInp
     }
 
     const emailKey = parsed.data.email?.toLowerCase()
-    if (phones.has(parsed.data.phone) || (emailKey && emails.has(emailKey))) {
+    if ((parsed.data.phone && phones.has(parsed.data.phone)) || (emailKey && emails.has(emailKey))) {
       errors.push(`第 ${rowNumber} 行：电话或邮箱在当前文件中重复`)
       return
     }
-    phones.add(parsed.data.phone)
+    if (parsed.data.phone) phones.add(parsed.data.phone)
     if (emailKey) emails.add(emailKey)
 
     customers.push({
       id: randomUUID(),
       name: parsed.data.name,
       company: parsed.data.company || null,
-      phone: parsed.data.phone,
+      phone: parsed.data.phone || null,
       email: parsed.data.email || null,
       address: parsed.data.address || null,
       level,

@@ -14,8 +14,11 @@ import {
 import { prisma } from "@/lib/prisma";
 
 const followUpSchema = z.object({
-  type: z.nativeEnum(FollowUpType),
-  content: z.string().trim().min(1, "请填写跟进内容").max(5000),
+  type: z.nativeEnum(FollowUpType).default(FollowUpType.PHONE),
+  content: z.preprocess(
+    (value) => value === undefined || value === null ? "" : value,
+    z.string().trim().max(5000),
+  ),
   result: z.string().trim().max(500).optional(),
   nextAction: z.string().trim().max(500).optional(),
   nextFollowUpAt: z.coerce.date().optional(),

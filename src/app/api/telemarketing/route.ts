@@ -12,10 +12,15 @@ const optionalText = (max: number) => z.preprocess(
   z.string().trim().max(max).optional()
 )
 
+const emptyText = (max: number) => z.preprocess(
+  (value) => value === undefined || value === null ? '' : value,
+  z.string().trim().max(max)
+)
+
 const recordSchema = z.object({
-  name: z.string().trim().min(1, '客户姓名为必填项').max(100),
+  name: emptyText(100),
   company: optionalText(200),
-  phone: z.string().trim().min(3, '电话号码格式不正确').max(20),
+  phone: emptyText(20).refine((value) => !value || value.length >= 3, '电话号码格式不正确'),
   position: optionalText(50),
   industry: optionalText(50),
   source: optionalText(100),

@@ -38,7 +38,7 @@ const updateSchema = z.object({
 const markSchema = z.object({
   customerId: z.string().uuid(),
   contractStartDate: z.coerce.date().optional(),
-  contractEndDate: z.coerce.date({ message: '请选择合同到期日期' }),
+  contractEndDate: z.coerce.date().optional(),
   contractAmount: z.coerce.number().min(0).max(99_999_999.99).optional(),
 }).refine(
   (data) => !data.contractStartDate || !data.contractEndDate || data.contractStartDate <= data.contractEndDate,

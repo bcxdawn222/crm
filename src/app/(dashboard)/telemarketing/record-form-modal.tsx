@@ -28,7 +28,7 @@ export function RecordFormModal(props: RecordFormModalProps) {
       maskClosable={!submitting}
     >
       <Form form={form} layout="vertical" onFinish={onSubmit} onValuesChange={onValuesChange}>
-        <Form.Item name="name" label="客户姓名" rules={[{ required: true, message: '请输入客户姓名' }]}>
+        <Form.Item name="name" label="客户姓名">
           <Input placeholder="请输入客户姓名" />
         </Form.Item>
         <Form.Item name="company" label="公司名称"><Input placeholder="请输入公司名称" /></Form.Item>
@@ -36,7 +36,6 @@ export function RecordFormModal(props: RecordFormModalProps) {
           name="phone"
           label="电话号码"
           rules={[
-            { required: true, message: '请输入电话号码' },
             { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的手机号码' },
           ]}
         >

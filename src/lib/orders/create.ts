@@ -10,7 +10,7 @@ export interface CreateOrderInput {
   contractNo?: string
   contractAmount: number
   currency: string
-  signDate: Date
+  signDate?: Date
   deliveryDate?: Date
   remarks?: string
   salesId: string
@@ -86,7 +86,7 @@ export async function createOrder(input: CreateOrderInput) {
           contractAmount: amount,
           paidAmount: 0,
           unpaidAmount: amount,
-          signDate: input.signDate,
+          signDate: input.signDate || null,
           deliveryDate: input.deliveryDate || null,
           currency: input.currency,
           remarks: input.remarks || null,

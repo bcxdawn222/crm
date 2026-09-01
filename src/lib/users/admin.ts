@@ -17,14 +17,13 @@ const nullableText = (max: number, label: string) => z
 
 const roleIdsSchema = z
   .array(z.string().uuid('角色 ID 不正确'))
-  .min(1, '至少选择一个角色')
   .refine((roleIds) => new Set(roleIds).size === roleIds.length, '角色不能重复')
 
 export const createUserSchema = z.object({
   username: usernameSchema,
   email: z.string().trim().email('邮箱格式不正确').max(100, '邮箱不能超过 100 个字符'),
   password: z.string().min(6, '密码至少 6 个字符').max(72, '密码不能超过 72 个字符'),
-  realName: z.string().trim().min(1, '姓名不能为空').max(50, '姓名不能超过 50 个字符'),
+  realName: z.string().trim().max(50, '姓名不能超过 50 个字符'),
   phone: nullableText(20, '电话'),
   department: nullableText(50, '部门'),
   position: nullableText(50, '职位'),
@@ -36,7 +35,7 @@ export const updateUserSchema = z.object({
   username: usernameSchema.optional(),
   email: z.string().trim().email('邮箱格式不正确').max(100, '邮箱不能超过 100 个字符').optional(),
   password: z.string().min(6, '密码至少 6 个字符').max(72, '密码不能超过 72 个字符').optional(),
-  realName: z.string().trim().min(1, '姓名不能为空').max(50, '姓名不能超过 50 个字符').optional(),
+  realName: z.string().trim().max(50, '姓名不能超过 50 个字符').optional(),
   phone: nullableText(20, '电话'),
   department: nullableText(50, '部门'),
   position: nullableText(50, '职位'),

@@ -208,7 +208,7 @@ export default function CustomersPage() {
     })
   }
 
-  const markCooperating = async (values: { contractStartDate?: Dayjs | null; contractEndDate: Dayjs; contractAmount?: number }) => {
+  const markCooperating = async (values: { contractStartDate?: Dayjs | null; contractEndDate?: Dayjs | null; contractAmount?: number }) => {
     if (!cooperationCustomer || cooperationSubmitting) return
     setCooperationSubmitting(true)
     try {
@@ -218,7 +218,7 @@ export default function CustomersPage() {
         body: JSON.stringify({
           customerId: cooperationCustomer.id,
           contractStartDate: values.contractStartDate?.format('YYYY-MM-DD'),
-          contractEndDate: values.contractEndDate.format('YYYY-MM-DD'),
+          contractEndDate: values.contractEndDate?.format('YYYY-MM-DD'),
           contractAmount: values.contractAmount,
         }),
       }, { requestKey: `customer-cooperate-${cooperationCustomer.id}` })

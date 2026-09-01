@@ -139,10 +139,6 @@ export default function CooperatingCustomersPage() {
 
   const handleEdit = async (values: CooperatingFormValues) => {
     if (!editingCustomer || submitting) return
-    if (!values.contractEndDate) {
-      message.error('请选择合同到期日期')
-      return
-    }
     setSubmitting(true)
     try {
       await apiRequest<{ success: true }>(`/api/customers/cooperating?id=${editingCustomer.id}`, {
@@ -151,7 +147,7 @@ export default function CooperatingCustomersPage() {
         body: JSON.stringify({
           ...values,
           contractStartDate: values.contractStartDate?.format('YYYY-MM-DD'),
-          contractEndDate: values.contractEndDate.format('YYYY-MM-DD'),
+          contractEndDate: values.contractEndDate?.format('YYYY-MM-DD') ?? null,
           lastVisitAt: values.lastVisitAt?.format('YYYY-MM-DD'),
           nextVisitAt: values.nextVisitAt?.format('YYYY-MM-DD'),
         }),

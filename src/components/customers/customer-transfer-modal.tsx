@@ -21,7 +21,7 @@ interface TransferTarget {
 }
 
 interface TransferFormValues {
-  targetSalesId: string
+  targetSalesId?: string
   reason?: string
 }
 
@@ -132,7 +132,6 @@ export function CustomerTransferModal({
         <Form.Item
           name="targetSalesId"
           label="目标销售"
-          rules={[{ required: true, message: '请选择目标销售' }]}
         >
           <Select
             showSearch

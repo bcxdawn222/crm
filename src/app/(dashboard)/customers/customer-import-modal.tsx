@@ -18,7 +18,7 @@ export function CustomerImportModal(props: CustomerImportModalProps) {
         <ul style={{ marginBottom: 24, paddingLeft: 20, color: '#999', lineHeight: 1.8 }}>
           <li>支持 .xlsx, .xls, .csv 格式</li>
           <li>第一行为表头，包含：姓名、公司、电话、邮箱等字段</li>
-          <li>姓名和电话为必填项</li>
+          <li>姓名和电话均可留空，有值时会按格式校验</li>
           <li>单次最多导入1000条记录</li>
         </ul>
         <Upload.Dragger name="file" accept=".xlsx,.xls,.csv" beforeUpload={props.onUpload} showUploadList={false} maxCount={1} disabled={props.uploading}>

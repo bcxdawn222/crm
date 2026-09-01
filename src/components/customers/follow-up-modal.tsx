@@ -9,8 +9,8 @@ import { apiRequest } from '@/lib/http/client'
 
 
 interface FollowUpFormValues {
-  type: string
-  content: string
+  type?: string
+  content?: string
   result?: string
   nextAction?: string
   nextFollowUpAt?: Dayjs
@@ -138,10 +138,10 @@ export function FollowUpModal({
         onFinish={handleSubmit}
         onValuesChange={draft.save}
       >
-        <Form.Item name="type" label="跟进方式" rules={[{ required: true, message: '请选择跟进方式' }]}>
+        <Form.Item name="type" label="跟进方式">
           <Select options={typeOptions} />
         </Form.Item>
-        <Form.Item name="content" label="跟进内容" rules={[{ required: true, message: '请填写跟进内容' }]}>
+        <Form.Item name="content" label="跟进内容">
           <Input.TextArea rows={4} maxLength={5000} showCount placeholder="记录本次沟通内容" />
         </Form.Item>
         <Form.Item name="result" label="跟进结果">

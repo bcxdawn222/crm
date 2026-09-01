@@ -18,8 +18,8 @@ export interface DailyReport {
 }
 
 export interface DailyReportFormValues {
-  reportDate: Dayjs
-  content: string
+  reportDate?: Dayjs
+  content?: string
   tomorrowPlan?: string
   issues?: string
 }

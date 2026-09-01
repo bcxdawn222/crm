@@ -17,11 +17,11 @@ interface CustomerResponse { success: true; data: { list: CustomerOption[] } }
 interface SubmitResponse { success: true }
 
 interface OrderFormValues {
-  customerId: string
+  customerId?: string
   contractNo?: string
-  contractAmount: number | string
-  currency: string
-  signDate: string
+  contractAmount?: number | string
+  currency?: string
+  signDate?: string
   deliveryDate?: string
   remarks?: string
 }
@@ -195,7 +195,7 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
       maskClosable={!isSubmitting}
     >
       <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={draft.save}>
-        <Form.Item name="customerId" label="客户" rules={[{ required: true, message: '请选择客户' }]}>
+        <Form.Item name="customerId" label="客户">
           <Select
             showSearch
             filterOption={false}
@@ -215,7 +215,7 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
         <Form.Item name="contractNo" label="合同号">
           <Input placeholder="请输入合同号" />
         </Form.Item>
-        <Form.Item name="contractAmount" label="合同金额" rules={[{ required: true, message: '请输入合同金额' }]}>
+        <Form.Item name="contractAmount" label="合同金额">
           <Input type="number" min="0.01" step="0.01" placeholder="请输入合同金额" prefix="¥" />
         </Form.Item>
         <Form.Item name="currency" label="币种">
@@ -225,7 +225,7 @@ export function OrderFormModal({ open, order, onClose, onSaved }: OrderFormModal
             { label: '欧元', value: 'EUR' },
           ]} />
         </Form.Item>
-        <Form.Item name="signDate" label="签约日期" rules={[{ required: true, message: '请选择签约日期' }]}>
+        <Form.Item name="signDate" label="签约日期">
           <Input type="date" />
         </Form.Item>
         <Form.Item name="deliveryDate" label="交付日期">

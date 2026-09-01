@@ -35,7 +35,10 @@ const optionalAmount = z.preprocess(
 );
 const metadataSchema = z
   .object({
-    contractName: z.string().trim().min(1, "合同名称为必填项").max(200),
+    contractName: z.preprocess(
+      (value) => value === undefined || value === null ? "" : value,
+      z.string().trim().max(200),
+    ),
     contractType: z.preprocess(
       (value) => (value === "" || value === null ? undefined : value),
       z.enum(CONTRACT_TYPES).optional(),
@@ -223,6 +226,7 @@ export async function POST(
 
     const { archive, replayed } = await createContractArchive({
       ...parsed.data,
+      contractName: parsed.data.contractName || upload.originalName.slice(0, 200),
       customerId: id,
       fileName: upload.originalName,
       fileType: upload.extension.slice(1),

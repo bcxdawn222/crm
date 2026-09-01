@@ -9,8 +9,11 @@ import { dateOnlySchema, parseDateRangeQuery } from '@/lib/http/date-validation'
 import { z } from 'zod'
 
 const createDailyReportSchema = z.object({
-  reportDate: dateOnlySchema,
-  content: z.string().trim().min(1, '工作内容不能为空'),
+  reportDate: dateOnlySchema.optional(),
+  content: z.preprocess(
+    (value) => value === undefined || value === null ? '' : value,
+    z.string().trim(),
+  ),
   tomorrowPlan: z.string().optional().nullable(),
   issues: z.string().optional().nullable(),
   attachments: z.string().max(1000).optional().nullable(),
@@ -123,7 +126,8 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
-    const { reportDate, content, tomorrowPlan, issues, attachments } = parsed.data
+    const { content, tomorrowPlan, issues, attachments } = parsed.data
+    const reportDate = parsed.data.reportDate ?? new Date(new Date().toISOString().slice(0, 10))
 
     // Create daily report
     const report = await prisma.dailyReport.create({

@@ -10,8 +10,8 @@ import {
 
 const convertSchema = z.object({
   telemarketingId: z.string().uuid('电销记录 ID 格式不正确'),
-  level: z.nativeEnum(CustomerLevel),
-  source: z.nativeEnum(CustomerSource),
+  level: z.nativeEnum(CustomerLevel).default(CustomerLevel.POTENTIAL),
+  source: z.nativeEnum(CustomerSource).default(CustomerSource.COLD_CALL),
   notes: z.preprocess(
     (value) => value === '' || value === null ? undefined : value,
     z.string().trim().max(5000, '备注不能超过 5000 个字符').optional(),

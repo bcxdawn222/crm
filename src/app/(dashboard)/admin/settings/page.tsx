@@ -62,7 +62,6 @@ export default function SettingsPage() {
             name="systemName"
             label="系统名称"
             rules={[
-              { required: true, message: '请输入系统名称' },
               { max: 100, message: '系统名称不能超过 100 个字符' },
             ]}
           >

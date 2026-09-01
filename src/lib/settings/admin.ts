@@ -15,7 +15,7 @@ export const defaultSystemSettings: SystemSettings = {
 }
 
 export const updateSystemSettingsSchema = z.object({
-  systemName: z.string().trim().min(1, '系统名称不能为空').max(100, '系统名称不能超过 100 个字符'),
+  systemName: z.string().trim().max(100, '系统名称不能超过 100 个字符'),
   companyName: z.string().trim().max(200, '公司名称不能超过 200 个字符'),
 }).strict('设置字段不受支持')
 

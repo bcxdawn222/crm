@@ -18,10 +18,10 @@ export function ReportFormModal(props: ReportFormModalProps) {
   return (
     <Modal title="提交日报" open={props.open} onCancel={props.onCancel} footer={null} width={700} closable={!props.submitting} maskClosable={!props.submitting}>
       <Form form={props.form} layout="vertical" onFinish={props.onSubmit} onValuesChange={props.onValuesChange}>
-        <Form.Item name="reportDate" label="日期" rules={[{ required: true, message: '请选择日期' }]}>
+        <Form.Item name="reportDate" label="日期">
           <DatePicker style={{ width: '100%' }} />
         </Form.Item>
-        <Form.Item name="content" label="今日工作内容" rules={[{ required: true, message: '请输入工作内容' }]}>
+        <Form.Item name="content" label="今日工作内容">
           <Input.TextArea rows={6} placeholder="请详细描述今天的工作内容" />
         </Form.Item>
         <Form.Item name="tomorrowPlan" label="明日计划"><Input.TextArea rows={4} placeholder="请描述明天的工作计划" /></Form.Item>

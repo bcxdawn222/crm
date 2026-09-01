@@ -101,7 +101,7 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
         },
         body: JSON.stringify({
           ...values,
-          paymentDate: values.paymentDate.format('YYYY-MM-DD'),
+          paymentDate: values.paymentDate?.format('YYYY-MM-DD'),
         }),
       }, {
         requestKey: `payment-form-${submissionIdRef.current}`,
@@ -141,7 +141,7 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
         onValuesChange={draft.save}
         initialValues={{ paymentMethod: 'BANK_TRANSFER', paymentDate: dayjs() }}
       >
-        <Form.Item name="orderId" label="订单" rules={[{ required: true, message: '请选择订单' }]}>
+        <Form.Item name="orderId" label="订单">
           <Select
             showSearch
             loading={ordersLoading}
@@ -154,7 +154,7 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
           />
         </Form.Item>
 
-        <Form.Item name="amount" label="收款金额" rules={[{ required: true, message: '请输入收款金额' }]}>
+        <Form.Item name="amount" label="收款金额">
           <InputNumber
             style={{ width: '100%' }}
             placeholder="请输入收款金额"
@@ -164,7 +164,7 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
           />
         </Form.Item>
 
-        <Form.Item name="paymentMethod" label="收款方式" rules={[{ required: true, message: '请选择收款方式' }]}>
+        <Form.Item name="paymentMethod" label="收款方式">
           <Select
             options={[
               { label: '银行转账', value: 'BANK_TRANSFER' },
@@ -177,7 +177,7 @@ export function PaymentFormModal({ open, onClose, onSaved }: PaymentFormModalPro
           />
         </Form.Item>
 
-        <Form.Item name="paymentDate" label="收款日期" rules={[{ required: true, message: '请选择收款日期' }]}>
+        <Form.Item name="paymentDate" label="收款日期">
           <DatePicker style={{ width: '100%' }} />
         </Form.Item>
 
