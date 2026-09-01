@@ -34,6 +34,33 @@ test.describe('列表状态与网络恢复', () => {
     await page.reload()
     await expect(tableRows(page)).toHaveCount(10)
   })
+
+  test('旧版本静态资源加载失败时最多自动刷新一次', async ({ page }) => {
+    await page.addInitScript(() => {
+      const count = Number(sessionStorage.getItem('e2e-page-load-count') || '0')
+      sessionStorage.setItem('e2e-page-load-count', String(count + 1))
+    })
+    await page.goto('/messages')
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('e2e-page-load-count'))).toBe('1')
+
+    const reloadPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded' })
+    await page.evaluate(() => {
+      window.dispatchEvent(new ErrorEvent('error', {
+        message: 'ChunkLoadError: Loading chunk 123 failed',
+      }))
+    })
+    await reloadPromise
+    await expect(page.evaluate(() => sessionStorage.getItem('e2e-page-load-count'))).resolves.toBe('2')
+    await expect(page.getByRole('main')).toBeVisible()
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new ErrorEvent('error', {
+        message: 'ChunkLoadError: Loading chunk 123 failed',
+      }))
+    })
+    await page.waitForTimeout(500)
+    await expect(page.evaluate(() => sessionStorage.getItem('e2e-page-load-count'))).resolves.toBe('2')
+  })
 })
 
 test.describe('会话过期恢复', () => {

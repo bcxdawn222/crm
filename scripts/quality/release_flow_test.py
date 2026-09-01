@@ -57,6 +57,18 @@ def check_release_payload_contract() -> None:
     )
 
 
+def check_browser_recovery_contract() -> None:
+    login_page = (ROOT / "src" / "app" / "(auth)" / "login" / "page.tsx").read_text(encoding="utf-8")
+    require("window.location.replace(getSafeCallbackPath())" in login_page, "登录成功未使用可靠的整页跳转")
+    require("router.refresh()" not in login_page, "登录成功仍同时触发客户端刷新")
+    client = (ROOT / "src" / "lib" / "http" / "client.ts").read_text(encoding="utf-8")
+    require("await waitBeforeRetry(attempt)" in client, "GET 瞬时失败重试前没有等待")
+    remote_release = (ROOT / "scripts" / "deploy" / "production" / "remote_release.sh").read_text(encoding="utf-8")
+    require("--ignore-existing" in remote_release, "发布切换未保留上一版本的静态资源")
+    require('"$CURRENT/.next/static/" "$release_dir/.next/static/"' in remote_release, "静态资源保留路径不正确")
+    require("native-static-files.txt" in remote_release, "发布脚本没有限制历史静态资源的继承范围")
+
+
 def write_artifact(root: Path, release_id: str, commit: str) -> tuple[Path, release.ReleaseManifest]:
     archive = root / ".build" / "test" / "release" / f"{release_id}.zip"
     archive.parent.mkdir(parents=True, exist_ok=True)
@@ -80,6 +92,7 @@ def write_artifact(root: Path, release_id: str, commit: str) -> tuple[Path, rele
 def main() -> int:
     check_deploy_templates()
     check_release_payload_contract()
+    check_browser_recovery_contract()
     with tempfile.TemporaryDirectory(prefix="crm-release-flow-") as directory:
         root = Path(directory)
         previous_root = release.ROOT

@@ -2,11 +2,11 @@
 
 ## 本轮结果
 
-- 生成时间：2026-08-29 12:09:10 +0800
+- 生成时间：2026-09-01 12:03:44 +0800
 - 运行环境：`CRM_PROFILE=test`
 - 数据库保护：仅允许数据库名以 `_test` 结尾
 - 浏览器：Chromium Desktop、Chromium Mobile（390px）
-- 结果：31 项通过，0 项未通过，共 31 项
+- 结果：33 项通过，0 项未通过，共 33 项
 - 原始 JSON：`output/playwright/report.json`
 - 失败产物：`output/playwright/results/`，仅失败时保留 screenshot、video 和 trace
 
@@ -47,19 +47,21 @@
 | 21 | specs\permissions.spec.ts / 主管数据范围 | 主管可读取本人和下属客户 | 通过 |
 | 22 | specs\permissions.spec.ts / 受限用户权限 | 客户接口返回 403 且页面转到无权限页 | 通过 |
 | 23 | specs\recovery.spec.ts / 列表状态与网络恢复 | 空状态、慢响应、断网恢复和浏览器刷新均可用 | 通过 |
-| 24 | specs\recovery.spec.ts / 会话过期恢复 | 会话失效后重新登录返回原页面 | 通过 |
-| 25 | specs\recovery.spec.ts / 真实服务端 500 | 下载对象缺失时按钮返回 500、带请求号且不误改数据 | 通过 |
-| 26 | specs\sales-sop.spec.ts | 浏览器完成销售 SOP 并保持数据库与审计一致 | 通过 |
-| 27 | specs\settings.spec.ts / 系统设置按钮 | 保存设置重复点击只写入一次并在刷新后回显 | 通过 |
-| 28 | specs\settings.spec.ts / 受限设置权限 | 受限用户直达页面和接口均被拒绝 | 通过 |
-| 29 | specs\ui-quality.spec.ts | 18 个页面在五档视口无整体溢出且按钮名称可读 | 通过 |
-| 30 | specs\ui-quality.spec.ts | 键盘焦点、表单标签和 reduced-motion 状态可识别 | 通过 |
-| 31 | specs\shell.mobile.spec.ts | 手机端使用抽屉导航且页面无横向溢出 | 通过 |
+| 24 | specs\recovery.spec.ts / 列表状态与网络恢复 | 旧版本静态资源加载失败时最多自动刷新一次 | 通过 |
+| 25 | specs\recovery.spec.ts / 会话过期恢复 | 会话失效后重新登录返回原页面 | 通过 |
+| 26 | specs\recovery.spec.ts / 真实服务端 500 | 下载对象缺失时按钮返回 500、带请求号且不误改数据 | 通过 |
+| 27 | specs\sales-sop.spec.ts | 浏览器完成销售 SOP 并保持数据库与审计一致 | 通过 |
+| 28 | specs\settings.spec.ts / 系统设置按钮 | 保存设置重复点击只写入一次并在刷新后回显 | 通过 |
+| 29 | specs\settings.spec.ts / 受限设置权限 | 受限用户直达页面和接口均被拒绝 | 通过 |
+| 30 | specs\ui-quality.spec.ts | 19 个页面在五档视口无整体溢出且按钮名称可读 | 通过 |
+| 31 | specs\ui-quality.spec.ts | 账号菜单的个人中心可进入并显示当前账号 | 通过 |
+| 32 | specs\ui-quality.spec.ts | 键盘焦点、表单标签和 reduced-motion 状态可识别 | 通过 |
+| 33 | specs\shell.mobile.spec.ts | 手机端使用抽屉导航且页面无横向溢出 | 通过 |
 
 ## 未自动化范围
 
 - 未使用 `skip`；业务写操作、权限和数据断言均连接真实 test 服务及 test 数据库。
 - 销售漏斗视觉边界用例仅替换 `/api/statistics/funnel` 的只读响应为五层全零数据，用于稳定复现截图中的布局问题，不作为业务接口正确性的证据。
-- 未对 stable 或线上数据库执行写操作，线上只允许发布后进行只读核对。
+- 未对 stable 或线上数据库执行写操作；线上受控写入冒烟由独立发布步骤执行，并使用可识别、可清理的验收记录。
 - 本阶段覆盖 Chromium Desktop 和 390px Chromium Mobile；Firefox、WebKit 及更多尺寸仍属于最终发布验收范围。
-- E2E 不替代持续压力测试、依赖安全审计和真实 Nginx/PM2/systemd 主机演练，这些由后续任务单独验证。
+- E2E 不替代持续压力测试、依赖安全审计和真实 Nginx/systemd 主机演练，这些由发布治理步骤单独验证。

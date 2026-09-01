@@ -171,6 +171,14 @@ stage() {
   install -d -o crmapp -g crmapp -m 750 "$SHARED/storage" "$SHARED/logs" "$release_dir/.deployment"
   [ ! -d "$CURRENT/storage" ] || rsync -a "$CURRENT/storage/" "$SHARED/storage/"
   [ ! -d "$CURRENT/logs" ] || rsync -a "$CURRENT/logs/" "$SHARED/logs/"
+  (cd "$release_dir/.next/static" && find . -type f -printf '%P\n' | sort >"$release_dir/.deployment/native-static-files.txt")
+  if [ -d "$CURRENT/.next/static" ] && [ -d "$release_dir/.next/static" ]; then
+    if [ -s "$CURRENT/.deployment/native-static-files.txt" ]; then
+      rsync -a --ignore-existing --files-from="$CURRENT/.deployment/native-static-files.txt" "$CURRENT/.next/static/" "$release_dir/.next/static/"
+    else
+      rsync -a --ignore-existing "$CURRENT/.next/static/" "$release_dir/.next/static/"
+    fi
+  fi
   rm -rf "$release_dir/storage" "$release_dir/logs"
   ln -s "$SHARED/storage" "$release_dir/storage"
   ln -s "$SHARED/logs" "$release_dir/logs"

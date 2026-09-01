@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 
 import { fixtureNames } from '../support/environment'
 import { prisma } from '../support/database'
-import { antText, searchCustomers, tableRow, tableRows } from '../support/ui'
+import { antText, searchCooperatingCustomers, searchCustomers, tableRow, tableRows } from '../support/ui'
 
 test.describe('模块化页面回归', () => {
   test('客户查看模式只读且编辑模式保留保存入口', async ({ page }) => {
@@ -70,6 +70,7 @@ test.describe('模块化页面回归', () => {
     await page.goto('/customers/cooperating')
     await responsePromise
     await expect(page.getByText('已合作客户管理', { exact: true }).first()).toBeVisible()
+    await searchCooperatingCustomers(page, fixtureNames.cooperatingCustomer)
     const row = tableRow(page, fixtureNames.cooperatingCustomer)
     await expect(row).toBeVisible()
     await row.getByRole('button', { name: antText('编辑') }).click()

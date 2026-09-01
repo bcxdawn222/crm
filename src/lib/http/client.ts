@@ -38,6 +38,7 @@ export class ApiError extends Error {
 
 const inFlightRequests = new Map<string, Promise<unknown>>()
 let redirectingToLogin = false
+const RETRY_DELAY_MS = 250
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -80,6 +81,10 @@ function redirectToLogin(): void {
   notifySessionExpired()
   const callbackUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
   window.location.assign(`/login?reason=session-expired&callbackUrl=${encodeURIComponent(callbackUrl)}`)
+}
+
+function waitBeforeRetry(attempt: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, RETRY_DELAY_MS * attempt))
 }
 
 async function executeRequest<T>(
@@ -126,15 +131,24 @@ async function executeRequest<T>(
       return payload as T
     } catch (error) {
       if (error instanceof ApiError) {
-        if (canRetry && error.status >= 500 && attempt < attempts) continue
+        if (canRetry && error.status >= 500 && attempt < attempts) {
+          await waitBeforeRetry(attempt)
+          continue
+        }
         throw error
       }
       if (externalSignal?.aborted) throw new ApiError('请求已取消', 'CANCELLED', 0, requestId)
       if (controller.signal.aborted) {
-        if (attempt < attempts) continue
+        if (attempt < attempts) {
+          await waitBeforeRetry(attempt)
+          continue
+        }
         throw new ApiError('请求超时，请稍后重试', 'TIMEOUT', 0, requestId)
       }
-      if (attempt < attempts) continue
+      if (attempt < attempts) {
+        await waitBeforeRetry(attempt)
+        continue
+      }
       const offline = typeof navigator !== 'undefined' && !navigator.onLine
       throw new ApiError(offline ? '网络连接已断开' : '网络请求失败，请稍后重试', offline ? 'OFFLINE' : 'SERVER_ERROR', 0, requestId)
     } finally {

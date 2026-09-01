@@ -1,13 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { Form, Input, Button, Card, message } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -44,8 +42,7 @@ export default function LoginPage() {
         message.error('用户名或密码错误')
       } else {
         message.success('登录成功')
-        router.replace(getSafeCallbackPath())
-        router.refresh()
+        window.location.replace(getSafeCallbackPath())
       }
     } catch (error) {
       message.error('登录失败,请稍后重试')

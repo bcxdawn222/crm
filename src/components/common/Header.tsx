@@ -3,6 +3,7 @@
 import React from 'react'
 import { Layout, Button, Avatar, Dropdown } from 'antd'
 import { MenuFoldOutlined, MenuOutlined, MenuUnfoldOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons'
+import Link from 'next/link'
 import { signOut, useSession } from 'next-auth/react'
 import { useUIStore } from '@/stores/uiStore'
 import { clearAllDrafts } from '@/lib/forms/draft-storage'
@@ -18,7 +19,7 @@ export default function AppHeader() {
     {
       key: 'profile',
       icon: <UserOutlined />,
-      label: '个人中心',
+      label: <Link className="crm-account-menu-link" href="/profile">个人中心</Link>,
     },
     {
       key: 'logout',

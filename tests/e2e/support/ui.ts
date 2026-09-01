@@ -28,6 +28,18 @@ export async function searchCustomers(page: Page, keyword: string): Promise<void
   expect(response.status()).toBe(200)
 }
 
+export async function searchCooperatingCustomers(page: Page, keyword: string): Promise<void> {
+  const responsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'GET'
+    && response.url().includes('/api/customers/cooperating?')
+    && response.url().includes(`keyword=${encodeURIComponent(keyword)}`)
+  ))
+  await page.getByPlaceholder('搜索客户、公司、联系人').fill(keyword)
+  await page.getByRole('button', { name: antText('搜索') }).click()
+  const response = await responsePromise
+  expect(response.status()).toBe(200)
+}
+
 export async function clickModalPrimary(page: Page, name?: string): Promise<void> {
   const dialog = page.locator('.ant-modal-confirm').filter({ visible: true })
   if (name) {

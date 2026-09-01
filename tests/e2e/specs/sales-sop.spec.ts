@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 import { prisma } from '../support/database'
 import { fixtureNames, marker, runId } from '../support/environment'
-import { antText, expectSuccessMessage, searchCustomers, tableRow } from '../support/ui'
+import { antText, expectSuccessMessage, searchCooperatingCustomers, searchCustomers, tableRow } from '../support/ui'
 
 function formatLocalDate(date: Date) {
   const year = date.getFullYear()
@@ -98,6 +98,7 @@ test('浏览器完成销售 SOP 并保持数据库与审计一致', async ({ pag
   expect(Number(cooperatingCustomer.contractAmount)).toBe(12000)
 
   await page.goto('/customers/cooperating')
+  await searchCooperatingCustomers(page, customerName)
   const cooperatingRow = tableRow(page, customerName)
   await expect(cooperatingRow).toBeVisible()
   await cooperatingRow.getByRole('button', { name: antText('编辑') }).click()

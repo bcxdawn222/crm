@@ -1,6 +1,6 @@
 'use client'
 
-import { Card, Form, message } from 'antd'
+import { Button, Card, Form, Input, message, Space } from 'antd'
 import dayjs from 'dayjs'
 import dynamic from 'next/dynamic'
 import { useEffect, useRef, useState } from 'react'
@@ -26,6 +26,8 @@ export default function CooperatingCustomersPage() {
   const [total, setTotal] = useState(0)
   const { page, pageSize, setPage, changePage } = useTablePagination()
   const [expiringSoon, setExpiringSoon] = useState(false)
+  const [keywordInput, setKeywordInput] = useState('')
+  const [keyword, setKeyword] = useState('')
   const [reminders, setReminders] = useState<CooperatingCustomer[]>([])
   const [editModalVisible, setEditModalVisible] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<CooperatingCustomer | null>(null)
@@ -67,6 +69,7 @@ export default function CooperatingCustomersPage() {
     try {
       const params = new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString() })
       if (expiringSoon) params.append('expiringSoon', 'true')
+      if (keyword) params.append('keyword', keyword)
       const result = await apiRequest<{ success: true; data: { list: CooperatingCustomer[]; total: number } }>(`/api/customers/cooperating?${params}`)
       if (requestId !== listRequestRef.current) return
       setData(result.data.list)
@@ -102,7 +105,7 @@ export default function CooperatingCustomersPage() {
   useEffect(() => {
     void loadData()
     void loadReminders()
-  }, [page, pageSize, expiringSoon])
+  }, [page, pageSize, expiringSoon, keyword])
 
   useEffect(() => {
     if (editModalVisible && cooperatingDraft.restore()) message.info('已恢复未提交的合作客户草稿')
@@ -170,6 +173,20 @@ export default function CooperatingCustomersPage() {
     <div>
       <Card title="已合作客户管理">
         <CooperatingSummary data={data} reminders={reminders} total={total} />
+        <Space wrap style={{ marginBottom: 16 }}>
+          <Input.Search
+            allowClear
+            enterButton="搜索"
+            placeholder="搜索客户、公司、联系人"
+            value={keywordInput}
+            onChange={(event) => setKeywordInput(event.target.value)}
+            onSearch={(value) => { setKeyword(value.trim()); setPage(1) }}
+            style={{ width: 320, maxWidth: '100%' }}
+          />
+          {keyword ? (
+            <Button onClick={() => { setKeywordInput(''); setKeyword(''); setPage(1) }}>重置</Button>
+          ) : null}
+        </Space>
         <CooperatingTable
           data={data} loading={loading} page={page} pageSize={pageSize} total={total}
           expiringSoon={expiringSoon} canUpdateCustomer={canUpdateCustomer}

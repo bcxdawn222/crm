@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { AntdRegistry } from '@ant-design/nextjs-registry'
 import { SessionProvider } from '@/components/providers/SessionProvider'
+import PageLoadRecovery from '@/components/common/PageLoadRecovery'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -17,7 +18,10 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body>
         <AntdRegistry>
-          <SessionProvider>{children}</SessionProvider>
+          <SessionProvider>
+            <PageLoadRecovery />
+            {children}
+          </SessionProvider>
         </AntdRegistry>
       </body>
     </html>

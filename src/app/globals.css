@@ -12,18 +12,16 @@
   --crm-focus-ring: #2563eb;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+html {
+  min-height: 100%;
+  background: #f1f5f9;
 }
 
 body {
   min-height: 100vh;
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-start-rgb));
+  min-height: 100dvh;
+  color: #0f172a;
+  background: #f1f5f9;
   font-family: Arial, 'Microsoft YaHei', sans-serif;
 }
 
@@ -38,24 +36,26 @@ a {
   text-decoration: none;
 }
 
-.crm-app-shell {
+.crm-app-shell.ant-layout {
   display: flex;
   min-height: 100vh;
   min-height: 100dvh;
   background: #f1f5f9;
 }
 
-.crm-main-layout {
+.crm-main-layout.ant-layout {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
   min-width: 0;
   margin-left: var(--crm-sidebar-width);
   background: #f1f5f9;
   transition: margin-left 0.2s ease;
 }
 
-.crm-main-layout--collapsed {
+.crm-main-layout.ant-layout.crm-main-layout--collapsed {
   margin-left: var(--crm-sidebar-collapsed-width);
 }
 
@@ -98,6 +98,23 @@ a {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.crm-profile-layout {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.crm-profile-avatar {
+  background: #197b9c;
+}
+
+.crm-profile-roles {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .crm-reminder-card-row {
@@ -226,6 +243,11 @@ a {
   border-radius: 8px;
 }
 
+.crm-account-menu-link {
+  display: block;
+  width: 100%;
+}
+
 .crm-header-menu-button:focus-visible,
 .crm-account-trigger:focus-visible {
   outline: 2px solid var(--crm-focus-ring);
@@ -252,7 +274,7 @@ a {
     display: none;
   }
 
-  .crm-main-layout {
+  .crm-main-layout.ant-layout {
     margin-left: 0 !important;
   }
 
@@ -298,6 +320,11 @@ a {
   .crm-page-actions {
     justify-content: flex-start;
     width: 100%;
+  }
+
+  .crm-profile-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .crm-reminder-card-row {
@@ -470,7 +497,7 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .crm-main-layout,
+  .crm-main-layout.ant-layout,
   .crm-app-header,
   .crm-sidebar-menu .ant-menu-item,
   .crm-sidebar-menu .ant-menu-submenu-title,
