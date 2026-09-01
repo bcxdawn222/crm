@@ -119,6 +119,7 @@ test.describe('管理员客户删除', () => {
     await clickModalPrimary(page)
     expect((await responsePromise).status()).toBe(200)
     await expectSuccessMessage(page, '删除成功')
+    await expect(tableRow(page, name)).toHaveCount(0)
 
     const customer = await prisma.customer.findFirstOrThrow({ where: { name, notes: marker } })
     expect(customer.status).toBe('INACTIVE')

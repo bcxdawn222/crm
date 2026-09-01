@@ -112,6 +112,8 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Customer status is invalid' }, { status: 400 })
       }
       where.status = status as CustomerStatus
+    } else if (!publicPool && !orderEligible) {
+      where.status = { not: CustomerStatus.INACTIVE }
     }
 
     const [total, customers] = await Promise.all([
