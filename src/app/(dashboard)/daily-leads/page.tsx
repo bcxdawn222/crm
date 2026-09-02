@@ -31,7 +31,7 @@ export default function DailyLeadsPage() {
 
   const loadSalesList = async () => {
     try {
-      const response = await apiRequest<{ success: true; data: SalesOption[] }>('/api/users?role=sales&pageSize=100')
+      const response = await apiRequest<{ success: true; data: SalesOption[] }>('/api/daily-leads/sales-options')
       setSalesList(response.data)
     } catch (error) {
       message.error(error instanceof Error ? error.message : '加载销售人员失败')
