@@ -1,6 +1,7 @@
 import { CustomerLevel, CustomerSource, Prisma } from '@prisma/client'
 
 import { recordAuditEvent } from '@/lib/audit/record'
+import { canAccessSalesData } from '@/lib/data-permission'
 import { prisma } from '@/lib/prisma'
 
 export interface ConvertTelemarketingInput {
@@ -9,6 +10,7 @@ export interface ConvertTelemarketingInput {
   source: CustomerSource
   notes?: string
   actorId: string
+  actorRoles: readonly string[]
   requestId: string
 }
 
@@ -42,7 +44,7 @@ export async function convertTelemarketingToCustomer(input: ConvertTelemarketing
       if (!telemarketing) {
         throw new TelemarketingConvertError('电销记录不存在', 404, 'TELEMARKETING_NOT_FOUND')
       }
-      if (telemarketing.salesId !== input.actorId) {
+      if (!(await canAccessSalesData(input.actorId, input.actorRoles, telemarketing.salesId))) {
         throw new TelemarketingConvertError('无权转化该电销记录', 403, 'DATA_SCOPE_DENIED')
       }
       if (telemarketing.customer) {
@@ -74,7 +76,7 @@ export async function convertTelemarketingToCustomer(input: ConvertTelemarketing
           level: input.level,
           source: input.source,
           notes: input.notes || telemarketing.notes,
-          salesId: input.actorId,
+          salesId: telemarketing.salesId,
           isPublic: false,
           status: 'ACTIVE',
         },

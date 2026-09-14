@@ -18,7 +18,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 from deploy.production.remote import RemoteClient, RemoteSettings
-from quality.crm_http import build_opener, json_body, login, request, require
+from quality.crm_http import build_opener, json_body, login, marker_mobile, request, require
 
 
 PROFILE = os.environ.get("CRM_PROFILE", "stable")
@@ -120,7 +120,7 @@ def create_fixture(marker: str, ids: FixtureIds, request_ids: list[str]) -> None
         payload={
             "name": f"线上验收客户-{marker}",
             "company": "CRM production acceptance",
-            "phone": f"139{marker[:8]}",
+            "phone": marker_mobile("139", marker),
             "source": "PRODUCTION_ACCEPTANCE",
             "notes": f"线上受控验收 {marker}，完成后自动清理",
         },

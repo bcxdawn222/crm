@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
+import { ensureSalesDailyReportPermissionsOnce } from '@/lib/roles/ensure-sales-daily-report'
 
 
 export interface AuthenticatedDatabaseUser {
@@ -53,6 +54,7 @@ function toAuthenticatedDatabaseUser(user: AuthenticatedUserRecord): Authenticat
 export async function loadActiveDatabaseUserById(
   id: string
 ): Promise<AuthenticatedDatabaseUser | null> {
+  await ensureSalesDailyReportPermissionsOnce()
   const user = await prisma.user.findUnique({
     where: { id },
     include: authenticatedUserInclude,
@@ -65,6 +67,7 @@ export async function authenticateDatabaseUser(
   username: string,
   password: string
 ): Promise<AuthenticatedDatabaseUser | null> {
+  await ensureSalesDailyReportPermissionsOnce()
   const user = await prisma.user.findUnique({
     where: { username },
     include: authenticatedUserInclude,

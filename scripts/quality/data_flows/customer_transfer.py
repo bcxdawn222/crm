@@ -3,7 +3,7 @@ from __future__ import annotations
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-from quality.crm_http import build_opener, json_body, login, request, require
+from quality.crm_http import build_opener, json_body, login, marker_mobile, request, require
 from quality.data_flows.customer_transfer_support import (
     UserPayload,
     convert_request,
@@ -32,7 +32,7 @@ def run_customer_transfer_flow(
     telemarketing_ids: list[str] = []
     customer_ids: list[str] = []
     request_ids: list[str] = []
-    phone = f"136{marker[:8]}"
+    phone = marker_mobile("136", marker)
 
     try:
         manager_request = f"transfer-user-manager-{marker}"

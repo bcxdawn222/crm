@@ -63,7 +63,7 @@ export async function GET(request: Request) {
         ? Math.ceil((new Date(c.contractEndDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
         : null,
       priority: 'HIGH',
-      message: `合同将在${Math.ceil((new Date(c.contractEndDate!).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))}天后到期`,
+      message: `续费月：${new Date(c.contractEndDate!).toISOString().slice(0, 10)}`,
     }))
 
     const formatUpcomingVisits = upcomingVisits.map(c => ({

@@ -10,7 +10,7 @@ sys.dont_write_bytecode = True
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
-from quality.crm_http import build_opener, json_body, login, request, require
+from quality.crm_http import build_opener, json_body, login, marker_mobile, request, require
 from runtime.mysql_client import parse_database_url, run_mysql
 
 
@@ -70,7 +70,7 @@ def main() -> int:
             payload={
                 "name": f"SOP验收客户-{marker}",
                 "company": "CRM SOP test",
-                "phone": f"138{marker[:8]}",
+                "phone": marker_mobile("138", marker),
                 "source": "SOP_TEST",
                 "notes": "仅用于 test 销售 SOP 验收",
             },

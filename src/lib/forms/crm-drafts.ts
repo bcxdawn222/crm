@@ -18,6 +18,10 @@ export interface TelemarketingDraft {
   industry?: string
   source?: string
   notes?: string
+  status?: string
+  result?: string
+  salesId?: string
+  isEffective?: boolean
 }
 
 export interface CooperatingCustomerDraft {
@@ -47,9 +51,12 @@ export function isCustomerDraft(value: unknown): value is CustomerDraft {
 }
 
 export function isTelemarketingDraft(value: unknown): value is TelemarketingDraft {
-  return isRecord(value) && optionalStrings(value, [
-    'name', 'company', 'phone', 'position', 'industry', 'source', 'notes',
-  ])
+  if (!isRecord(value) || !optionalStrings(value, [
+    'name', 'company', 'phone', 'position', 'industry', 'source', 'notes', 'status', 'result', 'salesId',
+  ])) {
+    return false
+  }
+  return value.isEffective === undefined || typeof value.isEffective === 'boolean'
 }
 
 export function isCooperatingCustomerDraft(value: unknown): value is CooperatingCustomerDraft {

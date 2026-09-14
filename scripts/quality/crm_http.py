@@ -143,3 +143,7 @@ def login(
     user = session.get("user")
     require(isinstance(user, dict), "登录后没有获得有效 session")
     return user
+
+
+def marker_mobile(prefix: str, marker: str) -> str:
+    return f"{prefix}{int(marker[:8], 16) % 10 ** 8:08d}"

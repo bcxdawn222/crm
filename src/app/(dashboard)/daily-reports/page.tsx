@@ -6,8 +6,8 @@ import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { useEffect, useRef, useState } from 'react'
 
-import { PermissionGuard } from '@/components/common/PermissionGuard'
 import { useFormDraft } from '@/hooks/useFormDraft'
+import { usePermission } from '@/hooks/usePermission'
 import { useTablePagination } from '@/hooks/useTablePagination'
 import { apiRequest } from '@/lib/http/client'
 
@@ -23,6 +23,8 @@ import {
 const { RangePicker } = DatePicker
 
 export default function DailyReportsPage() {
+  const { permissions } = usePermission()
+  const canCreateDaily = permissions.includes('report:daily:create')
   const [loading, setLoading] = useState(false)
   const [reports, setReports] = useState<DailyReport[]>([])
   const [total, setTotal] = useState(0)
@@ -110,7 +112,7 @@ export default function DailyReportsPage() {
   return (
     <Card
       title="日报管理"
-      extra={<PermissionGuard action="create" subject="report"><Button type="primary" icon={<PlusOutlined />} onClick={openForm}>提交日报</Button></PermissionGuard>}
+      extra={canCreateDaily ? <Button type="primary" icon={<PlusOutlined />} onClick={openForm}>提交日报</Button> : null}
     >
       <Space style={{ marginBottom: 16 }} wrap>
         <RangePicker value={dateRange} onChange={(dates) => setDateRange(dates?.[0] && dates[1] ? [dates[0], dates[1]] : undefined)} />

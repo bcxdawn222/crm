@@ -48,6 +48,10 @@ export function RecordsTable(props: RecordsTableProps) {
     },
     { title: '结果', dataIndex: 'result', key: 'result', width: 100, render: (result) => result ? resultMap[result] || result : '-' },
     { title: '有效性', dataIndex: 'isEffective', key: 'isEffective', width: 80, render: (value) => <Tag color={value ? 'green' : 'default'}>{value ? '有效' : '无效'}</Tag> },
+    {
+      title: '对应销售', key: 'sales', width: 120,
+      render: (_, record) => record.sales?.realName || '-',
+    },
     { title: '备注', dataIndex: 'notes', key: 'notes', width: 200, ellipsis: true },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: (text) => dayjs(text).format('YYYY-MM-DD HH:mm') },
     {
@@ -76,7 +80,7 @@ export function RecordsTable(props: RecordsTableProps) {
         current: props.page, pageSize: props.pageSize, total: props.total, showSizeChanger: true,
         showTotal: (total) => `共 ${total} 条`, onChange: props.onPageChange,
       }}
-      scroll={{ x: 1600 }}
+      scroll={{ x: 1760 }}
     />
   )
 }

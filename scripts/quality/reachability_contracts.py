@@ -52,6 +52,10 @@ CONTRACTS = (
         "src/lib/telemarketing/convert.ts", "Customer", "TELEMARKETING_CONVERTED",
     ),
     ReachabilityContract(
+        "电销导入", "src/app/(dashboard)/telemarketing/page.tsx", "src/app/api/telemarketing/import/route.ts",
+        "src/lib/telemarketing/import.ts", "TelemarketingList", "TELEMARKETING_IMPORTED",
+    ),
+    ReachabilityContract(
         "客户转移", "src/app/(dashboard)/customers/page.tsx", "src/app/api/customers/[id]/transfer/route.ts",
         "src/lib/customers/transfer.ts", "Customer", "CUSTOMER_TRANSFERRED",
     ),

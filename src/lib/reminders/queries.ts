@@ -13,7 +13,8 @@ export interface ReminderQueryInput {
 export async function loadReminderRows(input: ReminderQueryInput) {
   const threeDaysAgo = new Date(input.now.getTime() - 3 * 24 * 60 * 60 * 1000)
   const sevenDaysLater = new Date(input.now.getTime() + 7 * 24 * 60 * 60 * 1000)
-  const thirtyDaysLater = new Date(input.now.getTime() + 30 * 24 * 60 * 60 * 1000)
+  const startOfCurrentMonth = new Date(input.now.getFullYear(), input.now.getMonth(), 1)
+  const endOfCurrentMonth = new Date(input.now.getFullYear(), input.now.getMonth() + 1, 0, 23, 59, 59, 999)
 
   return Promise.all([
     prisma.customer.findMany({
@@ -34,7 +35,7 @@ export async function loadReminderRows(input: ReminderQueryInput) {
         isPublic: false,
         status: 'COOPERATING',
         reminderDisabled: false,
-        contractEndDate: { gte: input.now, lte: thirtyDaysLater },
+        contractEndDate: { gte: startOfCurrentMonth, lte: endOfCurrentMonth },
       },
       select: { id: true, name: true, company: true, contractEndDate: true, contractAmount: true },
       orderBy: { contractEndDate: 'asc' },

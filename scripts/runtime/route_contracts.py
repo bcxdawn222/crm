@@ -16,6 +16,7 @@ def run_route_check(logger: logging.Logger) -> int:
         ROOT / "src/app/api/public-pool/claim/route.ts",
         ROOT / "src/app/api/tasks/assignees/route.ts",
         ROOT / "src/app/api/telemarketing/convert/route.ts",
+        ROOT / "src/app/api/telemarketing/import/route.ts",
     )
     for path in required_routes:
         if not path.exists():

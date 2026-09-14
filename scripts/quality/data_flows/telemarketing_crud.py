@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import urllib.request
 
-from quality.crm_http import json_body, request, require
+from quality.crm_http import json_body, marker_mobile, multipart_form, request, require
 from quality.data_flows.customer_transfer_support import convert_request
 from runtime.mysql_client import parse_database_url, run_mysql
 
@@ -58,7 +58,7 @@ def run_telemarketing_crud_flow(
     try:
         create_id = f"telemarketing-crud-create-{marker}"
         request_ids.append(create_id)
-        record_id = create_record(opener, base_url, marker, "editable", f"134{marker[:8]}", create_id)
+        record_id = create_record(opener, base_url, marker, "editable", marker_mobile("134", marker), create_id)
         record_ids.append(record_id)
 
         update_id = f"telemarketing-crud-update-{marker}"
@@ -71,11 +71,13 @@ def run_telemarketing_crud_flow(
             payload={
                 "name": f"电销已更新-{marker}",
                 "company": "CRM updated verification",
-                "phone": f"134{marker[:8]}",
+                "phone": marker_mobile("134", marker),
                 "position": "更新岗位",
                 "industry": "企业服务",
                 "source": "接口验收",
                 "notes": "编辑字段已持久化",
+                "status": "CONNECTED",
+                "isEffective": True,
             },
             request_id=update_id,
         )
@@ -84,12 +86,12 @@ def run_telemarketing_crud_flow(
         require(updated.headers.get("x-request-id") == update_id, "更新电销记录响应缺少请求号")
         updated_row = database_value(
             database_url,
-            "SELECT CONCAT_WS('|',name,company,position,industry,source,notes) "
+            "SELECT CONCAT_WS('|',name,company,position,industry,source,notes,status,isEffective) "
             f"FROM TelemarketingList WHERE id={sql_quote(record_id)}",
         )
         require(
             updated_row == (
-                f"电销已更新-{marker}|CRM updated verification|更新岗位|企业服务|接口验收|编辑字段已持久化"
+                f"电销已更新-{marker}|CRM updated verification|更新岗位|企业服务|接口验收|编辑字段已持久化|CONNECTED|1"
             ),
             f"电销编辑字段未持久化: {updated_row}",
         )
@@ -111,7 +113,29 @@ def run_telemarketing_crud_flow(
 
         trace_create_id = f"telemarketing-trace-create-{marker}"
         request_ids.append(trace_create_id)
-        trace_id = create_record(opener, base_url, marker, "converted", f"135{marker[:8]}", trace_create_id)
+        landline_id = f"telemarketing-crud-landline-{marker}"
+        request_ids.append(landline_id)
+        landline_phone = f"010-{int(marker[:8], 16) % 10 ** 8:08d}"
+        landline_record_id = create_record(opener, base_url, marker, "landline", landline_phone, landline_id)
+        record_ids.append(landline_record_id)
+        require(
+            database_value(
+                database_url,
+                f"SELECT phone FROM TelemarketingList WHERE id={sql_quote(landline_record_id)}",
+            ) == landline_phone,
+            "座机号码未按原样保存",
+        )
+        deleted_landline = request(
+            opener,
+            base_url,
+            f"/api/telemarketing?id={landline_record_id}",
+            method="DELETE",
+            request_id=f"telemarketing-crud-landline-delete-{marker}",
+        )
+        request_ids.append(f"telemarketing-crud-landline-delete-{marker}")
+        require(deleted_landline.status == 200, "座机电销记录删除失败")
+
+        trace_id = create_record(opener, base_url, marker, "converted", marker_mobile("135", marker), trace_create_id)
         record_ids.append(trace_id)
         convert_id = f"telemarketing-trace-convert-{marker}"
         request_ids.append(convert_id)
@@ -120,6 +144,54 @@ def run_telemarketing_crud_flow(
         require(converted.status == 201 and converted_body.get("success") is True, "电销转客户失败")
         customer_id = str(converted_body["data"]["customer"]["id"])
         customer_ids.append(customer_id)
+        require(
+            database_value(
+                database_url,
+                f"SELECT salesId FROM Customer WHERE id={sql_quote(customer_id)}",
+            ) == database_value(
+                database_url,
+                f"SELECT salesId FROM TelemarketingList WHERE id={sql_quote(trace_id)}",
+            ),
+            "转化客户未归属名单负责人",
+        )
+
+        import_id = f"telemarketing-import-{marker}"
+        request_ids.append(import_id)
+        admin_username = database_value(database_url, "SELECT username FROM User WHERE username='admin' LIMIT 1")
+        admin_id = database_value(database_url, "SELECT id FROM User WHERE username='admin' LIMIT 1")
+        import_phone_a = marker_mobile("150", marker)
+        import_phone_b = marker_mobile("151", marker)
+        csv_body, csv_type = multipart_form(
+            {},
+            "file",
+            "telemarketing.csv",
+            (
+                "姓名,公司,电话,销售\n"
+                f"导入甲-{marker},公司A,{import_phone_a},{admin_username}\n"
+                f"导入乙-{marker},公司B,{import_phone_b},{admin_username}\n"
+            ).encode("utf-8-sig"),
+            "text/csv",
+        )
+        imported = request(
+            opener,
+            base_url,
+            "/api/telemarketing/import",
+            method="POST",
+            body=csv_body,
+            content_type=csv_type,
+            request_id=import_id,
+        )
+        imported_body = json_body(imported)
+        require(imported.status == 201 and imported_body.get("success") is True, f"电销导入失败: {imported_body}")
+        imported_ids = [str(value) for value in imported_body["data"]["ids"]]
+        require(len(imported_ids) == 2, f"电销导入条数不正确: {imported_ids}")
+        record_ids.extend(imported_ids)
+        assigned = database_value(
+            database_url,
+            "SELECT COUNT(*) FROM TelemarketingList WHERE id IN ("
+            f"{','.join(sql_quote(value) for value in imported_ids)}) AND salesId={sql_quote(admin_id)}",
+        )
+        require(assigned == "2", "导入名单未落到指定销售")
 
         blocked_delete_id = f"telemarketing-trace-delete-{marker}"
         request_ids.append(blocked_delete_id)
@@ -142,11 +214,12 @@ def run_telemarketing_crud_flow(
             database_url,
             "SELECT CONCAT_WS('|',"
             "SUM(reason='TELEMARKETING_CREATED'),SUM(reason='TELEMARKETING_UPDATED'),"
-            "SUM(reason='TELEMARKETING_DELETED'),SUM(reason='TELEMARKETING_CONVERTED')) "
+            "SUM(reason='TELEMARKETING_DELETED'),SUM(reason='TELEMARKETING_CONVERTED'),"
+            "SUM(reason='TELEMARKETING_IMPORTED')) "
             f"FROM AuditEvent WHERE requestId IN ({','.join(sql_quote(value) for value in request_ids)})",
         )
-        require(audit_counts == "2|1|1|1", f"电销 CRUD 审计数量异常: {audit_counts}")
-        print("电销新增、编辑、删除与转化追溯验收通过")
+        require(audit_counts == "3|1|2|1|1", f"电销 CRUD 审计数量异常: {audit_counts}")
+        print("电销新增、编辑、删除、导入与转化追溯验收通过")
     finally:
         identifiers = request_ids + record_ids + customer_ids
         if identifiers:

@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     const result = await convertTelemarketingToCustomer({
       ...parsed.data,
       actorId: session.user.id,
+      actorRoles: session.user.roles,
       requestId,
     })
     return jsonWithRequestId({

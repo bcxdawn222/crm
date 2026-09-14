@@ -1,11 +1,18 @@
-import { Prisma, TelemarketingStatus } from '@prisma/client'
+import { Prisma, TelemarketingResult, TelemarketingStatus } from '@prisma/client'
 import { z } from 'zod'
 
 import { recordAuditEvent } from '@/lib/audit/record'
 import { auth } from '@/lib/auth'
+import { canAccessSalesData, getAccessibleUserIds } from '@/lib/data-permission'
+import { CRM_PHONE_MESSAGE, isCrmPhone, normalizeCrmPhone } from '@/lib/http/phone'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { parsePagination } from '@/lib/http/pagination'
 import { prisma } from '@/lib/prisma'
+import {
+  canAssignTelemarketingOwner,
+  loadAccessibleTelemarketing,
+  resolveTelemarketingOwner,
+} from '@/lib/telemarketing/scope'
 
 const optionalText = (max: number) => z.preprocess(
   (value) => value === '' || value === null ? undefined : value,
@@ -17,25 +24,53 @@ const emptyText = (max: number) => z.preprocess(
   z.string().trim().max(max)
 )
 
-const recordSchema = z.object({
+const phoneSchema = z.preprocess(
+  (value) => typeof value === 'string' ? normalizeCrmPhone(value) : value,
+  z.string().max(20).refine((value) => isCrmPhone(value), CRM_PHONE_MESSAGE)
+)
+
+const optionalPhoneSchema = z.preprocess(
+  (value) => value === '' || value === null || value === undefined
+    ? undefined
+    : typeof value === 'string' ? normalizeCrmPhone(value) : value,
+  z.string().max(20).refine((value) => isCrmPhone(value), CRM_PHONE_MESSAGE).optional()
+)
+
+const createSchema = z.object({
   name: emptyText(100),
   company: optionalText(200),
-  phone: emptyText(20).refine((value) => !value || value.length >= 3, '电话号码格式不正确'),
+  phone: phoneSchema,
   position: optionalText(50),
   industry: optionalText(50),
   source: optionalText(100),
   notes: optionalText(10_000),
+  status: z.nativeEnum(TelemarketingStatus).optional(),
+  isEffective: z.boolean().optional(),
+  result: z.nativeEnum(TelemarketingResult).nullable().optional(),
+  salesId: z.string().uuid().optional(),
 })
+
+const updateSchema = z.object({
+  name: optionalText(100),
+  company: optionalText(200),
+  phone: optionalPhoneSchema,
+  position: optionalText(50),
+  industry: optionalText(50),
+  source: optionalText(100),
+  notes: optionalText(10_000),
+  status: z.nativeEnum(TelemarketingStatus).optional(),
+  isEffective: z.boolean().optional(),
+  result: z.nativeEnum(TelemarketingResult).nullable().optional(),
+  salesId: z.string().uuid().optional(),
+}).refine((value) => Object.values(value).some((item) => item !== undefined), '没有需要保存的电销字段')
+
+const salesInclude = {
+  sales: { select: { id: true, realName: true, username: true } },
+  customer: { select: { id: true, name: true, phone: true } },
+} satisfies Prisma.TelemarketingListInclude
 
 function recordId(request: Request): string | null {
   return new URL(request.url).searchParams.get('id')
-}
-
-async function ownedRecord(id: string, actorId: string) {
-  const record = await prisma.telemarketingList.findUnique({ where: { id } })
-  if (!record) return { error: '电销记录不存在', status: 404 } as const
-  if (record.salesId !== actorId) return { error: '无权操作该电销记录', status: 403 } as const
-  return { record } as const
 }
 
 async function requestBody(request: Request): Promise<unknown | null> {
@@ -58,10 +93,26 @@ export async function GET(request: Request) {
     const searchParams = new URL(request.url).searchParams
     const pagination = parsePagination(searchParams)
     if (!pagination) return jsonWithRequestId({ error: '分页参数不正确' }, requestId, { status: 400 })
+
+    const accessibleUserIds = await getAccessibleUserIds(session.user.id, session.user.roles)
+    const where: Prisma.TelemarketingListWhereInput = accessibleUserIds === null
+      ? {}
+      : { salesId: { in: accessibleUserIds } }
+
+    const salesId = searchParams.get('salesId')?.trim()
+    if (salesId) {
+      if (!z.string().uuid().safeParse(salesId).success) {
+        return jsonWithRequestId({ error: '销售筛选参数不正确' }, requestId, { status: 400 })
+      }
+      if (!(await canAccessSalesData(session.user.id, session.user.roles, salesId))) {
+        return jsonWithRequestId({ error: '无权查看电销名单' }, requestId, { status: 403 })
+      }
+      where.salesId = salesId
+    }
+
     const status = searchParams.get('status')
     const isEffective = searchParams.get('isEffective')
     const keyword = searchParams.get('keyword')?.trim()
-    const where: Prisma.TelemarketingListWhereInput = { salesId: session.user.id }
     if (status && status !== 'all') {
       if (!Object.values(TelemarketingStatus).includes(status as TelemarketingStatus)) {
         return jsonWithRequestId({ error: '电销状态不正确' }, requestId, { status: 400 })
@@ -84,7 +135,7 @@ export async function GET(request: Request) {
         skip: (pagination.page - 1) * pagination.pageSize,
         take: pagination.pageSize,
         orderBy: { createdAt: 'desc' },
-        include: { customer: { select: { id: true, name: true, phone: true } } },
+        include: salesInclude,
       }),
     ])
     return jsonWithRequestId({
@@ -106,12 +157,30 @@ export async function POST(request: Request) {
     }
     const body = await requestBody(request)
     if (body === null) return jsonWithRequestId({ error: '请求内容不是有效 JSON' }, requestId, { status: 400 })
-    const parsed = recordSchema.safeParse(body)
+    const parsed = createSchema.safeParse(body)
     if (!parsed.success) {
       return jsonWithRequestId({ error: parsed.error.issues[0]?.message || '电销信息不正确' }, requestId, { status: 400 })
     }
+    const { salesId: requestedSalesId, ...fields } = parsed.data
+    const owner = await resolveTelemarketingOwner({
+      actorId: session.user.id,
+      actorRoles: session.user.roles,
+      requestedSalesId,
+    })
+    if ('error' in owner) {
+      return jsonWithRequestId({ error: owner.error }, requestId, { status: owner.status })
+    }
+
     const record = await prisma.$transaction(async (tx) => {
-      const created = await tx.telemarketingList.create({ data: { ...parsed.data, salesId: session.user.id } })
+      const created = await tx.telemarketingList.create({
+        data: {
+          ...fields,
+          salesId: owner.salesId,
+          status: fields.status ?? TelemarketingStatus.PENDING,
+          isEffective: fields.isEffective ?? false,
+        },
+        include: salesInclude,
+      })
       await recordAuditEvent(tx, {
         actorId: session.user.id,
         action: 'CREATE',
@@ -139,22 +208,49 @@ export async function PUT(request: Request) {
     }
     const id = recordId(request)
     if (!id) return jsonWithRequestId({ error: '缺少电销记录 ID' }, requestId, { status: 400 })
-    const owned = await ownedRecord(id, session.user.id)
-    if ('error' in owned) return jsonWithRequestId({ error: owned.error }, requestId, { status: owned.status })
+    const accessible = await loadAccessibleTelemarketing(id, session.user.id, session.user.roles)
+    if ('error' in accessible) {
+      return jsonWithRequestId({ error: accessible.error }, requestId, { status: accessible.status })
+    }
     const body = await requestBody(request)
     if (body === null) return jsonWithRequestId({ error: '请求内容不是有效 JSON' }, requestId, { status: 400 })
-    const parsed = recordSchema.safeParse(body)
+    const parsed = updateSchema.safeParse(body)
     if (!parsed.success) {
       return jsonWithRequestId({ error: parsed.error.issues[0]?.message || '电销信息不正确' }, requestId, { status: 400 })
     }
+
+    const { salesId: requestedSalesId, ...fields } = parsed.data
+    let nextSalesId: string | undefined
+    if (requestedSalesId !== undefined && requestedSalesId !== accessible.record.salesId) {
+      if (!canAssignTelemarketingOwner(session.user.roles)) {
+        return jsonWithRequestId({ error: '无权改派电销负责人' }, requestId, { status: 403 })
+      }
+      const owner = await resolveTelemarketingOwner({
+        actorId: session.user.id,
+        actorRoles: session.user.roles,
+        requestedSalesId,
+      })
+      if ('error' in owner) {
+        return jsonWithRequestId({ error: owner.error }, requestId, { status: owner.status })
+      }
+      nextSalesId = owner.salesId
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
-      const record = await tx.telemarketingList.update({ where: { id }, data: parsed.data })
+      const record = await tx.telemarketingList.update({
+        where: { id },
+        data: {
+          ...fields,
+          ...(nextSalesId ? { salesId: nextSalesId } : {}),
+        },
+        include: salesInclude,
+      })
       await recordAuditEvent(tx, {
         actorId: session.user.id,
         action: 'UPDATE',
         entityType: 'TelemarketingList',
         entityId: id,
-        beforeData: owned.record,
+        beforeData: accessible.record,
         afterData: record,
         reason: 'TELEMARKETING_UPDATED',
         requestId,
@@ -177,9 +273,11 @@ export async function DELETE(request: Request) {
     }
     const id = recordId(request)
     if (!id) return jsonWithRequestId({ error: '缺少电销记录 ID' }, requestId, { status: 400 })
-    const owned = await ownedRecord(id, session.user.id)
-    if ('error' in owned) return jsonWithRequestId({ error: owned.error }, requestId, { status: owned.status })
-    if (owned.record.customerId) {
+    const accessible = await loadAccessibleTelemarketing(id, session.user.id, session.user.roles)
+    if ('error' in accessible) {
+      return jsonWithRequestId({ error: accessible.error }, requestId, { status: accessible.status })
+    }
+    if (accessible.record.customerId) {
       return jsonWithRequestId({ error: '已转客户的电销记录不能删除', code: 'CONVERTED_RECORD' }, requestId, { status: 409 })
     }
     await prisma.$transaction(async (tx) => {
@@ -189,7 +287,7 @@ export async function DELETE(request: Request) {
         action: 'DELETE',
         entityType: 'TelemarketingList',
         entityId: id,
-        beforeData: owned.record,
+        beforeData: accessible.record,
         reason: 'TELEMARKETING_DELETED',
         requestId,
       })

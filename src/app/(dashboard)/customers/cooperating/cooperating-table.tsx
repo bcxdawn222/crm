@@ -26,8 +26,8 @@ interface CooperatingTableProps {
 
 const initialWidths = {
   name: 100, company: 150, contactPerson: 100, phone: 120, operationManager: 120,
-  contractAmount: 120, contractPeriod: 200, daysLeft: 100, visitFrequency: 100,
-  nextVisitAt: 120, action: 160,
+  sales: 120, renewalDate: 120, contractAmount: 120, contractPeriod: 200, daysLeft: 100,
+  visitFrequency: 100, nextVisitAt: 120, action: 160,
 }
 
 function daysUntilEnd(endDate?: string) {
@@ -55,6 +55,15 @@ export function CooperatingTable(props: CooperatingTableProps) {
     {
       title: '运营负责人', key: 'operationManager', width: widths.operationManager,
       render: (_, record) => record.operationManager?.realName || '-', onHeaderCell: header('operationManager'),
+    },
+    {
+      title: '对应销售', key: 'sales', width: widths.sales,
+      render: (_, record) => record.sales?.realName || '-', onHeaderCell: header('sales'),
+    },
+    {
+      title: '续费时间', key: 'renewalDate', width: widths.renewalDate,
+      render: (_, record) => record.contractEndDate ? dayjs(record.contractEndDate).format('YYYY-MM-DD') : '-',
+      onHeaderCell: header('renewalDate'),
     },
     {
       title: '合同金额', dataIndex: 'contractAmount', key: 'contractAmount', width: widths.contractAmount,
@@ -99,7 +108,7 @@ export function CooperatingTable(props: CooperatingTableProps) {
         columns={columns} dataSource={props.data} rowKey="id" loading={props.loading}
         components={{ header: { cell: ResizableHeaderCell } }}
         pagination={{ current: props.page, pageSize: props.pageSize, total: props.total, showSizeChanger: true, showTotal: (count) => `共 ${count} 条`, onChange: props.onPageChange }}
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1640 }}
       />
     </>
   )
