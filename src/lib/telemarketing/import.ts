@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 import { recordAuditEvent } from '@/lib/audit/record'
 import { canAccessSalesData } from '@/lib/data-permission'
-import { CRM_PHONE_MESSAGE, isCrmPhone, normalizeCrmPhone } from '@/lib/http/phone'
+import { normalizeCrmPhone } from '@/lib/http/phone'
 import { prisma } from '@/lib/prisma'
 import {
   canAssignTelemarketingOwner,
@@ -172,20 +172,15 @@ async function parseImportRows(input: {
       errors.push(`第 ${rowNumber} 行：${parsed.error.issues[0]?.message ?? '字段校验失败'}`)
       continue
     }
-    if (!parsed.data.name) {
-      errors.push(`第 ${rowNumber} 行：姓名不能为空`)
-      continue
-    }
+    if (Object.keys(mapped).length === 0) continue
     const phone = normalizeCrmPhone(parsed.data.phone)
-    if (!isCrmPhone(phone)) {
-      errors.push(`第 ${rowNumber} 行：${CRM_PHONE_MESSAGE}`)
-      continue
+    if (phone) {
+      if (phones.has(phone)) {
+        errors.push(`第 ${rowNumber} 行：电话在当前文件中重复`)
+        continue
+      }
+      phones.add(phone)
     }
-    if (phones.has(phone)) {
-      errors.push(`第 ${rowNumber} 行：电话在当前文件中重复`)
-      continue
-    }
-    phones.add(phone)
 
     try {
       const salesId = await resolveRowOwner({
@@ -241,10 +236,13 @@ export async function importTelemarketingLists(input: {
     }
 
     try {
-      const conflicts = await tx.telemarketingList.findMany({
-        where: { phone: { in: phones } },
-        select: { id: true },
-      })
+      const uniquePhones = phones.filter((phone) => phone.length > 0)
+      const conflicts = uniquePhones.length === 0
+        ? []
+        : await tx.telemarketingList.findMany({
+            where: { phone: { in: uniquePhones } },
+            select: { id: true },
+          })
       if (conflicts.length > 0) throw new TelemarketingImportConflictError(conflicts.length)
 
       for (let index = 0; index < records.length; index += IMPORT_BATCH_SIZE) {

@@ -135,6 +135,57 @@ def run_telemarketing_crud_flow(
         request_ids.append(f"telemarketing-crud-landline-delete-{marker}")
         require(deleted_landline.status == 200, "座机电销记录删除失败")
 
+        loose_id = f"telemarketing-crud-loose-{marker}"
+        request_ids.append(loose_id)
+        loose_phone = f"123{int(marker[:8], 16) % 10 ** 8:08d}"
+        loose_record_id = create_record(opener, base_url, marker, "loose", loose_phone, loose_id)
+        record_ids.append(loose_record_id)
+        require(
+            database_value(
+                database_url,
+                f"SELECT phone FROM TelemarketingList WHERE id={sql_quote(loose_record_id)}",
+            ) == loose_phone,
+            "非标准电话号码未按原样保存",
+        )
+        deleted_loose = request(
+            opener,
+            base_url,
+            f"/api/telemarketing?id={loose_record_id}",
+            method="DELETE",
+            request_id=f"telemarketing-crud-loose-delete-{marker}",
+        )
+        request_ids.append(f"telemarketing-crud-loose-delete-{marker}")
+        require(deleted_loose.status == 200, "非标准电话电销记录删除失败")
+
+        empty_id = f"telemarketing-crud-empty-{marker}"
+        request_ids.append(empty_id)
+        empty_created = request(
+            opener,
+            base_url,
+            "/api/telemarketing",
+            method="POST",
+            payload={"name": "", "phone": ""},
+            request_id=empty_id,
+        )
+        empty_body = json_body(empty_created)
+        require(empty_created.status == 201 and empty_body.get("success") is True, f"空字段电销记录创建失败: {empty_body}")
+        empty_record_id = str(empty_body["data"]["id"])
+        record_ids.append(empty_record_id)
+        empty_row = database_value(
+            database_url,
+            f"SELECT CONCAT_WS('|',name,phone) FROM TelemarketingList WHERE id={sql_quote(empty_record_id)}",
+        )
+        require(empty_row == "|", f"空字段电销记录未按空值保存: {empty_row}")
+        deleted_empty = request(
+            opener,
+            base_url,
+            f"/api/telemarketing?id={empty_record_id}",
+            method="DELETE",
+            request_id=f"telemarketing-crud-empty-delete-{marker}",
+        )
+        request_ids.append(f"telemarketing-crud-empty-delete-{marker}")
+        require(deleted_empty.status == 200, "空字段电销记录删除失败")
+
         trace_id = create_record(opener, base_url, marker, "converted", marker_mobile("135", marker), trace_create_id)
         record_ids.append(trace_id)
         convert_id = f"telemarketing-trace-convert-{marker}"
@@ -218,7 +269,7 @@ def run_telemarketing_crud_flow(
             "SUM(reason='TELEMARKETING_IMPORTED')) "
             f"FROM AuditEvent WHERE requestId IN ({','.join(sql_quote(value) for value in request_ids)})",
         )
-        require(audit_counts == "3|1|2|1|1", f"电销 CRUD 审计数量异常: {audit_counts}")
+        require(audit_counts == "5|1|4|1|1", f"电销 CRUD 审计数量异常: {audit_counts}")
         print("电销新增、编辑、删除、导入与转化追溯验收通过")
     finally:
         identifiers = request_ids + record_ids + customer_ids

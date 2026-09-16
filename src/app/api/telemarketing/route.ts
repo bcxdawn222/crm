@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { recordAuditEvent } from '@/lib/audit/record'
 import { auth } from '@/lib/auth'
 import { canAccessSalesData, getAccessibleUserIds } from '@/lib/data-permission'
-import { CRM_PHONE_MESSAGE, isCrmPhone, normalizeCrmPhone } from '@/lib/http/phone'
+import { normalizeCrmPhone } from '@/lib/http/phone'
 import { getRequestId, jsonWithRequestId, serverErrorResponse } from '@/lib/http/request-context'
 import { parsePagination } from '@/lib/http/pagination'
 import { prisma } from '@/lib/prisma'
@@ -24,22 +24,27 @@ const emptyText = (max: number) => z.preprocess(
   z.string().trim().max(max)
 )
 
-const phoneSchema = z.preprocess(
-  (value) => typeof value === 'string' ? normalizeCrmPhone(value) : value,
-  z.string().max(20).refine((value) => isCrmPhone(value), CRM_PHONE_MESSAGE)
+const phoneText = z.preprocess(
+  (value) => {
+    if (value === undefined || value === null) return ''
+    return typeof value === 'string' ? normalizeCrmPhone(value) : value
+  },
+  z.string().max(20)
 )
 
-const optionalPhoneSchema = z.preprocess(
-  (value) => value === '' || value === null || value === undefined
-    ? undefined
-    : typeof value === 'string' ? normalizeCrmPhone(value) : value,
-  z.string().max(20).refine((value) => isCrmPhone(value), CRM_PHONE_MESSAGE).optional()
+const optionalPhoneText = z.preprocess(
+  (value) => {
+    if (value === undefined) return undefined
+    if (value === null) return ''
+    return typeof value === 'string' ? normalizeCrmPhone(value) : value
+  },
+  z.string().max(20).optional()
 )
 
 const createSchema = z.object({
   name: emptyText(100),
   company: optionalText(200),
-  phone: phoneSchema,
+  phone: phoneText,
   position: optionalText(50),
   industry: optionalText(50),
   source: optionalText(100),
@@ -53,7 +58,7 @@ const createSchema = z.object({
 const updateSchema = z.object({
   name: optionalText(100),
   company: optionalText(200),
-  phone: optionalPhoneSchema,
+  phone: optionalPhoneText,
   position: optionalText(50),
   industry: optionalText(50),
   source: optionalText(100),

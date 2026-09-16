@@ -32,7 +32,7 @@ export function RecordImportModal(props: RecordImportModalProps) {
         <ul style={{ marginBottom: 16, paddingLeft: 20, color: '#999', lineHeight: 1.8 }}>
           <li>支持 .xlsx、.xls、.csv，单次最多 1000 条，文件不超过 5 MB</li>
           <li>表头：姓名、公司、电话、职位、行业、来源、备注、销售</li>
-          <li>姓名和电话必填；电话支持手机号和国内座机，如 010-84467791</li>
+          <li>各列均可留空；电话最长 20 字，不校验号码格式</li>
           <li>销售列填用户名或姓名；管理员/主管也可在下方指定默认负责人</li>
         </ul>
         {props.canAssignOwner ? (

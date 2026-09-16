@@ -55,23 +55,26 @@ export async function convertTelemarketingToCustomer(input: ConvertTelemarketing
         }
       }
 
-      const duplicate = await tx.customer.findFirst({
-        where: { phone: telemarketing.phone },
-        select: { id: true },
-      })
-      if (duplicate) {
-        throw new TelemarketingConvertError(
-          '该电话号码已存在客户记录',
-          409,
-          'CUSTOMER_PHONE_EXISTS'
-        )
+      const phone = telemarketing.phone.trim() || null
+      if (phone) {
+        const duplicate = await tx.customer.findFirst({
+          where: { phone },
+          select: { id: true },
+        })
+        if (duplicate) {
+          throw new TelemarketingConvertError(
+            '该电话号码已存在客户记录',
+            409,
+            'CUSTOMER_PHONE_EXISTS'
+          )
+        }
       }
 
       const customer = await tx.customer.create({
         data: {
           name: telemarketing.name,
           company: telemarketing.company,
-          phone: telemarketing.phone,
+          phone,
           industry: telemarketing.industry,
           level: input.level,
           source: input.source,

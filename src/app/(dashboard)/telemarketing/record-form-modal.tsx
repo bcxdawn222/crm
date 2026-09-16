@@ -3,8 +3,6 @@
 import { Button, Form, Input, Modal, Select, Space, Switch } from 'antd'
 import type { FormInstance } from 'antd'
 
-import { CRM_PHONE_MESSAGE, isCrmPhone } from '@/lib/http/phone'
-
 import {
   TELEMARKETING_RESULT_OPTIONS,
   TELEMARKETING_STATUS_OPTIONS,
@@ -38,28 +36,18 @@ export function RecordFormModal(props: RecordFormModalProps) {
       maskClosable={!submitting}
     >
       <Form form={form} layout="vertical" onFinish={onSubmit} onValuesChange={onValuesChange}>
-        <Form.Item name="name" label="客户姓名" rules={[{ required: true, message: '请输入客户姓名' }]}>
+        <Form.Item name="name" label="客户姓名">
           <Input placeholder="请输入客户姓名" />
         </Form.Item>
         <Form.Item name="company" label="公司名称"><Input placeholder="请输入公司名称" /></Form.Item>
-        <Form.Item
-          name="phone"
-          label="电话号码"
-          rules={[
-            {
-              validator: async (_, value: string) => {
-                if (!isCrmPhone(value || '')) throw new Error(CRM_PHONE_MESSAGE)
-              },
-            },
-          ]}
-        >
-          <Input placeholder="手机号或座机号，如 010-84467791" maxLength={20} />
+        <Form.Item name="phone" label="电话号码">
+          <Input placeholder="请输入电话号码" maxLength={20} />
         </Form.Item>
         <Form.Item name="position" label="职位"><Input placeholder="请输入职位" /></Form.Item>
         <Form.Item name="industry" label="行业"><Input placeholder="请输入行业" /></Form.Item>
         <Form.Item name="source" label="数据来源"><Input placeholder="如:展会、网站、推荐等" /></Form.Item>
-        <Form.Item name="status" label="状态" rules={[{ required: true, message: '请选择状态' }]}>
-          <Select options={TELEMARKETING_STATUS_OPTIONS} placeholder="请选择状态" />
+        <Form.Item name="status" label="状态">
+          <Select allowClear options={TELEMARKETING_STATUS_OPTIONS} placeholder="请选择状态" />
         </Form.Item>
         <Form.Item name="result" label="结果">
           <Select allowClear options={TELEMARKETING_RESULT_OPTIONS} placeholder="请选择结果" />
